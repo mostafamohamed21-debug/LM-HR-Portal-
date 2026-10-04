@@ -2,7 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("Portal Initialized with Dark Tech Theme.");
     
     // تم تصحيح اسم الملف ليطابق الملف المرفوع
-    fetch('clean_employees_data_2_2.json')
+    fetch('clean_employees_data_2.json')
         .then(response => response.json())
         .then(jsonData => {
             const tableBody = document.getElementById('employees-table-body');
