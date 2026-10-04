@@ -1,103 +1,118 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" id="html-root">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>البورتال المركزي - شؤون العاملين</title>
-    <!-- Tailwind CSS للستايل السريع والجميل -->
+    <title id="page-title">البورتال المركزي - شؤون العاملين | Lacto Misr</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- خط Cairo عشان الكتابة العربية تبقى مظبوطة -->
+    <!-- خط Cairo -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Cairo', sans-serif; }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(rgba(5, 11, 24, 0.85), rgba(5, 11, 24, 0.92)), url('background.jpg') no-repeat center center fixed;
+            background-size: cover;
+            color: #e2e8f0;
+        }
+        .glass-card {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+        }
+        .glass-table th, .glass-table td {
+            border-color: rgba(56, 189, 248, 0.1) !important;
+        }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body class="min-h-screen flex flex-col">
 
-    <div class="flex h-screen overflow-hidden">
+    <!-- Top Header -->
+    <header class="glass-card shadow-lg px-6 py-4 flex justify-between items-center border-b">
+        <div class="flex items-center space-x-4 space-x-reverse">
+            <span class="text-2xl font-bold text-sky-400">⚡ Lacto Misr HR</span>
+            <span class="text-xs px-3 py-1 rounded-full bg-sky-900/60 text-sky-300 border border-sky-500/30" id="connection-status">جاري الاتصال...</span>
+        </div>
+        <div class="flex items-center space-x-4 space-x-reverse">
+            <!-- زرار تغيير اللغة -->
+            <button onclick="toggleLanguage()" class="px-3 py-1.5 text-xs font-bold rounded bg-slate-800 hover:bg-slate-700 text-sky-300 border border-sky-500/40 transition">
+                🌐 <span id="lang-btn-text">English</span>
+            </button>
+            <span class="font-semibold text-slate-300" data-translate="admin">مسؤول النظام</span>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="flex flex-1 overflow-hidden">
         
-        <!-- Sidebar (القائمة الجانبية) -->
-        <aside class="w-64 bg-indigo-900 text-white flex flex-col justify-between hidden md:flex">
-            <div>
-                <div class="p-5 text-2xl font-bold border-b border-indigo-800 text-center">
-                    لوحة التحكم HR
+        <!-- Sidebar -->
+        <aside class="w-64 glass-card hidden md:flex flex-col justify-between border-l">
+            <div class="p-5">
+                <div class="text-lg font-bold text-sky-300 mb-6 text-center border-b border-sky-500/20 pb-3" data-translate="control_panel">
+                    غرفة التحكم المركزية
                 </div>
-                <nav class="mt-5 px-4 space-y-2">
-                    <a href="#" class="block px-4 py-2.5 rounded bg-indigo-800 text-white font-semibold">الرئيسية والموظفين</a>
-                    <a href="#" class="block px-4 py-2.5 rounded hover:bg-indigo-800 transition">الإدارات والأقسام</a>
-                    <a href="#" class="block px-4 py-2.5 rounded hover:bg-indigo-800 transition">الحضور والإنصراف</a>
-                    <a href="#" class="block px-4 py-2.5 rounded hover:bg-indigo-800 transition">التقارير والإحصائيات</a>
+                <nav class="space-y-2 text-sm">
+                    <a href="#" class="block px-4 py-2.5 rounded bg-sky-600/30 text-sky-300 font-semibold border border-sky-500/40" data-translate="nav_home">الرئيسية والموظفين</a>
+                    <a href="#" class="block px-4 py-2.5 rounded hover:bg-slate-800/60 text-slate-300 transition" data-translate="nav_depts">الإدارات والأقسام</a>
+                    <a href="#" class="block px-4 py-2.5 rounded hover:bg-slate-800/60 text-slate-300 transition" data-translate="nav_attendance">الحضور والإنصراف</a>
+                    <a href="#" class="block px-4 py-2.5 rounded hover:bg-slate-800/60 text-slate-300 transition" data-translate="nav_reports">التقارير والإحصائيات</a>
                 </nav>
             </div>
-            <div class="p-4 border-t border-indigo-800 text-sm text-indigo-300 text-center">
-                إصدار البورتال v1.0
+            <div class="p-4 border-t border-sky-500/20 text-xs text-slate-400 text-center">
+                Portal v2.0 - Dark Tech
             </div>
         </aside>
 
-        <!-- Main Content (المحتوى الرئيسي) -->
-        <div class="flex-1 flex flex-col overflow-y-auto">
+        <!-- Content Area -->
+        <main class="flex-1 p-6 overflow-y-auto">
             
-            <!-- Top Header (البار العُلوي) -->
-            <header class="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
-                <h1 class="text-xl font-bold text-gray-700">إدارة العاملين وقاعدة البيانات</h1>
-                <div class="flex items-center space-x-3 space-x-reverse">
-                    <span id="connection-status" class="px-3 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 font-semibold">جاري الاتصال...</span>
-                    <span class="font-semibold text-gray-600">مسؤول النظام</span>
+            <!-- Quick Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="glass-card p-5 rounded-xl border-r-4 border-sky-500">
+                    <p class="text-xs text-slate-400 font-semibold" data-translate="total_emp">إجمالي العاملين</p>
+                    <h3 id="total-employees-count" class="text-3xl font-bold mt-1 text-sky-300">352</h3>
                 </div>
-            </header>
-
-            <!-- Page Body (محتوى الصفحة) -->
-            <main class="p-6">
-                
-                <!-- Cards Grid (كاردات الإحصائيات السريعة) -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                    <div class="bg-white p-5 rounded-lg shadow border-r-4 border-indigo-600">
-                        <p class="text-sm text-gray-500 font-semibold">إجمالي العاملين</p>
-                        <h3 id="total-employees-count" class="text-2xl font-bold mt-1">352</h3>
-                    </div>
-                    <div class="bg-white p-5 rounded-lg shadow border-r-4 border-green-600">
-                        <p class="text-sm text-gray-500 font-semibold">الإدارات النشطة</p>
-                        <h3 class="text-2xl font-bold mt-1">--</h3>
-                    </div>
-                    <div class="bg-white p-5 rounded-lg shadow border-r-4 border-blue-600">
-                        <p class="text-sm text-gray-500 font-semibold">حالة النظام</p>
-                        <h3 class="text-2xl font-bold mt-1 text-green-600">متصل</h3>
-                    </div>
+                <div class="glass-card p-5 rounded-xl border-r-4 border-emerald-500">
+                    <p class="text-xs text-slate-400 font-semibold" data-translate="active_depts">الإدارات النشطة</p>
+                    <h3 class="text-3xl font-bold mt-1 text-emerald-400">--</h3>
                 </div>
-
-                <!-- Data Table Section (جدول عرض الموظفين) -->
-                <div class="bg-white rounded-lg shadow overflow-hidden">
-                    <div class="p-4 border-b flex justify-between items-center">
-                        <h2 class="font-bold text-lg text-gray-700">قائمة العاملين</h2>
-                        <input type="text" id="search-input" placeholder="بحث بالاسم أو الكود..." class="px-4 py-2 border rounded-lg text-sm w-64 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-right border-collapse">
-                            <thead>
-                                <tr class="bg-gray-50 text-gray-600 border-b text-sm">
-                                    <th class="p-3">الكود</th>
-                                    <th class="p-3">اسم الموظف</th>
-                                    <th class="p-3">الإدارة</th>
-                                    <th class="p-3">الوظيفة</th>
-                                    <th class="p-3">تاريخ التعيين</th>
-                                    <th class="p-3 text-center">الإجراءات</th>
-                                </tr>
-                            </thead>
-                            <tbody id="employees-table-body" class="divide-y text-sm">
-                                <!-- البيانات هتنزل هنا ديناميكياً من ملف الـ JS والفايربيس -->
-                                <tr>
-                                    <td colspan="6" class="p-4 text-center text-gray-400">جاري تحميل البيانات...</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="glass-card p-5 rounded-xl border-r-4 border-amber-500">
+                    <p class="text-xs text-slate-400 font-semibold" data-translate="system_status">حالة النظام</p>
+                    <h3 class="text-3xl font-bold mt-1 text-emerald-400" data-translate="connected">متصل</h3>
                 </div>
+            </div>
 
-            </main>
-        </div>
+            <!-- Table Section -->
+            <div class="glass-card rounded-xl overflow-hidden shadow-2xl">
+                <div class="p-4 border-b border-sky-500/20 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <h2 class="font-bold text-lg text-sky-200" data-translate="emp_list">قائمة العاملين بالقاعدة</h2>
+                    <input type="text" id="search-input" data-translate-placeholder="search_placeholder" placeholder="بحث بالاسم أو الكود..." class="px-4 py-2 bg-slate-900/80 border border-sky-500/30 rounded-lg text-sm w-full md:w-72 focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200 placeholder-slate-500">
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-right border-collapse glass-table">
+                        <thead>
+                            <tr class="bg-slate-900/60 text-sky-400 border-b text-xs uppercase tracking-wider">
+                                <th class="p-3.5" data-translate="th_code">الكود</th>
+                                <th class="p-3.5" data-translate="th_name">اسم الموظف</th>
+                                <th class="p-3.5" data-translate="th_dept">الإدارة</th>
+                                <th class="p-3.5" data-translate="th_job">الوظيفة</th>
+                                <th class="p-3.5" data-translate="th_hire">تاريخ التعيين</th>
+                                <th class="p-3.5 text-center" data-translate="th_actions">الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="employees-table-body" class="divide-y divide-sky-500/10 text-sm">
+                            <tr>
+                                <td colspan="6" class="p-6 text-center text-slate-400" data-translate="loading">جاري جلب البيانات من القاعدة...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
     </div>
 
-    <!-- ربط ملف الـ JavaScript الخاص بالمنطق -->
+    <!-- Script الربط واللغات -->
     <script src="app.js"></script>
 </body>
 </html>
