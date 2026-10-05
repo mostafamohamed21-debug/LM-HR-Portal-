@@ -1,9 +1,8 @@
 const translations = {
     ar: {
         page_title: "البورتال المركزي - شؤون العاملين | Lacto Misr",
-        connection_status: "متصل بقاعدة البيانات",
         admin: "مسؤول النظام",
-        control_panel: "غرفة التحكم المركزية",
+        control_panel: "غرفة التحكم",
         nav_home: "الرئيسية والموظفين",
         nav_depts: "الإدارات والأقسام",
         nav_attendance: "الحضور والإنصراف",
@@ -11,7 +10,7 @@ const translations = {
         total_emp: "إجمالي العاملين",
         active_depts: "الإدارات النشطة",
         system_status: "حالة النظام",
-        connected: "متصل",
+        connected: "مستقر",
         emp_list: "قائمة العاملين بالقاعدة",
         search_placeholder: "بحث بالاسم أو الكود...",
         th_code: "الكود",
@@ -23,13 +22,39 @@ const translations = {
         loading: "جاري جلب البيانات من القاعدة...",
         lang_btn: "English",
         action_btn: "عرض الملف",
-        no_results: "لا توجد نتائج مطابقة للبحث."
+        no_results: "لا توجد نتائج مطابقة للبحث.",
+        back_btn: "← العودة لقائمة الموظفين",
+        profile_title: "الملف الوظيفي الشامل",
+        profile_subtitle: "Comprehensive Employee Profile",
+        save_btn: "💾 حفظ التعديلات",
+        lbl_name_ar: "اسم الموظف (عربي)",
+        lbl_name_en: "Employee Name (English)",
+        sec_org: "🏢 الهيكل التنظيمي",
+        sec_qual: "🎓 المؤهل والخدمة",
+        sec_bio: "👤 الميلاد والسن والتأمين",
+        sec_contact: "📞 قنوات الاتصال والعنوان",
+        lbl_dept_ar: "الإدارة (عربي)",
+        lbl_dept_en: "Department (English)",
+        lbl_manager: "المدير المباشر",
+        lbl_hiredate: "تاريخ التعيين",
+        lbl_service_years: "سنوات الخدمة",
+        lbl_qual: "المؤهل الدراسي",
+        lbl_qual_auth: "جهة التخرج",
+        lbl_dob: "تاريخ الميلاد",
+        lbl_age: "السن حتى تاريخه",
+        lbl_pob: "مكان الميلاد",
+        lbl_insurance: "الحالة التأمينية",
+        lbl_national_id: "الرقم القومي",
+        lbl_mobile: "رقم الهاتف",
+        lbl_emergency: "رقم الطوارئ",
+        lbl_email: "البريد الإلكتروني",
+        lbl_leave_bal: "رصيد الإجازات",
+        lbl_address: "العنوان بالتفصيل"
     },
     en: {
         page_title: "HR Central Portal | Lacto Misr",
-        connection_status: "Connected to Database",
         admin: "System Admin",
-        control_panel: "Central Control Room",
+        control_panel: "Control Room",
         nav_home: "Home & Employees",
         nav_depts: "Departments",
         nav_attendance: "Attendance",
@@ -37,7 +62,7 @@ const translations = {
         total_emp: "Total Employees",
         active_depts: "Active Departments",
         system_status: "System Status",
-        connected: "Online",
+        connected: "Stable",
         emp_list: "Employees Database List",
         search_placeholder: "Search by name or code...",
         th_code: "Code",
@@ -49,7 +74,34 @@ const translations = {
         loading: "Loading database records...",
         lang_btn: "العربية",
         action_btn: "View Profile",
-        no_results: "No matching records found."
+        no_results: "No matching records found.",
+        back_btn: "← Back to Employees",
+        profile_title: "Comprehensive Employee Profile",
+        profile_subtitle: "Comprehensive Employee Profile",
+        save_btn: "💾 Save Changes",
+        lbl_name_ar: "Employee Name (Arabic)",
+        lbl_name_en: "Employee Name (English)",
+        sec_org: "🏢 Organizational Structure",
+        sec_qual: "🎓 Qualification & Service",
+        sec_bio: "👤 DOB, Age & Insurance",
+        sec_contact: "📞 Contact & Address",
+        lbl_dept_ar: "Department (Arabic)",
+        lbl_dept_en: "Department (English)",
+        lbl_manager: "Direct Manager",
+        lbl_hiredate: "Hire Date",
+        lbl_service_years: "Years of Service",
+        lbl_qual: "Qualification",
+        lbl_qual_auth: "Issuing Authority",
+        lbl_dob: "Date of Birth",
+        lbl_age: "Age to Date",
+        lbl_pob: "Place of Birth",
+        lbl_insurance: "Insurance Status",
+        lbl_national_id: "National ID",
+        lbl_mobile: "Mobile Number",
+        lbl_emergency: "Emergency Phone",
+        lbl_email: "Email Address",
+        lbl_leave_bal: "Leave Balance",
+        lbl_address: "Detailed Address"
     }
 };
 
@@ -96,22 +148,26 @@ document.addEventListener("DOMContentLoaded", () => {
             const rawEmployees = resData.employees ? resData.employees : resData;
             allEmployees = Array.isArray(rawEmployees) ? rawEmployees : Object.values(rawEmployees);
 
+            // دمج التعديلات المحفوظة مسبقاً في الـ localStorage لضمان ثبات البيانات والصور بعد الريفرش
+            allEmployees.forEach(emp => {
+                const code = String(emp.الكود || emp.Code);
+                const savedData = localStorage.getItem('emp_edit_' + code);
+                if (savedData) {
+                    const parsed = JSON.parse(savedData);
+                    Object.assign(emp, parsed);
+                }
+            });
+
             renderTable(allEmployees);
             
             const totalCountEl = document.getElementById('total-employees-count');
             if (totalCountEl) totalCountEl.textContent = allEmployees.length;
-
-            const statusBadge = document.getElementById('connection-status');
-            if (statusBadge) {
-                statusBadge.textContent = currentLang === 'ar' ? `متصل بنجاح (${allEmployees.length} موظف)` : `Connected (${allEmployees.length} employees)`;
-                statusBadge.className = "text-xs px-3 py-1 rounded-full bg-emerald-900/60 text-emerald-300 border border-emerald-500/30";
-            }
         })
         .catch(error => {
             console.error("خطأ:", error);
             const tableBody = document.getElementById('employees-table-body');
             if (tableBody) {
-                tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-400" data-translate="loading">فشل تحميل ملف البيانات (clean_employees_data)، تأكد أنه في نفس مجلد المشروع.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-400">فشل تحميل ملف البيانات (clean_employees_data)، تأكد أنه في نفس مجلد المشروع.</td></tr>`;
             }
         });
 });
@@ -172,7 +228,7 @@ function filterEmployees() {
     renderTable(filtered);
 }
 
-// دالة عرض ملف الموظف في صفحة كاملة (Full Page View) داخل عنصر main لتفادي أي Popup مبتذل
+// عرض ملف الموظف الكامل مع عناوين هيدر متغيرة للغة (عربي/إنجليزي)
 let cachedMainHTML = "";
 
 function viewEmployee(code) {
@@ -185,10 +241,11 @@ function viewEmployee(code) {
     const mainContainer = document.querySelector('main');
     if (!mainContainer) return;
 
-    // حفظ المحتوى القديم للرجوع إليه
     if (!cachedMainHTML) {
         cachedMainHTML = mainContainer.innerHTML;
     }
+
+    const t = translations[currentLang];
 
     const nameAr = emp["اسم الموظف"] || "غير متوفر";
     const nameEn = emp["Emp_name _En"] || "N/A";
@@ -216,25 +273,24 @@ function viewEmployee(code) {
     
     const empPhoto = emp.photo || 'background.jpg';
 
-    // تصميم الصفحة الكاملة الاحترافي المنسق بالكامل
     mainContainer.innerHTML = `
         <div class="space-y-6 animate-fadeIn pb-12">
             
-            <!-- شريط التنقل العلوي للملف -->
+            <!-- شريط التنقل العلوي -->
             <div class="glass-card p-4 rounded-2xl flex items-center justify-between border border-sky-500/30 shadow-xl">
-                <button onclick="restoreMainContent()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sky-300 rounded-xl text-xs font-semibold transition border border-sky-500/30 flex items-center gap-2">
-                    ← العودة لقائمة الموظفين
+                <button onclick="restoreMainContent()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sky-300 rounded-xl text-xs font-semibold transition border border-sky-500/30 shadow-md">
+                    ${t.back_btn}
                 </button>
                 <div class="text-center">
-                    <h2 class="text-base font-bold text-white">الملف الوظيفي الشامل</h2>
-                    <p class="text-[11px] text-sky-400">Comprehensive Employee Profile</p>
+                    <h2 class="text-base font-bold text-white">${t.profile_title}</h2>
+                    <p class="text-[11px] text-sky-400">${t.profile_subtitle}</p>
                 </div>
-                <button onclick="saveEmployeeProfileChanges('${code}')" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-emerald-900/30">
-                    💾 حفظ التعديلات
+                <button onclick="saveEmployeeProfileChanges('${code}')" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-emerald-900/35">
+                    ${t.save_btn}
                 </button>
             </div>
 
-            <!-- رأس الملف الشخصي (الصورة والاسم) -->
+            <!-- رأس الملف الشخصي -->
             <div class="glass-card p-6 rounded-2xl border border-sky-500/30 shadow-xl flex flex-col md:flex-row items-center gap-6">
                 <div class="relative group">
                     <div class="w-32 h-32 rounded-2xl bg-gradient-to-tr from-sky-600 to-indigo-600 p-1 shadow-2xl">
@@ -248,11 +304,11 @@ function viewEmployee(code) {
                 <div class="flex-1 w-full space-y-3">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs text-slate-400 mb-1">اسم الموظف (عربي)</label>
+                            <label class="block text-xs text-slate-400 mb-1">${t.lbl_name_ar}</label>
                             <input type="text" id="edit-name-ar" value="${nameAr}" class="w-full bg-slate-900/90 border border-sky-500/30 rounded-xl px-3 py-2 text-white font-semibold text-sm focus:outline-none focus:border-sky-500">
                         </div>
                         <div>
-                            <label class="block text-xs text-slate-400 mb-1">Employee Name (English)</label>
+                            <label class="block text-xs text-slate-400 mb-1">${t.lbl_name_en}</label>
                             <input type="text" id="edit-name-en" value="${nameEn}" class="w-full bg-slate-900/90 border border-sky-500/30 rounded-xl px-3 py-2 text-sky-300 font-medium text-sm focus:outline-none focus:border-sky-500">
                         </div>
                     </div>
@@ -263,101 +319,101 @@ function viewEmployee(code) {
                 </div>
             </div>
 
-            <!-- شبكة تفاصيل البيانات (كل خانة مستقلة ومنسقة بألوان احترافية) -->
+            <!-- شبكة تفاصيل البيانات -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 
                 <!-- الهيكل التنظيمي -->
                 <div class="glass-card p-5 rounded-2xl space-y-3 border border-sky-500/30 shadow-xl">
-                    <h3 class="text-xs font-bold text-sky-400 border-b border-sky-500/20 pb-2">🏢 الهيكل التنظيمي</h3>
+                    <h3 class="text-xs font-bold text-sky-400 border-b border-sky-500/20 pb-2">${t.sec_org}</h3>
                     <div>
-                        <label class="block text-[11px] text-slate-400 mb-1">الإدارة (عربي)</label>
+                        <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_dept_ar}</label>
                         <input type="text" id="edit-dept-ar" value="${deptAr}" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-sky-500">
                     </div>
                     <div>
-                        <label class="block text-[11px] text-slate-400 mb-1">Department (English)</label>
+                        <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_dept_en}</label>
                         <input type="text" id="edit-dept-en" value="${deptEn}" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-300 text-xs focus:outline-none focus:border-sky-500">
                     </div>
                     <div>
-                        <label class="block text-[11px] text-slate-400 mb-1">المدير المباشر</label>
+                        <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_manager}</label>
                         <input type="text" value="${directMgrAr} / ${directMgrEn}" class="w-full bg-slate-900/50 border border-slate-700/50 rounded-lg px-3 py-2 text-slate-300 text-xs" readonly>
                     </div>
                 </div>
 
                 <!-- المؤهلات والخدمة -->
                 <div class="glass-card p-5 rounded-2xl space-y-3 border border-sky-500/30 shadow-xl">
-                    <h3 class="text-xs font-bold text-indigo-400 border-b border-sky-500/20 pb-2">🎓 المؤهل والخدمة</h3>
+                    <h3 class="text-xs font-bold text-indigo-400 border-b border-sky-500/20 pb-2">${t.sec_qual}</h3>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
-                            <label class="block text-[11px] text-slate-400 mb-1">تاريخ التعيين</label>
+                            <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_hiredate}</label>
                             <input type="text" value="${hireDate}" class="w-full bg-slate-900/50 border border-slate-700/50 rounded-lg px-3 py-2 text-emerald-400 text-xs font-mono" readonly>
                         </div>
                         <div>
-                            <label class="block text-[11px] text-slate-400 mb-1">سنوات الخدمة</label>
+                            <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_service_years}</label>
                             <input type="text" value="${yearsService} سنة" class="w-full bg-slate-900/50 border border-slate-700/50 rounded-lg px-3 py-2 text-emerald-400 text-xs font-bold" readonly>
                         </div>
                     </div>
                     <div>
-                        <label class="block text-[11px] text-slate-400 mb-1">المؤهل الدراسي</label>
+                        <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_qual}</label>
                         <input type="text" value="${qualAr} - ${qualEn}" class="w-full bg-slate-900/50 border border-slate-700/50 rounded-lg px-3 py-2 text-slate-300 text-xs" readonly>
                     </div>
                     <div>
-                        <label class="block text-[11px] text-slate-400 mb-1">جهة التخرج</label>
+                        <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_qual_auth}</label>
                         <input type="text" value="${qualAuthAr}" class="w-full bg-slate-900/50 border border-slate-700/50 rounded-lg px-3 py-2 text-slate-300 text-xs" readonly>
                     </div>
                 </div>
 
-                <!-- الميلاد والسن (كل خانة لوحدها) -->
+                <!-- الميلاد والسن -->
                 <div class="glass-card p-5 rounded-2xl space-y-3 border border-sky-500/30 shadow-xl">
-                    <h3 class="text-xs font-bold text-emerald-400 border-b border-sky-500/20 pb-2">👤 الميلاد والسن والتأمين</h3>
+                    <h3 class="text-xs font-bold text-emerald-400 border-b border-sky-500/20 pb-2">${t.sec_bio}</h3>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
-                            <label class="block text-[11px] text-slate-400 mb-1">تاريخ الميلاد</label>
+                            <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_dob}</label>
                             <input type="text" value="${dob}" class="w-full bg-slate-900/50 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-xs font-mono" readonly>
                         </div>
                         <div>
-                            <label class="block text-[11px] text-slate-400 mb-1">السن حتى تاريخه</label>
+                            <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_age}</label>
                             <input type="text" value="${age} سنة" class="w-full bg-slate-900/50 border border-slate-700/50 rounded-lg px-3 py-2 text-amber-400 text-xs font-bold" readonly>
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
-                            <label class="block text-[11px] text-slate-400 mb-1">مكان الميلاد</label>
+                            <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_pob}</label>
                             <input type="text" value="${pobAr}" class="w-full bg-slate-900/50 border border-slate-700/50 rounded-lg px-3 py-2 text-slate-300 text-xs" readonly>
                         </div>
                         <div>
-                            <label class="block text-[11px] text-slate-400 mb-1">الحالة التأمينية</label>
+                            <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_insurance}</label>
                             <input type="text" value="${insuranceAr}" class="w-full bg-slate-900/50 border border-slate-700/50 rounded-lg px-3 py-2 text-sky-300 text-xs" readonly>
                         </div>
                     </div>
                     <div>
-                        <label class="block text-[11px] text-slate-400 mb-1">الرقم القومي</label>
+                        <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_national_id}</label>
                         <input type="text" value="${nationalId}" class="w-full bg-slate-900/50 border border-slate-700/50 rounded-lg px-3 py-2 text-white text-xs font-mono" readonly>
                     </div>
                 </div>
 
                 <!-- التواصل والعنوان -->
                 <div class="glass-card p-5 rounded-2xl col-span-1 md:col-span-3 space-y-3 border border-sky-500/30 shadow-xl">
-                    <h3 class="text-xs font-bold text-amber-400 border-b border-sky-500/20 pb-2">📞 قنوات الاتصال والعنوان</h3>
+                    <h3 class="text-xs font-bold text-amber-400 border-b border-sky-500/20 pb-2">${t.sec_contact}</h3>
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                         <div>
-                            <label class="block text-[11px] text-slate-400 mb-1">رقم الهاتف</label>
+                            <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_mobile}</label>
                             <input type="text" id="edit-mobile" value="${mobile}" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-sky-500">
                         </div>
                         <div>
-                            <label class="block text-[11px] text-slate-400 mb-1">رقم الطوارئ</label>
+                            <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_emergency}</label>
                             <input type="text" id="edit-emg" value="${emgPhone}" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-sky-500">
                         </div>
                         <div>
-                            <label class="block text-[11px] text-slate-400 mb-1">البريد الإلكتروني</label>
+                            <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_email}</label>
                             <input type="text" id="edit-email" value="${email}" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-sky-500">
                         </div>
                         <div>
-                            <label class="block text-[11px] text-slate-400 mb-1">رصيد الإجازات</label>
+                            <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_leave_bal}</label>
                             <input type="text" value="${leaveBal} يوم" class="w-full bg-slate-900/50 border border-slate-700/50 rounded-lg px-3 py-2 text-emerald-400 text-xs font-bold" readonly>
                         </div>
                     </div>
                     <div>
-                        <label class="block text-[11px] text-slate-400 mb-1">العنوان بالتفصيل</label>
+                        <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_address}</label>
                         <input type="text" id="edit-address" value="${address}" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-sky-500">
                     </div>
                 </div>
@@ -369,7 +425,6 @@ function viewEmployee(code) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// دالة العودة للقائمة الرئيسية
 function restoreMainContent() {
     const mainContainer = document.querySelector('main');
     if (mainContainer && cachedMainHTML) {
@@ -380,7 +435,7 @@ function restoreMainContent() {
     }
 }
 
-// دالة رفع وتعديل الصورة بتنبيه احترافي
+// حفظ الصورة وتثبيتها محلياً في الـ localStorage
 function handlePhotoUpload(event, code) {
     const file = event.target.files[0];
     if (file) {
@@ -393,34 +448,46 @@ function handlePhotoUpload(event, code) {
             const emp = allEmployees.find(e => String(e.الكود || e.Code) === String(code));
             if (emp) {
                 emp.photo = base64Image;
+                let existing = JSON.parse(localStorage.getItem('emp_edit_' + code) || '{}');
+                existing.photo = base64Image;
+                localStorage.setItem('emp_edit_' + code, JSON.stringify(existing));
             }
-            showCustomToast("تم رفع وتحديث صورة الموظف بنجاح!", "success");
+            showCustomToast("تم رفع وتثبيت الصورة بنجاح!", "success");
         };
         reader.readAsDataURL(file);
     }
 }
 
-// حفظ التعديلات بتنبيه احترافي متناسق مع التصميم
+// حفظ التعديلات وتثبيتها في الـ localStorage عشان ما تروحش بالريفرش
 function saveEmployeeProfileChanges(code) {
     const emp = allEmployees.find(e => String(e.الكود || e.Code) === String(code));
     if (emp) {
-        emp["اسم الموظف"] = document.getElementById('edit-name-ar').value;
-        emp["Emp_name _En"] = document.getElementById('edit-name-en').value;
-        emp["الإدارة"] = document.getElementById('edit-dept-ar').value;
-        emp["Human Resources & Administrative Affairs"] = document.getElementById('edit-dept-en').value;
-        emp["رقم الهاتف"] = document.getElementById('edit-mobile').value;
-        emp["رقم هاتف الطوارئ"] = document.getElementById('edit-emg').value;
-        emp["الايميل"] = document.getElementById('edit-email').value;
-        emp["العنوان"] = document.getElementById('edit-address').value;
+        const updatedData = {
+            "اسم الموظف": document.getElementById('edit-name-ar').value,
+            "Emp_name _En": document.getElementById('edit-name-en').value,
+            "الإدارة": document.getElementById('edit-dept-ar').value,
+            "Human Resources & Administrative Affairs": document.getElementById('edit-dept-en').value,
+            "رقم الهاتف": document.getElementById('edit-mobile').value,
+            "رقم هاتف الطوارئ": document.getElementById('edit-emg').value,
+            "الايميل": document.getElementById('edit-email').value,
+            "العنوان": document.getElementById('edit-address').value,
+            "photo": emp.photo || 'background.jpg'
+        };
 
-        showCustomToast(`تم حفظ تعديلات الموظف [${code}] بنجاح ومزامنتها مع القاعدة!`, "success");
+        // تحديث كائن الموظف
+        Object.assign(emp, updatedData);
+
+        // تخزين نهائي في الـ localStorage لتثبيتها وعدم فقدانها عند التحديث
+        localStorage.setItem('emp_edit_' + code, JSON.stringify(updatedData));
+
+        showCustomToast(`تم حفظ وتثبيت تعديلات الموظف [${code}] بنجاح!`, "success");
         setTimeout(() => {
             restoreMainContent();
         }, 1200);
     }
 }
 
-// دالة تنبيهات احترافية داخلية (Custom Toast) بدلاً من الـ Alert العادي
+// تنبيه احترافي داخلي
 function showCustomToast(message, type = "success") {
     const existingToast = document.getElementById('custom-toast-alert');
     if (existingToast) existingToast.remove();
