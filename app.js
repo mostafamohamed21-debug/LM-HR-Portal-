@@ -41,10 +41,8 @@ const translations = {
         sec_qual: "🎓 المؤهل والخدمة",
         sec_bio: "👤 الميلاد والسن والتأمين",
         sec_contact: "📞 قنوات الاتصال والعنوان",
-        lbl_name_ar: "اسم الموظف (عربي)",
-        lbl_name_en: "اسم الموظف (إنجليزي)",
-        lbl_dept_ar: "الإدارة (عربي)",
-        lbl_dept_en: "الإدارة (إنجليزي)",
+        lbl_name: "اسم الموظف",
+        lbl_dept: "الإدارة",
         lbl_job: "الوظيفة",
         lbl_manager: "المدير المباشر",
         lbl_hiredate: "تاريخ التعيين",
@@ -93,10 +91,8 @@ const translations = {
         sec_qual: "🎓 Qualification & Service",
         sec_bio: "👤 DOB, Age & Insurance",
         sec_contact: "📞 Contact & Address",
-        lbl_name_ar: "Employee Name (Arabic)",
-        lbl_name_en: "Employee Name (English)",
-        lbl_dept_ar: "Department (Arabic)",
-        lbl_dept_en: "Department (English)",
+        lbl_name: "Employee Name",
+        lbl_dept: "Department",
         lbl_job: "Job Title",
         lbl_manager: "Direct Manager",
         lbl_hiredate: "Hire Date",
@@ -118,6 +114,7 @@ const translations = {
 
 let currentLang = 'ar';
 let allEmployees = [];
+let activeViewingCode = null; // يحفظ الكود الحالي للموظف المفتوح لو حصل تبديل لغة
 
 function toggleLangDropdown() {
     const dropdown = document.getElementById('lang-dropdown');
@@ -167,7 +164,12 @@ function setLanguage(lang) {
         }
     });
 
-    renderTable(allEmployees);
+    // لو المستخدم جوه ملف موظف حالياً، نعمل ريفريش للملف بنفس اللغة الجديدة بدلاً من الخروج للجدول
+    if (activeViewingCode) {
+        viewEmployee(activeViewingCode, true);
+    } else {
+        renderTable(allEmployees);
+    }
 }
 
 window.addEventListener('click', function(e) {
@@ -223,20 +225,9 @@ function renderTable(dataList) {
     dataList.forEach(emp => {
         const empCode = emp.الكود || emp.Code || '--';
         
-        let empName = '';
-        let empDept = '';
-        let empJob = '';
-
-        if (currentLang === 'ar') {
-            empName = emp["اسم الموظف"] || emp.اسم_الموظف || '--';
-            empDept = emp["الإدارة"] || '--';
-            empJob = emp["الوظيفة"] || '--';
-        } else {
-            empName = emp["Emp_name _En"] || emp.Emp_name_En || emp.Name || '--';
-            empDept = emp["Human Resources & Administrative Affairs"] || emp.Department || '--';
-            empJob = emp["Job title"] || emp.Job_title || '--';
-        }
-
+        let empName = currentLang === 'ar' ? (emp["اسم الموظف"] || emp.اسم_الموظف || emp["Emp_name _En"] || '--') : (emp["Emp_name _En"] || emp.Emp_name_En || emp["اسم الموظف"] || '--');
+        let empDept = currentLang === 'ar' ? (emp["الإدارة"] || emp["Human Resources & Administrative Affairs"] || '--') : (emp["Human Resources & Administrative Affairs"] || emp["الإدارة"] || '--');
+        let empJob = currentLang === 'ar' ? (emp["الوظيفة"] || emp["Job title"] || '--') : (emp["Job title"] || emp["الوظيفة"] || '--');
         const empHireDate = emp["تاريخ التعيين"] || emp.Date_of_Hiring || '--';
 
         const row = document.createElement('tr');
@@ -271,7 +262,8 @@ function filterEmployees() {
 
 let cachedMainHTML = "";
 
-function viewEmployee(code) {
+function viewEmployee(code, isLangSwitch = false) {
+    activeViewingCode = code;
     const emp = allEmployees.find(e => String(e.الكود || e.Code) === String(code));
     if (!emp) {
         showCustomToast("Employee not found", "error");
@@ -281,17 +273,16 @@ function viewEmployee(code) {
     const mainContainer = document.querySelector('main');
     if (!mainContainer) return;
 
-    if (!cachedMainHTML) {
+    if (!cachedMainHTML || !isLangSwitch) {
         cachedMainHTML = mainContainer.innerHTML;
     }
 
     const t = translations[currentLang];
 
-    const nameVal = emp["اسم الموظف"] || "";
-    const nameOtherVal = emp["Emp_name _En"] || "";
-    const deptVal = emp["الإدارة"] || "";
-    const deptOtherVal = emp["Human Resources & Administrative Affairs"] || "";
-    const jobVal = currentLang === 'ar' ? (emp["الوظيفة"] || "") : (emp["Job title"] || emp["الوظيفة"] || "");
+    // جلب القيم حسب اللغة الحالية بشكل قاطع لمنع أي تداخل
+    const nameVal = currentLang === 'ar' ? (emp["اسم الموظف"] || emp["Emp_name _En"] || "") : (emp["Emp_name _En"] || emp["اسم الموظف"] || "");
+    const deptVal = currentLang === 'ar' ? (emp["الإدارة"] || emp["Human Resources & Administrative Affairs"] || "") : (emp["Human Resources & Administrative Affairs"] || emp["الإدارة"] || "");
+    const jobVal = currentLang === 'ar' ? (emp["الوظيفة"] || emp["Job title"] || "") : (emp["Job title"] || emp["الوظيفة"] || "");
     const directMgr = emp["المدير المباشر"] || emp["Direct manager"] || "";
     const qual = emp["المؤهل"] || emp["Qualification"] || "";
     const qualAuth = emp["جهة المؤهل"] || emp["Qulification Issuing Authority"] || "";
@@ -340,15 +331,9 @@ function viewEmployee(code) {
                     </label>
                 </div>
                 <div class="flex-1 w-full space-y-3">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs text-slate-400 mb-1">${t.lbl_name_ar}</label>
-                            <input type="text" id="edit-name-ar" value="${nameVal}" class="w-full bg-slate-900/90 border border-sky-500/30 rounded-xl px-3 py-2 text-white font-semibold text-sm focus:outline-none focus:border-sky-500">
-                        </div>
-                        <div>
-                            <label class="block text-xs text-slate-400 mb-1">${t.lbl_name_en}</label>
-                            <input type="text" id="edit-name-en" value="${nameOtherVal}" class="w-full bg-slate-900/90 border border-sky-500/30 rounded-xl px-3 py-2 text-sky-300 font-medium text-sm focus:outline-none focus:border-sky-500">
-                        </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">${t.lbl_name}</label>
+                        <input type="text" id="edit-name" value="${nameVal}" class="w-full bg-slate-900/90 border border-sky-500/30 rounded-xl px-3 py-2 text-white font-semibold text-sm focus:outline-none focus:border-sky-500">
                     </div>
                     <div class="flex flex-wrap gap-2 pt-1">
                         <span class="px-3 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs font-mono text-sky-400">ID: ${code}</span>
@@ -364,12 +349,12 @@ function viewEmployee(code) {
                 <div class="glass-card p-5 rounded-2xl space-y-3 border border-sky-500/30 shadow-xl">
                     <h3 class="text-xs font-bold text-sky-400 border-b border-sky-500/20 pb-2">${t.sec_org}</h3>
                     <div>
-                        <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_dept_ar}</label>
-                        <input type="text" id="edit-dept-ar" value="${deptVal}" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-sky-500">
+                        <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_dept}</label>
+                        <input type="text" id="edit-dept" value="${deptVal}" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-sky-500">
                     </div>
                     <div>
-                        <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_dept_en}</label>
-                        <input type="text" id="edit-dept-en" value="${deptOtherVal}" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-300 text-xs focus:outline-none focus:border-sky-500">
+                        <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_job}</label>
+                        <input type="text" id="edit-job" value="${jobVal}" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-300 text-xs focus:outline-none focus:border-sky-500">
                     </div>
                     <div>
                         <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_manager}</label>
@@ -464,6 +449,7 @@ function viewEmployee(code) {
 }
 
 function restoreMainContent() {
+    activeViewingCode = null;
     const mainContainer = document.querySelector('main');
     if (mainContainer && cachedMainHTML) {
         mainContainer.innerHTML = cachedMainHTML;
@@ -499,28 +485,31 @@ function handlePhotoUpload(event, code) {
 function saveEmployeeProfileChanges(code) {
     const emp = allEmployees.find(e => String(e.الكود || e.Code) === String(code));
     if (emp) {
-        const updatedData = {
-            "اسم الموظف": document.getElementById('edit-name-ar').value,
-            "Emp_name _En": document.getElementById('edit-name-en').value,
-            "الإدارة": document.getElementById('edit-dept-ar').value,
-            "Human Resources & Administrative Affairs": document.getElementById('edit-dept-en').value,
-            "المدير المباشر": document.getElementById('edit-manager').value,
-            "تاريخ التعيين": document.getElementById('edit-hiredate').value,
-            "سنوات الخدمة": document.getElementById('edit-service').value,
-            "المؤهل": document.getElementById('edit-qual').value,
-            "جهة المؤهل": document.getElementById('edit-qualauth').value,
-            "تاريخ الميلاد": document.getElementById('edit-dob').value,
-            "السن حتى تاريخه": document.getElementById('edit-age').value,
-            "مكان الميلاد": document.getElementById('edit-pob').value,
-            "الحالة التأمينية": document.getElementById('edit-insurance').value,
-            "الرقم القومى": document.getElementById('edit-nid').value,
-            "رقم الهاتف": document.getElementById('edit-mobile').value,
-            "رقم هاتف الطوارئ": document.getElementById('edit-emg').value,
-            "الايميل": document.getElementById('edit-email').value,
-            "رصيد الاجازات": document.getElementById('edit-leave').value,
-            "العنوان": document.getElementById('edit-address').value,
-            "photo": emp.photo || 'background.jpg'
-        };
+        const fieldKeyName = currentLang === 'ar' ? "اسم الموظف" : "Emp_name _En";
+        const fieldKeyDept = currentLang === 'ar' ? "الإدارة" : "Human Resources & Administrative Affairs";
+        const fieldKeyJob = currentLang === 'ar' ? "الوظيفة" : "Job title";
+
+        const updatedData = {};
+        updatedData[fieldKeyName] = document.getElementById('edit-name').value;
+        updatedData[fieldKeyDept] = document.getElementById('edit-dept').value;
+        updatedData[fieldKeyJob] = document.getElementById('edit-job').value;
+        
+        updatedData["المدير المباشر"] = document.getElementById('edit-manager').value;
+        updatedData["تاريخ التعيين"] = document.getElementById('edit-hiredate').value;
+        updatedData["سنوات الخدمة"] = document.getElementById('edit-service').value;
+        updatedData["المؤهل"] = document.getElementById('edit-qual').value;
+        updatedData["جهة المؤهل"] = document.getElementById('edit-qualauth').value;
+        updatedData["تاريخ الميلاد"] = document.getElementById('edit-dob').value;
+        updatedData["السن حتى تاريخه"] = document.getElementById('edit-age').value;
+        updatedData["مكان الميلاد"] = document.getElementById('edit-pob').value;
+        updatedData["الحالة التأمينية"] = document.getElementById('edit-insurance').value;
+        updatedData["الرقم القومى"] = document.getElementById('edit-nid').value;
+        updatedData["رقم الهاتف"] = document.getElementById('edit-mobile').value;
+        updatedData["رقم هاتف الطوارئ"] = document.getElementById('edit-emg').value;
+        updatedData["الايميل"] = document.getElementById('edit-email').value;
+        updatedData["رصيد الاجازات"] = document.getElementById('edit-leave').value;
+        updatedData["العنوان"] = document.getElementById('edit-address').value;
+        updatedData["photo"] = emp.photo || 'background.jpg';
 
         Object.assign(emp, updatedData);
         localStorage.setItem('emp_edit_' + code, JSON.stringify(updatedData));
