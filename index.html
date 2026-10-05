@@ -14,37 +14,38 @@
     <style>
         body {
             font-family: 'Cairo', sans-serif;
-            background: linear-gradient(rgba(5, 11, 24, 0.92), rgba(5, 11, 24, 0.97)), url('background.jpg') no-repeat center center fixed;
+            background: linear-gradient(rgba(5, 11, 24, 0.93), rgba(5, 11, 24, 0.98)), url('background.jpg') no-repeat center center fixed;
             background-size: cover;
             color: #e2e8f0;
         }
         .glass-card {
             background: rgba(15, 23, 42, 0.82);
             backdrop-filter: blur(16px);
-            border: 1px solid rgba(56, 189, 248, 0.25);
+            border: 1px solid rgba(56, 189, 248, 0.22);
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
         .glass-table th, .glass-table td {
             border-color: rgba(56, 189, 248, 0.1) !important;
         }
-        /* أيقونات نيون بلون موحد (أزرق نيون مضيء) */
+        /* أيقونات نيون موحدة لون واحد أزرق هادئ */
         .neon-blue-icon {
             color: #38bdf8;
-            filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.8));
+            filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.7));
             transition: all 0.3s ease;
         }
         .sidebar-item:hover .neon-blue-icon {
-            filter: drop-shadow(0 0 14px rgba(56, 189, 248, 1));
+            filter: drop-shadow(0 0 12px rgba(56, 189, 248, 1));
             transform: scale(1.1);
         }
-        /* انيميشن 3D وظل نيون للوجو بدون إطار أو مربعات مزعجة */
+        /* لوجو ناعم بدون حواف حادة مع ظل نيون فخم */
         @keyframes rotate3D {
             0% { transform: perspective(800px) rotateY(0deg); }
             100% { transform: perspective(800px) rotateY(360deg); }
         }
-        .logo-3d {
-            animation: rotate3D 6s linear infinite;
-            filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.7));
+        .logo-soft-3d {
+            animation: rotate3D 7s linear infinite;
+            border-radius: 12px;
+            filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.6));
         }
         /* Sidebar Hover Drawer */
         .sidebar-collapsed {
@@ -70,19 +71,18 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
-    <!-- Top Header -->
+    <!-- Top Header مع زر اللغة المطابق للـ ESS واللوجو الناعم -->
     <header class="glass-card shadow-xl px-6 py-4 flex justify-between items-center border-b z-30">
         <div class="flex items-center space-x-4 space-x-reverse">
-            <!-- اللوجو 3D بدون إطار وبظل نيون ظريف -->
-            <div class="w-11 h-11 flex items-center justify-center">
-                <img src="logo.png" alt="Company Logo" class="w-full h-full object-contain logo-3d">
+            <div class="w-10 h-10 flex items-center justify-center">
+                <img src="logo.png" alt="Company Logo" class="w-full h-full object-contain logo-soft-3d">
             </div>
             <span class="text-2xl font-bold text-sky-400 tracking-wider">Lacto Misr HR</span>
         </div>
         
         <div class="flex items-center space-x-4 space-x-reverse relative">
             
-            <!-- زر اللغة المطابق تماماً لـ ESS (كرى أرضية + القائمة المنسدلة بالأعلام) -->
+            <!-- زر اللغة المطابق للـ ESS (كرى أرضية + القائمة المنسدلة بالأعلام) -->
             <div class="relative">
                 <button onclick="toggleLangDropdown()" class="flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-800/90 hover:bg-slate-700 text-sky-300 border border-sky-500/40 transition shadow-lg">
                     <span class="text-base neon-blue-icon">🌐</span>
@@ -92,7 +92,6 @@
                     <span class="text-[10px] text-sky-400">▼</span>
                 </button>
                 
-                <!-- القائمة المنسدلة للغة -->
                 <div id="lang-dropdown" class="hidden absolute left-0 mt-2 w-36 glass-card rounded-xl shadow-2xl border border-sky-500/30 overflow-hidden z-50">
                     <button onclick="setLanguage('ar')" class="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-right text-slate-200 hover:bg-sky-600/30 transition">
                         <span>🇪🇬</span> <span class="font-bold">AR</span>
@@ -136,7 +135,7 @@
                 </nav>
             </div>
             <div class="p-4 border-t border-sky-500/20 text-[10px] text-slate-400 text-center truncate">
-                <span class="nav-text">Portal v3.5 - Pure Neon</span>
+                <span class="nav-text">Portal v4.0 - Clean Neon</span>
             </div>
         </aside>
 
@@ -149,13 +148,13 @@
                     <p class="text-xs text-slate-400 font-semibold" data-translate="total_emp">إجمالي العاملين</p>
                     <h3 id="total-employees-count" class="text-3xl font-bold mt-1 text-sky-300">352</h3>
                 </div>
-                <div class="glass-card p-5 rounded-2xl border-r-4 border-emerald-500 shadow-xl">
+                <div class="glass-card p-5 rounded-2xl border-r-4 border-sky-500 shadow-xl">
                     <p class="text-xs text-slate-400 font-semibold" data-translate="active_depts">الإدارات النشطة</p>
-                    <h3 class="text-3xl font-bold mt-1 text-emerald-400">12</h3>
+                    <h3 class="text-3xl font-bold mt-1 text-sky-300">12</h3>
                 </div>
-                <div class="glass-card p-5 rounded-2xl border-r-4 border-amber-500 shadow-xl">
+                <div class="glass-card p-5 rounded-2xl border-r-4 border-sky-500 shadow-xl">
                     <p class="text-xs text-slate-400 font-semibold" data-translate="system_status">حالة النظام</p>
-                    <h3 class="text-3xl font-bold mt-1 text-emerald-400" data-translate="connected">مستقر (متصل بـ Firebase)</h3>
+                    <h3 class="text-3xl font-bold mt-1 text-sky-300" data-translate="connected">مستقر (متصل بـ Firebase)</h3>
                 </div>
             </div>
 
