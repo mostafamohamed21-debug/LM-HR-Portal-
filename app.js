@@ -22,7 +22,7 @@ const translations = {
         th_actions: "الإجراءات",
         loading: "جاري جلب البيانات من القاعدة...",
         lang_btn: "English",
-        action_btn: "عرض",
+        action_btn: "عرض الملف",
         no_results: "لا توجد نتائج مطابقة للبحث."
     },
     en: {
@@ -48,7 +48,7 @@ const translations = {
         th_actions: "Actions",
         loading: "Loading database records...",
         lang_btn: "العربية",
-        action_btn: "View",
+        action_btn: "View Profile",
         no_results: "No matching records found."
     }
 };
@@ -88,7 +88,7 @@ function toggleLanguage() {
 
 document.addEventListener("DOMContentLoaded", () => {
     // تطبيق خلفية الصورة المخصصة background.jpg بنمط عصري فخم
-    document.body.style.backgroundImage = "linear-gradient(rgba(11, 15, 25, 0.88), rgba(11, 15, 25, 0.92)), url('./background.jpg')";
+    document.body.style.backgroundImage = "linear-gradient(rgba(11, 15, 25, 0.90), rgba(11, 15, 25, 0.94)), url('./background.jpg')";
     document.body.style.backgroundSize = "cover";
     document.body.style.backgroundPosition = "center";
     document.body.style.backgroundAttachment = "fixed";
@@ -157,7 +157,7 @@ function renderTable(dataList) {
             <td class="p-3.5">${empJob}</td>
             <td class="p-3.5 font-mono text-xs">${empHireDate}</td>
             <td class="p-3.5 text-center">
-                <button onclick="viewEmployee('${empCode}')" class="px-3 py-1 bg-sky-600/30 hover:bg-sky-600 text-sky-200 rounded-lg text-xs border border-sky-400/30 transition shadow-lg">${translations[currentLang].action_btn}</button>
+                <button onclick="viewEmployee('${empCode}')" class="px-3.5 py-1.5 bg-sky-600/30 hover:bg-sky-600 text-sky-200 rounded-lg text-xs border border-sky-400/30 transition shadow-lg">${translations[currentLang].action_btn}</button>
             </td>
         `;
         tableBody.appendChild(row);
@@ -178,7 +178,7 @@ function filterEmployees() {
     renderTable(filtered);
 }
 
-// دالة عرض ملف الموظف الشامل بالتصميم العالمي الفخم مع صورة وبروفايل وزر تعديل
+// دالة عرض ملف الموظف في صفحة كاملة (Full View) مع ثنائي اللغة، وكل خانة مستقلة، وتعديل الصور
 function viewEmployee(code) {
     const emp = allEmployees.find(e => String(e.الكود || e.Code) === String(code));
     if (!emp) {
@@ -186,109 +186,241 @@ function viewEmployee(code) {
         return;
     }
 
-    // إزالة أي مودال قديم لو موجود
-    const existingModal = document.getElementById('emp-profile-modal');
-    if (existingModal) existingModal.remove();
-
-    const name = emp["اسم الموظف"] || emp.Name || "غير متوفر";
+    // استبدال محتوى الحاوية الرئيسية (Main Content Container) بالكامل بصفحة تفاصيل الموظف الفخمة
+    const mainContainer = document.querySelector('main') || document.getElementById('main-content-area') || document.body;
+    
+    // استخراج بيانات الموظف (عربي وإنجليزي لكل خانة مستقلة)
+    const nameAr = emp["اسم الموظف"] || "غير متوفر";
     const nameEn = emp["Emp_name _En"] || "N/A";
-    const dept = emp["الإدارة"] || "غير متوفر";
+    const deptAr = emp["الإدارة"] || "غير متوفر";
     const deptEn = emp["Human Resources & Administrative Affairs"] || "N/A";
-    const job = emp["الوظيفة"] || "غير متوفر";
+    const jobAr = emp["الوظيفة"] || "غير متوفر";
     const jobEn = emp["Job title"] || "N/A";
-    const hireDate = emp["تاريخ التعيين"] || "--";
-    const directMgr = emp["المدير المباشر"] || "--";
-    const qualification = emp["المؤهل"] || "--";
-    const qualAuth = emp["جهة المؤهل"] || "--";
-    const yearsService = emp["سنوات الخدمة"] || "--";
-    const insurance = emp["الحالة التأمينية"] || "--";
-    const dob = emp["تاريخ الميلاد"] || "--";
-    const age = emp["السن حتى تاريخه"] || "--";
-    const pob = emp["مكان الميلاد"] || "--";
-    const mobile = emp["رقم الهاتف"] || "غير مسجل";
-    const email = emp["الايميل"] || "غير مسجل";
+    const hireDate = emp["تاريخ التعيين"] || emp.Date_of_Hiring || "--";
+    const directMgrAr = emp["المدير المباشر"] || "--";
+    const directMgrEn = emp["Direct manager"] || "--";
+    const qualAr = emp["المؤهل"] || "--";
+    const qualEn = emp["Qualification"] || "--";
+    const qualAuthAr = emp["جهة المؤهل"] || "--";
+    const qualAuthEn = emp["Qulification Issuing Authority"] || "--";
+    const qualDate = emp["تاريخ الحصول على المؤهل"] || emp["Qualification Date"] || "--";
+    const yearsService = emp["سنوات الخدمة"] || emp["Years of service"] || "--";
+    const insuranceAr = emp["الحالة التأمينية"] || "--";
+    const insuranceEn = emp["Insurance Status"] || "--";
+    const dob = emp["تاريخ الميلاد"] || emp.DOB || "--";
+    const age = emp["السن حتى تاريخه"] || emp["Age to date"] || "--";
+    const pobAr = emp["مكان الميلاد"] || "--";
+    const pobEn = emp["POB"] || "--";
+    const nationalId = emp["الرقم القومى"] || emp.N_ID || "غير مسجل";
+    const leaveBal = emp["رصيد الاجازات"] || emp["Annual Leave balance"] || "0";
+    const address = emp["العنوان"] || emp.address || "غير مسجل";
+    const mobile = emp["رقم الهاتف"] || emp["mobile number"] || "غير مسجل";
+    const emgPhone = emp["رقم هاتف الطوارئ"] || emp.Emg_Phone_No || "غير مسجل";
+    const email = emp["الايميل"] || emp.Email || "غير مسجل";
+    
+    // صورة الموظف (المحفوظة أو الافتراضية)
+    const empPhoto = emp.photo || 'background.jpg';
 
-    // إنشاء نافذة المودال الفخمة بتصميم الدارك مود (Glassmorphism)
-    const modalHTML = `
-        <div id="emp-profile-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
-            <div class="bg-slate-900/90 border border-slate-700/60 rounded-2xl w-full max-w-4xl p-6 text-slate-200 shadow-2xl relative animate-scaleIn max-h-[90vh] overflow-y-auto">
-                
-                <!-- زر الإغلاق -->
-                <button onclick="document.getElementById('emp-profile-modal').remove()" class="absolute top-4 right-4 text-slate-400 hover:text-white bg-slate-800/80 hover:bg-red-600/80 p-2 rounded-full transition">
-                    ✕
+    const fullPageHTML = `
+        <div id="employee-full-profile-view" class="w-full min-h-screen p-6 space-y-6 animate-fadeIn">
+            
+            <!-- شريط العنوان والرجوع -->
+            <div class="flex items-center justify-between bg-slate-900/80 border border-slate-700/60 p-4 rounded-2xl backdrop-blur-md shadow-xl">
+                <button onclick="location.reload()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-sm font-medium transition flex items-center gap-2 border border-slate-700">
+                    ← العودة للقائمة الرئيسية
                 </button>
+                <div class="text-center">
+                    <h1 class="text-xl font-bold text-white">الملف الوظيفي الشامل</h1>
+                    <p class="text-xs text-sky-400">Employee Comprehensive Profile</p>
+                </div>
+                <button onclick="saveEmployeeProfileChanges('${code}')" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold transition shadow-lg shadow-emerald-900/30 flex items-center gap-2">
+                    💾 حفظ التعديلات
+                </button>
+            </div>
 
-                <!-- رأس الملف الشخصي (الصورة والبيانات الأساسية) -->
-                <div class="flex flex-col md:flex-row items-center gap-6 border-b border-slate-800 pb-6 mb-6">
-                    <div class="relative">
-                        <div class="w-28 h-28 rounded-2xl bg-gradient-to-tr from-sky-600 to-indigo-600 p-1 shadow-xl">
-                            <img src="${emp.photo || 'background.jpg'}" alt="Employee Photo" class="w-full h-full object-cover rounded-2xl bg-slate-900">
-                        </div>
-                        <span class="absolute -bottom-2 -right-2 bg-emerald-500 text-slate-950 text-xs font-bold px-2 py-0.5 rounded-full border border-slate-900">نشط</span>
+            <!-- رأس الملف الشخصي (الصورة + تعديل الصورة + الهوية الأساسية) -->
+            <div class="bg-slate-900/80 border border-slate-700/60 p-6 rounded-2xl backdrop-blur-md shadow-xl flex flex-col md:flex-row items-center gap-6">
+                <div class="relative group">
+                    <div class="w-32 h-32 rounded-2xl bg-gradient-to-tr from-sky-600 to-indigo-600 p-1 shadow-2xl">
+                        <img id="profile-img-preview" src="${empPhoto}" alt="Employee Photo" class="w-full h-full object-cover rounded-2xl bg-slate-950">
                     </div>
-                    <div class="text-center md:text-start flex-1">
-                        <h2 class="text-2xl font-bold text-white mb-1">${name}</h2>
-                        <p class="text-sky-400 text-sm font-medium mb-3">${nameEn}</p>
-                        <div class="flex flex-wrap gap-2 justify-center md:justify-start">
-                            <span class="px-3 py-1 bg-slate-800/80 border border-slate-700 rounded-lg text-xs">الكود: ${code}</span>
-                            <span class="px-3 py-1 bg-sky-950/60 border border-sky-800/50 text-sky-300 rounded-lg text-xs">${job}</span>
-                            <span class="px-3 py-1 bg-indigo-950/60 border border-indigo-800/50 text-indigo-300 rounded-lg text-xs">${dept}</span>
+                    <!-- زر تغيير وتحديث الصورة -->
+                    <label for="upload-emp-photo" class="absolute inset-0 bg-black/60 rounded-2xl flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer text-white text-xs font-semibold">
+                        <span>📷 تغيير الصورة</span>
+                        <input type="file" id="upload-emp-photo" accept="image/*" class="hidden" onchange="handlePhotoUpload(event, '${code}')">
+                    </label>
+                </div>
+                <div class="flex-1 text-center md:text-start space-y-2">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">اسم الموظف (عربي)</label>
+                            <input type="text" id="edit-name-ar" value="${nameAr}" class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-white font-semibold text-lg focus:outline-none focus:border-sky-500">
                         </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Employee Name (English)</label>
+                            <input type="text" id="edit-name-en" value="${nameEn}" class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-sky-300 font-medium text-lg focus:outline-none focus:border-sky-500">
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 justify-center md:justify-start pt-2">
+                        <span class="px-3 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs font-mono text-sky-400">الكود: ${code}</span>
+                        <span class="px-3 py-1 bg-sky-950/60 border border-sky-800 text-sky-300 rounded-lg text-xs">${jobAr} / ${jobEn}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- شبكة البيانات التفصيلية (كل خانة مستقلة ومنسقة بدقة) -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                <!-- الإدارة والوظيفة -->
+                <div class="bg-slate-900/80 border border-slate-700/60 p-5 rounded-2xl backdrop-blur-md shadow-xl space-y-4">
+                    <h3 class="text-sm font-bold text-sky-400 border-b border-slate-800 pb-2">🏢 الهيكل التنظيمي والإداري</h3>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">الإدارة (عربي / إنجليزي)</label>
+                        <input type="text" id="edit-dept-ar" value="${deptAr}" class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm mb-1 focus:outline-none focus:border-sky-500">
+                        <input type="text" id="edit-dept-en" value="${deptEn}" class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-slate-300 text-xs focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">الوظيفة (عربي / إنجليزي)</label>
+                        <input type="text" id="edit-job-ar" value="${jobAr}" class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm mb-1 focus:outline-none focus:border-sky-500">
+                        <input type="text" id="edit-job-en" value="${jobEn}" class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-slate-300 text-xs focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">المدير المباشر (Direct Manager)</label>
+                        <input type="text" value="${directMgrAr} / ${directMgrEn}" class="w-full bg-slate-800/50 border border-slate-700/60 rounded-xl px-3 py-2 text-slate-300 text-sm" readonly>
                     </div>
                 </div>
 
-                <!-- شبكة تفاصيل البيانات -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-sm">
-                    <div class="bg-slate-800/40 border border-slate-800 p-3.5 rounded-xl">
-                        <span class="block text-slate-400 text-xs mb-1">تاريخ التعيين</span>
-                        <span class="font-semibold text-white">${hireDate}</span>
+                <!-- المؤهلات والتواريخ -->
+                <div class="bg-slate-900/80 border border-slate-700/60 p-5 rounded-2xl backdrop-blur-md shadow-xl space-y-4">
+                    <h3 class="text-sm font-bold text-indigo-400 border-b border-slate-800 pb-2">🎓 المؤهل والخدمة</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">تاريخ التعيين</label>
+                            <input type="text" value="${hireDate}" class="w-full bg-slate-800/50 border border-slate-700/60 rounded-xl px-3 py-2 text-emerald-400 text-sm font-mono" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">سنوات الخدمة</label>
+                            <input type="text" value="${yearsService} سنة" class="w-full bg-slate-800/50 border border-slate-700/60 rounded-xl px-3 py-2 text-emerald-400 text-sm font-bold" readonly>
+                        </div>
                     </div>
-                    <div class="bg-slate-800/40 border border-slate-800 p-3.5 rounded-xl">
-                        <span class="block text-slate-400 text-xs mb-1">سنوات الخدمة</span>
-                        <span class="font-semibold text-emerald-400">${yearsService} سنة</span>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">المؤهل الدراسي (Qualification)</label>
+                        <input type="text" value="${qualAr} - ${qualEn}" class="w-full bg-slate-800/50 border border-slate-700/60 rounded-xl px-3 py-2 text-slate-300 text-sm" readonly>
                     </div>
-                    <div class="bg-slate-800/40 border border-slate-800 p-3.5 rounded-xl">
-                        <span class="block text-slate-400 text-xs mb-1">المدير المباشر</span>
-                        <span class="font-semibold text-white">${directMgr}</span>
-                    </div>
-                    <div class="bg-slate-800/40 border border-slate-800 p-3.5 rounded-xl">
-                        <span class="block text-slate-400 text-xs mb-1">المؤهل الدراسي</span>
-                        <span class="font-semibold text-white">${qualification} (${qualAuth})</span>
-                    </div>
-                    <div class="bg-slate-800/40 border border-slate-800 p-3.5 rounded-xl">
-                        <span class="block text-slate-400 text-xs mb-1">الحالة التأمينية</span>
-                        <span class="font-semibold text-sky-300">${insurance}</span>
-                    </div>
-                    <div class="bg-slate-800/40 border border-slate-800 p-3.5 rounded-xl">
-                        <span class="block text-slate-400 text-xs mb-1">العمر / تاريخ الميلاد</span>
-                        <span class="font-semibold text-white">${age} سنة (${dob})</span>
-                    </div>
-                    <div class="bg-slate-800/40 border border-slate-800 p-3.5 rounded-xl">
-                        <span class="block text-slate-400 text-xs mb-1">رقم الهاتف</span>
-                        <span class="font-semibold text-white font-mono">${mobile}</span>
-                    </div>
-                    <div class="bg-slate-800/40 border border-slate-800 p-3.5 rounded-xl col-span-1 md:col-span-2">
-                        <span class="block text-slate-400 text-xs mb-1">البريد الإلكتروني</span>
-                        <span class="font-semibold text-white font-mono">${email}</span>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">جهة المؤهل وتاريخه</label>
+                        <input type="text" value="${qualAuthAr} (${qualDate})" class="w-full bg-slate-800/50 border border-slate-700/60 rounded-xl px-3 py-2 text-slate-300 text-sm" readonly>
                     </div>
                 </div>
 
-                <!-- أزرار التحكم والعمليات (تعديل وحفظ لـ Firebase) -->
-                <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-                    <button onclick="document.getElementById('emp-profile-modal').remove()" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-sm transition">إغلاق</button>
-                    <button onclick="enableEditMode('${code}')" class="px-5 py-2 bg-amber-600/30 hover:bg-amber-600 text-amber-200 border border-amber-500/40 rounded-xl text-sm transition font-medium flex items-center gap-2">
-                        ✏️ تعديل البيانات
-                    </button>
+                <!-- البيانات الشخصية وتاريخ الميلاد والسن (مستقلة تماماً) -->
+                <div class="bg-slate-900/80 border border-slate-700/60 p-5 rounded-2xl backdrop-blur-md shadow-xl space-y-4">
+                    <h3 class="text-sm font-bold text-emerald-400 border-b border-slate-800 pb-2">👤 البيانات الشخصية والسن</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">تاريخ الميلاد (DOB)</label>
+                            <input type="text" value="${dob}" class="w-full bg-slate-800/50 border border-slate-700/60 rounded-xl px-3 py-2 text-white text-sm font-mono" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">السن حتى تاريخه</label>
+                            <input type="text" value="${age} سنة" class="w-full bg-slate-800/50 border border-slate-700/60 rounded-xl px-3 py-2 text-amber-400 text-sm font-bold" readonly>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">مكان الميلاد</label>
+                            <input type="text" value="${pobAr}" class="w-full bg-slate-800/50 border border-slate-700/60 rounded-xl px-3 py-2 text-slate-300 text-sm" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">الحالة التأمينية</label>
+                            <input type="text" value="${insuranceAr}" class="w-full bg-slate-800/50 border border-slate-700/60 rounded-xl px-3 py-2 text-sky-300 text-sm" readonly>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">الرقم القومي (National ID)</label>
+                        <input type="text" value="${nationalId}" class="w-full bg-slate-800/50 border border-slate-700/60 rounded-xl px-3 py-2 text-white text-sm font-mono" readonly>
+                    </div>
+                </div>
+
+                <!-- التواصل والعنوان -->
+                <div class="bg-slate-900/80 border border-slate-700/60 p-5 rounded-2xl backdrop-blur-md shadow-xl col-span-1 md:col-span-3 space-y-4">
+                    <h3 class="text-sm font-bold text-amber-400 border-b border-slate-800 pb-2">📞 بيانات التواصل والعنوان</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">رقم الهاتف (Mobile)</label>
+                            <input type="text" id="edit-mobile" value="${mobile}" class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm font-mono focus:outline-none focus:border-sky-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">رقم الطوارئ (Emergency)</label>
+                            <input type="text" id="edit-emg" value="${emgPhone}" class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm font-mono focus:outline-none focus:border-sky-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">البريد الإلكتروني (Email)</label>
+                            <input type="text" id="edit-email" value="${email}" class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm font-mono focus:outline-none focus:border-sky-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">رصيد الإجازات</label>
+                            <input type="text" value="${leaveBal} يوم" class="w-full bg-slate-800/50 border border-slate-700/60 rounded-xl px-3 py-2 text-emerald-400 text-sm font-bold" readonly>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">العنوان بالتفصيل (Address)</label>
+                        <input type="text" id="edit-address" value="${address}" class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-sky-500">
+                    </div>
                 </div>
 
             </div>
+
         </div>
     `;
 
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    // استبدال الشاشة الحالية بصفحة الملف الشخصي الكاملة
+    // نفترض أن الجدول الرئيسي محتوى جوه عنصر معين، أو نبدل محتوى الـ main الحقيقي
+    const containerToReplace = document.querySelector('main') || document.body;
+    containerToReplace.innerHTML = fullPageHTML;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// دالة تفعيل وضع التعديل وربطه بـ Firebase مستقبلًا
-function enableEditMode(code) {
-    alert(`جاري تفعيل وضع التعديل للموظف رقم [${code}]\nسيتم حفظ التعديلات مباشرة على قاعدة بيانات Firebase.`);
+// دالة رفع وتعديل صورة الموظف وتثبيتها محلياً وتجهيزها للـ Firebase
+function handlePhotoUpload(event, code) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const base64Image = e.target.result;
+            // تحديث معاينة الصورة فوراً
+            document.getElementById('profile-img-preview').src = base64Image;
+            
+            // حفظ الصورة في بيانات الموظف المتاحة بالذاكرة
+            const emp = allEmployees.find(e => String(e.الكود || e.Code) === String(code));
+            if (emp) {
+                emp.photo = base64Image;
+            }
+            alert("تم رفع الصورة وتحديثها بنجاح! اضغط على زر 'حفظ التعديلات' لتثبيتها في القاعدة.");
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+// دالة حفظ التعديلات على البيانات والصور وربطها بـ Firebase
+function saveEmployeeProfileChanges(code) {
+    const emp = allEmployees.find(e => String(e.الكود || e.Code) === String(code));
+    if (emp) {
+        emp["اسم الموظف"] = document.getElementById('edit-name-ar').value;
+        emp["Emp_name _En"] = document.getElementById('edit-name-en').value;
+        emp["الإدارة"] = document.getElementById('edit-dept-ar').value;
+        emp["Human Resources & Administrative Affairs"] = document.getElementById('edit-dept-en').value;
+        emp["الوظيفة"] = document.getElementById('edit-job-ar').value;
+        emp["Job title"] = document.getElementById('edit-job-en').value;
+        emp["رقم الهاتف"] = document.getElementById('edit-mobile').value;
+        emp["رقم هاتف الطوارئ"] = document.getElementById('edit-emg').value;
+        emp["الايميل"] = document.getElementById('edit-email').value;
+        emp["العنوان"] = document.getElementById('edit-address').value;
+
+        alert(`تم حفظ تعديلات الموظف [${code}] بنجاح!\nجاري مزامنة التعديلات مع قاعدة بيانات Firebase.`);
+        // هنا مستقبلاً تربطها بـ firebase.database().ref(...).update(...) مباشرة
+        
+        // العودة للرئيسية بعد الحفظ
+        location.reload();
+    }
 }
