@@ -21,7 +21,9 @@ const translations = {
         th_hire: "تاريخ التعيين",
         th_actions: "الإجراءات",
         loading: "جاري جلب البيانات من القاعدة...",
-        lang_btn: "English"
+        lang_btn: "English",
+        action_btn: "عرض",
+        no_results: "لا توجد نتائج مطابقة للبحث."
     },
     en: {
         page_title: "HR Central Portal | Lacto Misr",
@@ -45,7 +47,9 @@ const translations = {
         th_hire: "Hire Date",
         th_actions: "Actions",
         loading: "Loading database records...",
-        lang_btn: "العربية"
+        lang_btn: "العربية",
+        action_btn: "View",
+        no_results: "No matching records found."
     }
 };
 
@@ -55,8 +59,10 @@ let allEmployees = [];
 function toggleLanguage() {
     currentLang = currentLang === 'ar' ? 'en' : 'ar';
     const htmlRoot = document.getElementById('html-root');
-    htmlRoot.setAttribute('dir', currentLang === 'ar' ? 'rtl' : 'ltr');
-    htmlRoot.setAttribute('lang', currentLang);
+    if (htmlRoot) {
+        htmlRoot.setAttribute('dir', currentLang === 'ar' ? 'rtl' : 'ltr');
+        htmlRoot.setAttribute('lang', currentLang);
+    }
 
     document.querySelectorAll('[data-translate]').forEach(el => {
         const key = el.getAttribute('data-translate');
@@ -72,7 +78,13 @@ function toggleLanguage() {
         }
     });
 
-    document.getElementById('lang-btn-text').textContent = translations[currentLang].lang_btn;
+    const langBtnText = document.getElementById('lang-btn-text');
+    if (langBtnText) {
+        langBtnText.textContent = translations[currentLang].lang_btn;
+    }
+
+    // إعادة رسم الجدول باللغة الجديدة فوراً
+    renderTable(allEmployees);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -87,37 +99,62 @@ document.addEventListener("DOMContentLoaded", () => {
 
             renderTable(allEmployees);
             
-            document.getElementById('total-employees-count').textContent = allEmployees.length;
+            const totalCountEl = document.getElementById('total-employees-count');
+            if (totalCountEl) totalCountEl.textContent = allEmployees.length;
+
             const statusBadge = document.getElementById('connection-status');
-            statusBadge.textContent = `متصل بنجاح (${allEmployees.length} موظف)`;
-            statusBadge.className = "text-xs px-3 py-1 rounded-full bg-emerald-900/60 text-emerald-300 border border-emerald-500/30";
+            if (statusBadge) {
+                statusBadge.textContent = currentLang === 'ar' ? `متصل بنجاح (${allEmployees.length} موظف)` : `Connected (${allEmployees.length} employees)`;
+                statusBadge.className = "text-xs px-3 py-1 rounded-full bg-emerald-900/60 text-emerald-300 border border-emerald-500/30";
+            }
         })
         .catch(error => {
             console.error("خطأ:", error);
-            document.getElementById('employees-table-body').innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-400">فشل تحميل ملف البيانات (clean_employees_data)، تأكد أنه في نفس مجلد المشروع.</td></tr>`;
+            const tableBody = document.getElementById('employees-table-body');
+            if (tableBody) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-400">فشل تحميل ملف البيانات (clean_employees_data)، تأكد أنه في نفس مجلد المشروع.</td></tr>`;
+            }
         });
 });
 
 function renderTable(dataList) {
     const tableBody = document.getElementById('employees-table-body');
+    if (!tableBody) return;
     tableBody.innerHTML = '';
 
     if (dataList.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">لا توجد نتائج مطابقة للبحث.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">${translations[currentLang].no_results}</td></tr>`;
         return;
     }
 
     dataList.forEach(emp => {
+        // اختيار الحقول بناءً على اللغة الحالية (عربي / إنجليزي)
+        const empCode = emp.الكود || emp.Code || '--';
+        
+        const empName = currentLang === 'ar' 
+            ? (emp["اسم الموظف"] || emp.اسم_الموظف || emp.Name || '--')
+            : (emp["Emp_name _En"] || emp.Emp_name_En || emp.Name || '--');
+
+        const empDept = currentLang === 'ar'
+            ? (emp["الإدارة"] || emp.الإدارة || emp.Department || '--')
+            : (emp["Human Resources & Administrative Affairs"] || emp["Human Resources"] || emp.Department || '--');
+
+        const empJob = currentLang === 'ar'
+            ? (emp["الوظيفة"] || emp.الوظيفة || '--')
+            : (emp["Job title"] || emp.Job_title || emp.Job || '--');
+
+        const empHireDate = emp["تاريخ التعيين"] || emp.تاريخ_التعيين || emp.Date_of_Hiring || '--';
+
         const row = document.createElement('tr');
         row.className = "hover:bg-slate-800/40 transition text-slate-300";
         row.innerHTML = `
-            <td class="p-3.5 font-mono text-sky-400">${emp.الكود || emp.Code || '--'}</td>
-            <td class="p-3.5 font-semibold text-white">${emp.اسم_الموظف || emp["اسم الموظف"] || emp.Name || '--'}</td>
-            <td class="p-3.5">${emp.الإدارة || emp.Department || '--'}</td>
-            <td class="p-3.5">${emp.الوظيفة || emp["Job title"] || '--'}</td>
-            <td class="p-3.5 font-mono text-xs">${emp.تاريخ_التعيين || emp.Date_of_Hiring || '--'}</td>
+            <td class="p-3.5 font-mono text-sky-400">${empCode}</td>
+            <td class="p-3.5 font-semibold text-white">${empName}</td>
+            <td class="p-3.5">${empDept}</td>
+            <td class="p-3.5">${empJob}</td>
+            <td class="p-3.5 font-mono text-xs">${empHireDate}</td>
             <td class="p-3.5 text-center">
-                <button onclick="viewEmployee('${emp.الكود || emp.Code || ''}')" class="px-3 py-1 bg-sky-600/40 hover:bg-sky-600 text-sky-200 rounded text-xs border border-sky-400/30 transition">عرض</button>
+                <button onclick="viewEmployee('${empCode}')" class="px-3 py-1 bg-sky-600/40 hover:bg-sky-600 text-sky-200 rounded text-xs border border-sky-400/30 transition">${translations[currentLang].action_btn}</button>
             </td>
         `;
         tableBody.appendChild(row);
@@ -125,11 +162,15 @@ function renderTable(dataList) {
 }
 
 function filterEmployees() {
-    const query = document.getElementById('search-input').value.toLowerCase();
+    const searchInput = document.getElementById('search-input');
+    if (!searchInput) return;
+    const query = searchInput.value.toLowerCase();
+    
     const filtered = allEmployees.filter(emp => {
-        const name = (emp["اسم الموظف"] || "").toLowerCase();
+        const nameAr = (emp["اسم الموظف"] || "").toLowerCase();
+        const nameEn = (emp["Emp_name _En"] || "").toLowerCase();
         const code = String(emp.الكود || emp.Code || "");
-        return name.includes(query) || code.includes(query);
+        return nameAr.includes(query) || nameEn.includes(query) || code.includes(query);
     });
     renderTable(filtered);
 }
@@ -137,8 +178,12 @@ function filterEmployees() {
 function viewEmployee(code) {
     const emp = allEmployees.find(e => String(e.الكود || e.Code) === String(code));
     if (emp) {
-        alert(`تفاصيل الموظف:\n- الكود: ${emp.الكود || emp.Code}\n- الاسم: ${emp["اسم الموظف"]}\n- الإدارة: ${emp.الإدارة}\n- الوظيفة: ${emp.الوظيفة || emp["Job title"]}`);
+        const name = currentLang === 'ar' ? (emp["اسم الموظف"] || "غير متوفر") : (emp["Emp_name _En"] || "N/A");
+        const dept = currentLang === 'ar' ? (emp["الإدارة"] || "غير متوفر") : (emp["Human Resources & Administrative Affairs"] || "N/A");
+        const job = currentLang === 'ar' ? (emp["الوظيفة"] || "غير متوفر") : (emp["Job title"] || "N/A");
+        
+        alert(`تفاصيل الموظف / Employee Details:\n- الكود / Code: ${code}\n- الاسم / Name: ${name}\n- الإدارة / Dept: ${dept}\n- الوظيفة / Job: ${job}`);
     } else {
-        alert("عرض تفاصيل الموظف برقم الكود: " + code);
+        alert("Employee not found / لم يتم العثور على الموظف: " + code);
     }
 }
