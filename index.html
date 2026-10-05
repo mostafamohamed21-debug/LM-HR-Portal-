@@ -71,7 +71,7 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
-    <!-- Top Header مع زر اللغة المطابق للـ ESS واللوجو الناعم -->
+    <!-- Top Header مع زر اللغة (هيكل الكرة الارضية فقط بدون فريمات) -->
     <header class="glass-card shadow-xl px-6 py-4 flex justify-between items-center border-b z-30">
         <div class="flex items-center space-x-4 space-x-reverse">
             <div class="w-10 h-10 flex items-center justify-center">
@@ -82,21 +82,21 @@
         
         <div class="flex items-center space-x-4 space-x-reverse relative">
             
-            <!-- زر اللغة المطابق للـ ESS (كرى أرضية + القائمة المنسدلة بالأعلام) -->
+            <!-- زر اللغة (هيكل الكرة الأرضية فقط بدون أي فريمات محيطة) -->
             <div class="relative">
-                <button onclick="toggleLangDropdown()" class="flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-800/90 hover:bg-slate-700 text-sky-300 border border-sky-500/40 transition shadow-lg">
-                    <span class="text-base neon-blue-icon">🌐</span>
-                    <span id="current-lang-display" class="flex items-center gap-1.5">
+                <button onclick="toggleLangDropdown()" class="flex items-center gap-1.5 px-2 py-1 text-xs font-bold text-sky-300 hover:text-sky-100 transition focus:outline-none">
+                    <span class="text-lg neon-blue-icon">🌐</span>
+                    <span id="current-lang-display" class="flex items-center gap-1">
                         <span id="lang-flag">🇪🇬</span> <span id="lang-code">AR</span>
                     </span>
-                    <span class="text-[10px] text-sky-400">▼</span>
+                    <span class="text-[9px] text-sky-400">▼</span>
                 </button>
                 
-                <div id="lang-dropdown" class="hidden absolute left-0 mt-2 w-36 glass-card rounded-xl shadow-2xl border border-sky-500/30 overflow-hidden z-50">
-                    <button onclick="setLanguage('ar')" class="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-right text-slate-200 hover:bg-sky-600/30 transition">
+                <div id="lang-dropdown" class="hidden absolute left-0 mt-2 w-32 glass-card rounded-xl shadow-2xl border border-sky-500/30 overflow-hidden z-50">
+                    <button onclick="setLanguage('ar')" class="w-full flex items-center gap-2 px-3 py-2 text-xs text-right text-slate-200 hover:bg-sky-600/30 transition">
                         <span>🇪🇬</span> <span class="font-bold">AR</span>
                     </button>
-                    <button onclick="setLanguage('en')" class="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-right text-slate-200 hover:bg-sky-600/30 transition">
+                    <button onclick="setLanguage('en')" class="w-full flex items-center gap-2 px-3 py-2 text-xs text-right text-slate-200 hover:bg-sky-600/30 transition">
                         <span>🇬🇧</span> <span class="font-bold">EN</span>
                     </button>
                 </div>
