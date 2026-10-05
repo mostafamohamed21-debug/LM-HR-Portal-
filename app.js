@@ -1,4 +1,3 @@
-// إعدادات اتصال Firebase الحقيقي
 const firebaseConfig = {
     apiKey: "AIzaSyDummyKey-LactoMisrHRPortal",
     authDomain: "lactomisr-hr.firebaseapp.com",
@@ -38,7 +37,7 @@ const translations = {
         profile_title: "الملف الوظيفي الشامل",
         profile_subtitle: "Comprehensive Employee Profile",
         save_btn: "💾 حفظ ومزامنة Firebase",
-        lbl_name_ar: "اسم الموظف (عربي)",
+        lbl_name_ar: "اسم الموظف",
         lbl_name_en: "Employee Name (English)",
         sec_org: "🏢 الهيكل التنظيمي",
         sec_qual: "🎓 المؤهل والخدمة",
@@ -277,14 +276,14 @@ function viewEmployee(code) {
 
     const t = translations[currentLang];
 
-    // فلترة كاملة: لو اللغة EN لا تظهر أي كلمات عربية، والعكس صحيح
-    const nameVal = currentLang === 'ar' ? (emp["اسم الموظف"] || "غير متوفر") : (emp["Emp_name _En"] || "N/A");
-    const nameOtherVal = currentLang === 'ar' ? (emp["Emp_name _En"] || "N/A") : (emp["اسم الموظف"] || "");
+    // فلترة صارمة: منع خلط اللغات نهائياً بناءً على اختيار AR أو EN
+    const nameVal = currentLang === 'ar' ? (emp["اسم الموظف"] || "") : (emp["Emp_name _En"] || "");
+    const nameOtherVal = currentLang === 'ar' ? (emp["Emp_name _En"] || "") : (emp["اسم الموظف"] || "");
     
-    const deptVal = currentLang === 'ar' ? (emp["الإدارة"] || "غير متوفر") : (emp["Human Resources & Administrative Affairs"] || "N/A");
-    const deptOtherVal = currentLang === 'ar' ? (emp["Human Resources & Administrative Affairs"] || "N/A") : (emp["الإدارة"] || "");
+    const deptVal = currentLang === 'ar' ? (emp["الإدارة"] || "") : (emp["Human Resources & Administrative Affairs"] || emp["Department"] || "");
+    const deptOtherVal = currentLang === 'ar' ? (emp["Human Resources & Administrative Affairs"] || "") : (emp["الإدارة"] || "");
     
-    const jobVal = currentLang === 'ar' ? (emp["الوظيفة"] || "غير متوفر") : (emp["Job title"] || "N/A");
+    const jobVal = currentLang === 'ar' ? (emp["الوظيفة"] || "") : (emp["Job title"] || "");
     
     const hireDate = emp["تاريخ التعيين"] || emp.Date_of_Hiring || "";
     const directMgr = currentLang === 'ar' ? (emp["المدير المباشر"] || "") : (emp["Direct manager"] || emp["المدير المباشر"] || "");
@@ -350,7 +349,7 @@ function viewEmployee(code) {
                 </div>
             </div>
 
-            <!-- شبكة تفاصيل البيانات (كل الخانات قابلة للتعديل والكتابة) -->
+            <!-- شبكة تفاصيل البيانات -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 
                 <!-- الهيكل التنظيمي -->
@@ -466,7 +465,6 @@ function restoreMainContent() {
     }
 }
 
-// رفع الصورة وتثبيتها محلياً وفي الـ Firebase
 function handlePhotoUpload(event, code) {
     const file = event.target.files[0];
     if (file) {
@@ -484,13 +482,12 @@ function handlePhotoUpload(event, code) {
                 localStorage.setItem('emp_edit_' + code, JSON.stringify(existing));
                 syncToFirebase(code, existing);
             }
-            showCustomToast("Photo uploaded & synced with Firebase!", "success");
+            showCustomToast("Photo uploaded & synced with Firebase successfully!", "success");
         };
         reader.readAsDataURL(file);
     }
 }
 
-// حفظ التعديلات وإرسالها الحية للـ Firebase
 function saveEmployeeProfileChanges(code) {
     const emp = allEmployees.find(e => String(e.الكود || e.Code) === String(code));
     if (emp) {
@@ -521,7 +518,7 @@ function saveEmployeeProfileChanges(code) {
         localStorage.setItem('emp_edit_' + code, JSON.stringify(updatedData));
         syncToFirebase(code, updatedData);
 
-        showCustomToast(`Changes for employee [${code}] successfully saved & synced to Firebase!`, "success");
+        showCustomToast(`Changes for employee [${code}] saved & synced to Firebase!`, "success");
         setTimeout(() => {
             restoreMainContent();
         }, 1200);
@@ -533,7 +530,7 @@ function syncToFirebase(code, data) {
         if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
             const dbRef = firebase.database().ref('employees/' + code);
             dbRef.set(data).then(() => {
-                console.log("Firebase Realtime DB sync successful for ID:", code);
+                console.log("Firebase sync successful for ID:", code);
             });
         }
     } catch (e) {
