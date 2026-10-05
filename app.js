@@ -38,13 +38,13 @@ const translations = {
         profile_subtitle: "Comprehensive Employee Profile",
         save_btn: "💾 حفظ ومزامنة Firebase",
         lbl_name_ar: "اسم الموظف",
-        lbl_name_en: "Employee Name (English)",
+        lbl_name_en: "اسم الموظف باللغة الإنجليزية",
         sec_org: "🏢 الهيكل التنظيمي",
         sec_qual: "🎓 المؤهل والخدمة",
         sec_bio: "👤 الميلاد والسن والتأمين",
         sec_contact: "📞 قنوات الاتصال والعنوان",
         lbl_dept_ar: "الإدارة",
-        lbl_dept_en: "Department (English)",
+        lbl_dept_en: "الإدارة باللغة الإنجليزية",
         lbl_manager: "المدير المباشر",
         lbl_hiredate: "تاريخ التعيين",
         lbl_service_years: "سنوات الخدمة",
@@ -88,14 +88,14 @@ const translations = {
         profile_title: "Comprehensive Employee Profile",
         profile_subtitle: "Comprehensive Employee Profile",
         save_btn: "💾 Save & Sync Firebase",
-        lbl_name_ar: "Employee Name",
-        lbl_name_en: "Employee Name (Arabic)",
+        lbl_name_ar: "Employee Name (Arabic)",
+        lbl_name_en: "Employee Name",
         sec_org: "🏢 Organizational Structure",
         sec_qual: "🎓 Qualification & Service",
         sec_bio: "👤 DOB, Age & Insurance",
         sec_contact: "📞 Contact & Address",
-        lbl_dept_ar: "Department",
-        lbl_dept_en: "Department (Arabic)",
+        lbl_dept_ar: "Department (Arabic)",
+        lbl_dept_en: "Department",
         lbl_manager: "Direct Manager",
         lbl_hiredate: "Hire Date",
         lbl_service_years: "Years of Service",
@@ -215,7 +215,6 @@ function renderTable(dataList) {
     dataList.forEach(emp => {
         const empCode = emp.الكود || emp.Code || '--';
         
-        // فلترة صارمة تمنع خلط اللغات في الجدول الرئيسي
         let empName = '';
         let empDept = '';
         let empJob = '';
@@ -225,9 +224,9 @@ function renderTable(dataList) {
             empDept = emp["الإدارة"] || '--';
             empJob = emp["الوظيفة"] || '--';
         } else {
-            empName = emp["Emp_name _En"] || emp.Emp_name_En || emp.Name || emp["اسم الموظف"] || '--';
-            empDept = emp["Human Resources & Administrative Affairs"] || emp["Human Resources"] || emp.Department || emp["الإدارة"] || '--';
-            empJob = emp["Job title"] || emp.Job_title || emp["الوظيفة"] || '--';
+            empName = emp["Emp_name _En"] || emp.Emp_name_En || emp.Name || '--';
+            empDept = emp["Human Resources & Administrative Affairs"] || emp.Department || '--';
+            empJob = emp["Job title"] || emp.Job_title || '--';
         }
 
         const empHireDate = emp["تاريخ التعيين"] || emp.Date_of_Hiring || '--';
@@ -280,7 +279,6 @@ function viewEmployee(code) {
 
     const t = translations[currentLang];
 
-    // فلترة دقيقة ومنفصلة تماماً حسب وضع AR أو EN لعدم حدوث أي اختلاط
     let nameVal = '';
     let nameOtherVal = '';
     let deptVal = '';
@@ -304,16 +302,16 @@ function viewEmployee(code) {
         insurance = emp["الحالة التأمينية"] || "";
         pob = emp["مكان الميلاد"] || "";
     } else {
-        nameVal = emp["Emp_name _En"] || emp["اسم الموظف"] || "";
+        nameVal = emp["Emp_name _En"] || "";
         nameOtherVal = emp["اسم الموظف"] || "";
-        deptVal = emp["Human Resources & Administrative Affairs"] || emp["الإدارة"] || "";
+        deptVal = emp["Human Resources & Administrative Affairs"] || "";
         deptOtherVal = emp["الإدارة"] || "";
-        jobVal = emp["Job title"] || emp["الوظيفة"] || "";
-        directMgr = emp["Direct manager"] || emp["المدير المباشر"] || "";
-        qual = emp["Qualification"] || emp["المؤهل"] || "";
-        qualAuth = emp["Qulification Issuing Authority"] || emp["جهة المؤهل"] || "";
-        insurance = emp["Insurance Status"] || emp["الحالة التأمينية"] || "";
-        pob = emp["POB"] || emp["مكان الميلاد"] || "";
+        jobVal = emp["Job title"] || "";
+        directMgr = emp["Direct manager"] || "";
+        qual = emp["Qualification"] || "";
+        qualAuth = emp["Qulification Issuing Authority"] || "";
+        insurance = emp["Insurance Status"] || "";
+        pob = emp["POB"] || "";
     }
     
     const hireDate = emp["تاريخ التعيين"] || emp.Date_of_Hiring || "";
