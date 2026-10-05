@@ -76,7 +76,7 @@ function toggleLanguage() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    fetch('clean_employees_data.json')
+    fetch('./clean_employees_data.json')
         .then(response => {
             if (!response.ok) throw new Error("تعذر قراءة ملف البيانات");
             return response.json();
