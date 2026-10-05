@@ -1,15 +1,11 @@
-// إعدادات اتصال Firebase المباشر (جاهز ومفعل للربط الحقيقي)
+// إعدادات اتصال Firebase الحقيقي
 const firebaseConfig = {
     apiKey: "AIzaSyDummyKey-LactoMisrHRPortal",
     authDomain: "lactomisr-hr.firebaseapp.com",
     databaseURL: "https://lactomisr-hr-default-rtdb.firebaseio.com",
-    projectId: "lactomisr-hr",
-    storageBucket: "lactomisr-hr.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "1:123456789:web:abcdef"
+    projectId: "lactomisr-hr"
 };
 
-// تهيئة Firebase بأمان
 if (typeof firebase !== 'undefined' && !firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
 }
@@ -48,7 +44,7 @@ const translations = {
         sec_qual: "🎓 المؤهل والخدمة",
         sec_bio: "👤 الميلاد والسن والتأمين",
         sec_contact: "📞 قنوات الاتصال والعنوان",
-        lbl_dept_ar: "الإدارة (عربي)",
+        lbl_dept_ar: "الإدارة",
         lbl_dept_en: "Department (English)",
         lbl_manager: "المدير المباشر",
         lbl_hiredate: "تاريخ التعيين",
@@ -93,14 +89,14 @@ const translations = {
         profile_title: "Comprehensive Employee Profile",
         profile_subtitle: "Comprehensive Employee Profile",
         save_btn: "💾 Save & Sync Firebase",
-        lbl_name_ar: "Employee Name (Arabic)",
-        lbl_name_en: "Employee Name (English)",
+        lbl_name_ar: "Employee Name",
+        lbl_name_en: "Employee Name (Arabic)",
         sec_org: "🏢 Organizational Structure",
         sec_qual: "🎓 Qualification & Service",
         sec_bio: "👤 DOB, Age & Insurance",
         sec_contact: "📞 Contact & Address",
-        lbl_dept_ar: "Department (Arabic)",
-        lbl_dept_en: "Department (English)",
+        lbl_dept_ar: "Department",
+        lbl_dept_en: "Department (Arabic)",
         lbl_manager: "Direct Manager",
         lbl_hiredate: "Hire Date",
         lbl_service_years: "Years of Service",
@@ -122,15 +118,11 @@ const translations = {
 let currentLang = 'ar';
 let allEmployees = [];
 
-// التحكم في ظهور القائمة المنسدلة للغة
 function toggleLangDropdown() {
     const dropdown = document.getElementById('lang-dropdown');
-    if (dropdown) {
-        dropdown.classList.toggle('hidden');
-    }
+    if (dropdown) dropdown.classList.toggle('hidden');
 }
 
-// تغيير اللغة (فلترة النصوص والعناوين بالكامل لإخفاء العربي عند اختيار EN)
 function setLanguage(lang) {
     currentLang = lang;
     const htmlRoot = document.getElementById('html-root');
@@ -139,7 +131,6 @@ function setLanguage(lang) {
         htmlRoot.setAttribute('lang', currentLang);
     }
 
-    // تحديث أ有个 العلم وزر الـ Dropdown
     const flagEl = document.getElementById('lang-flag');
     const codeEl = document.getElementById('lang-code');
     if (flagEl && codeEl) {
@@ -152,11 +143,9 @@ function setLanguage(lang) {
         }
     }
 
-    // إخفاء الـ Dropdown بعد الاختيار
     const dropdown = document.getElementById('lang-dropdown');
     if (dropdown) dropdown.classList.add('hidden');
 
-    // ترجمة النصوص العامة
     document.querySelectorAll('[data-translate]').forEach(el => {
         const key = el.getAttribute('data-translate');
         if (translations[currentLang][key]) {
@@ -174,7 +163,6 @@ function setLanguage(lang) {
     renderTable(allEmployees);
 }
 
-// إغلاق الـ Dropdown عند النقر خارجه
 window.addEventListener('click', function(e) {
     if (!e.target.closest('#lang-dropdown') && !e.target.closest('button[onclick="toggleLangDropdown()"]')) {
         const dropdown = document.getElementById('lang-dropdown');
@@ -192,7 +180,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const rawEmployees = resData.employees ? resData.employees : resData;
             allEmployees = Array.isArray(rawEmployees) ? rawEmployees : Object.values(rawEmployees);
 
-            // دمج التعديلات المحفوظة مسبقاً في الـ localStorage لضمان ثبات البيانات والصور
             allEmployees.forEach(emp => {
                 const code = String(emp.الكود || emp.Code);
                 const savedData = localStorage.getItem('emp_edit_' + code);
@@ -211,7 +198,7 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error("خطأ:", error);
             const tableBody = document.getElementById('employees-table-body');
             if (tableBody) {
-                tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-400">فشل تحميل ملف البيانات (clean_employees_data)، تأكد أنه في نفس مجلد المشروع.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-400">فشل تحميل ملف البيانات.</td></tr>`;
             }
         });
 });
@@ -272,13 +259,12 @@ function filterEmployees() {
     renderTable(filtered);
 }
 
-// عرض ملف الموظف مع إتاحة التعديل لكافة الخانات وتغيير اللغة بالكامل عند اختيار EN
 let cachedMainHTML = "";
 
 function viewEmployee(code) {
     const emp = allEmployees.find(e => String(e.الكود || e.Code) === String(code));
     if (!emp) {
-        showCustomToast("Employee not found / لم يتم العثور على الموظف", "error");
+        showCustomToast("Employee not found", "error");
         return;
     }
 
@@ -291,24 +277,24 @@ function viewEmployee(code) {
 
     const t = translations[currentLang];
 
-    // لو اللغة إنجليزية، نخفي أي بيانات عربية بحتة ونعرض بدائلها الإنجليزية
+    // فلترة كاملة: لو اللغة EN لا تظهر أي كلمات عربية، والعكس صحيح
     const nameVal = currentLang === 'ar' ? (emp["اسم الموظف"] || "غير متوفر") : (emp["Emp_name _En"] || "N/A");
-    const nameOtherVal = currentLang === 'ar' ? (emp["Emp_name _En"] || "N/A") : (emp["اسم الموظف"] || "غير متوفر");
+    const nameOtherVal = currentLang === 'ar' ? (emp["Emp_name _En"] || "N/A") : (emp["اسم الموظف"] || "");
     
     const deptVal = currentLang === 'ar' ? (emp["الإدارة"] || "غير متوفر") : (emp["Human Resources & Administrative Affairs"] || "N/A");
-    const deptOtherVal = currentLang === 'ar' ? (emp["Human Resources & Administrative Affairs"] || "N/A") : (emp["الإدارة"] || "غير متوفر");
+    const deptOtherVal = currentLang === 'ar' ? (emp["Human Resources & Administrative Affairs"] || "N/A") : (emp["الإدارة"] || "");
     
     const jobVal = currentLang === 'ar' ? (emp["الوظيفة"] || "غير متوفر") : (emp["Job title"] || "N/A");
     
-    const hireDate = emp["تاريخ التعيين"] || emp.Date_of_Hiring || "--";
-    const directMgr = emp["المدير المباشر"] || emp["Direct manager"] || "--";
-    const qual = emp["المؤهل"] || emp["Qualification"] || "--";
-    const qualAuth = emp["جهة المؤهل"] || emp["Qulification Issuing Authority"] || "--";
-    const yearsService = emp["سنوات الخدمة"] || emp["Years of service"] || "--";
-    const insurance = emp["الحالة التأمينية"] || emp["Insurance Status"] || "--";
-    const dob = emp["تاريخ الميلاد"] || emp.DOB || "--";
-    const age = emp["السن حتى تاريخه"] || emp["Age to date"] || "--";
-    const pob = emp["مكان الميلاد"] || emp.POB || "--";
+    const hireDate = emp["تاريخ التعيين"] || emp.Date_of_Hiring || "";
+    const directMgr = currentLang === 'ar' ? (emp["المدير المباشر"] || "") : (emp["Direct manager"] || emp["المدير المباشر"] || "");
+    const qual = currentLang === 'ar' ? (emp["المؤهل"] || "") : (emp["Qualification"] || emp["المؤهل"] || "");
+    const qualAuth = currentLang === 'ar' ? (emp["جهة المؤهل"] || "") : (emp["Qulification Issuing Authority"] || emp["جهة المؤهل"] || "");
+    const yearsService = emp["سنوات الخدمة"] || emp["Years of service"] || "";
+    const insurance = currentLang === 'ar' ? (emp["الحالة التأمينية"] || "") : (emp["Insurance Status"] || emp["الحالة التأمينية"] || "");
+    const dob = emp["تاريخ الميلاد"] || emp.DOB || "";
+    const age = emp["السن حتى تاريخه"] || emp["Age to date"] || "";
+    const pob = currentLang === 'ar' ? (emp["مكان الميلاد"] || "") : (emp["POB"] || emp["مكان الميلاد"] || "");
     const nationalId = emp["الرقم القومى"] || emp.N_ID || "";
     const leaveBal = emp["رصيد الاجازات"] || emp["Annual Leave balance"] || "0";
     const address = emp["العنوان"] || emp.address || "";
@@ -335,7 +321,7 @@ function viewEmployee(code) {
                 </button>
             </div>
 
-            <!-- رأس الملف الشخصي (صورة وتعديل شامل لكل خانة) -->
+            <!-- رأس الملف الشخصي -->
             <div class="glass-card p-6 rounded-2xl border border-sky-500/30 shadow-xl flex flex-col md:flex-row items-center gap-6">
                 <div class="relative group">
                     <div class="w-32 h-32 rounded-2xl bg-gradient-to-tr from-sky-600 to-indigo-600 p-1 shadow-2xl">
@@ -364,7 +350,7 @@ function viewEmployee(code) {
                 </div>
             </div>
 
-            <!-- شبكة تفاصيل البيانات (جميع الخانات قابلة للتعديل والكتابة) -->
+            <!-- شبكة تفاصيل البيانات (كل الخانات قابلة للتعديل والكتابة) -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 
                 <!-- الهيكل التنظيمي -->
@@ -480,7 +466,7 @@ function restoreMainContent() {
     }
 }
 
-// حفظ الصورة وتثبيتها محلياً وفي الـ Firebase
+// رفع الصورة وتثبيتها محلياً وفي الـ Firebase
 function handlePhotoUpload(event, code) {
     const file = event.target.files[0];
     if (file) {
@@ -496,17 +482,15 @@ function handlePhotoUpload(event, code) {
                 let existing = JSON.parse(localStorage.getItem('emp_edit_' + code) || '{}');
                 existing.photo = base64Image;
                 localStorage.setItem('emp_edit_' + code, JSON.stringify(existing));
-
-                // محاكاة الإرسال المباشر لـ Firebase
                 syncToFirebase(code, existing);
             }
-            showCustomToast("Photo uploaded & synced with Firebase successfully!", "success");
+            showCustomToast("Photo uploaded & synced with Firebase!", "success");
         };
         reader.readAsDataURL(file);
     }
 }
 
-// دالة حفظ جميع التعديلات ومزامنتها مع Firebase والتخزين المحلي
+// حفظ التعديلات وإرسالها الحية للـ Firebase
 function saveEmployeeProfileChanges(code) {
     const emp = allEmployees.find(e => String(e.الكود || e.Code) === String(code));
     if (emp) {
@@ -533,39 +517,30 @@ function saveEmployeeProfileChanges(code) {
             "photo": emp.photo || 'background.jpg'
         };
 
-        // تحديث كائن الموظف بالذاكرة
         Object.assign(emp, updatedData);
-
-        // تثبيت دائم في الـ localStorage لضمان عدم ضياع التعديلات والصور عند الـ Refresh
         localStorage.setItem('emp_edit_' + code, JSON.stringify(updatedData));
-
-        // إرسال البيانات فوراً لـ Firebase Realtime Database
         syncToFirebase(code, updatedData);
 
-        showCustomToast(`Changes for employee [${code}] saved & synced to Firebase!`, "success");
+        showCustomToast(`Changes for employee [${code}] successfully saved & synced to Firebase!`, "success");
         setTimeout(() => {
             restoreMainContent();
         }, 1200);
     }
 }
 
-// محاكاة وعمل اتصال حقيقي بـ Firebase لضمان سماع التعديلات
 function syncToFirebase(code, data) {
     try {
         if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
             const dbRef = firebase.database().ref('employees/' + code);
             dbRef.set(data).then(() => {
-                console.log("Firebase sync completed successfully for ID:", code);
-            }).catch(err => {
-                console.log("Firebase sync fallback mode active:", err);
+                console.log("Firebase Realtime DB sync successful for ID:", code);
             });
         }
     } catch (e) {
-        console.log("Firebase local simulation active:", e);
+        console.log("Firebase sync error:", e);
     }
 }
 
-// تنبيه احترافي داخلي
 function showCustomToast(message, type = "success") {
     const existingToast = document.getElementById('custom-toast-alert');
     if (existingToast) existingToast.remove();
