@@ -14,7 +14,7 @@
     <style>
         body {
             font-family: 'Cairo', sans-serif;
-            background: linear-gradient(rgba(5, 11, 24, 0.90), rgba(5, 11, 24, 0.95)), url('background.jpg') no-repeat center center fixed;
+            background: linear-gradient(rgba(5, 11, 24, 0.92), rgba(5, 11, 24, 0.97)), url('background.jpg') no-repeat center center fixed;
             background-size: cover;
             color: #e2e8f0;
         }
@@ -37,13 +37,14 @@
             filter: drop-shadow(0 0 14px rgba(56, 189, 248, 1));
             transform: scale(1.1);
         }
-        /* انيميشن 3D للجو الشعار الجديد logo.png */
+        /* انيميشن 3D وظل نيون للوجو بدون إطار أو مربعات مزعجة */
         @keyframes rotate3D {
             0% { transform: perspective(800px) rotateY(0deg); }
             100% { transform: perspective(800px) rotateY(360deg); }
         }
         .logo-3d {
             animation: rotate3D 6s linear infinite;
+            filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.7));
         }
         /* Sidebar Hover Drawer */
         .sidebar-collapsed {
@@ -69,11 +70,11 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
-    <!-- Top Header مع شعار 3D مطابق لطلبك وزر اللغة المطابق للـ ESS -->
+    <!-- Top Header -->
     <header class="glass-card shadow-xl px-6 py-4 flex justify-between items-center border-b z-30">
         <div class="flex items-center space-x-4 space-x-reverse">
-            <!-- الشعار 3D logo.png -->
-            <div class="w-10 h-10 rounded-xl overflow-hidden shadow-lg border border-sky-500/40 bg-slate-900 flex items-center justify-center">
+            <!-- اللوجو 3D بدون إطار وبظل نيون ظريف -->
+            <div class="w-11 h-11 flex items-center justify-center">
                 <img src="logo.png" alt="Company Logo" class="w-full h-full object-contain logo-3d">
             </div>
             <span class="text-2xl font-bold text-sky-400 tracking-wider">Lacto Misr HR</span>
@@ -81,10 +82,10 @@
         
         <div class="flex items-center space-x-4 space-x-reverse relative">
             
-            <!-- زر اللغة المطابق للـ ESS (Dropdown احترافي بالعلم و AR/EN) -->
+            <!-- زر اللغة المطابق تماماً لـ ESS (كرى أرضية + القائمة المنسدلة بالأعلام) -->
             <div class="relative">
-                <button onclick="toggleLangDropdown()" class="flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-800/90 hover:bg-slate-700 text-sky-300 border border-sky-500/40 transition shadow-lg">
-                    <span class="text-sm neon-blue-icon">🌐</span>
+                <button onclick="toggleLangDropdown()" class="flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-800/90 hover:bg-slate-700 text-sky-300 border border-sky-500/40 transition shadow-lg">
+                    <span class="text-base neon-blue-icon">🌐</span>
                     <span id="current-lang-display" class="flex items-center gap-1.5">
                         <span id="lang-flag">🇪🇬</span> <span id="lang-code">AR</span>
                     </span>
@@ -109,7 +110,7 @@
     <!-- Main Container -->
     <div class="flex flex-1 overflow-hidden">
         
-        <!-- Sidebar المخفية بأيقونات نيون زرقاء موحدة -->
+        <!-- Sidebar -->
         <aside class="sidebar-collapsed glass-card hidden md:flex flex-col justify-between border-l z-20 overflow-hidden shadow-2xl">
             <div class="p-4 space-y-6">
                 <div class="text-sm font-bold text-sky-300 text-center border-b border-sky-500/20 pb-3 truncate">
@@ -135,7 +136,7 @@
                 </nav>
             </div>
             <div class="p-4 border-t border-sky-500/20 text-[10px] text-slate-400 text-center truncate">
-                <span class="nav-text">Portal v3.0 - Neon Blue</span>
+                <span class="nav-text">Portal v3.5 - Pure Neon</span>
             </div>
         </aside>
 
