@@ -35,16 +35,17 @@ const translations = {
         no_results: "لا توجد نتائج مطابقة للبحث.",
         back_btn: "← العودة لقائمة الموظفين",
         profile_title: "الملف الوظيفي الشامل",
-        profile_subtitle: "Comprehensive Employee Profile",
+        profile_subtitle: "بيانات السجل الوظيفي للموظف",
         save_btn: "💾 حفظ ومزامنة Firebase",
-        lbl_name_ar: "اسم الموظف",
-        lbl_name_en: "اسم الموظف باللغة الإنجليزية",
         sec_org: "🏢 الهيكل التنظيمي",
         sec_qual: "🎓 المؤهل والخدمة",
         sec_bio: "👤 الميلاد والسن والتأمين",
         sec_contact: "📞 قنوات الاتصال والعنوان",
-        lbl_dept_ar: "الإدارة",
-        lbl_dept_en: "الإدارة باللغة الإنجليزية",
+        lbl_name_ar: "اسم الموظف (عربي)",
+        lbl_name_en: "اسم الموظف (إنجليزي)",
+        lbl_dept_ar: "الإدارة (عربي)",
+        lbl_dept_en: "الإدارة (إنجليزي)",
+        lbl_job: "الوظيفة",
         lbl_manager: "المدير المباشر",
         lbl_hiredate: "تاريخ التعيين",
         lbl_service_years: "سنوات الخدمة",
@@ -86,16 +87,17 @@ const translations = {
         no_results: "No matching records found.",
         back_btn: "← Back to Employees",
         profile_title: "Comprehensive Employee Profile",
-        profile_subtitle: "Comprehensive Employee Profile",
+        profile_subtitle: "Employee's Complete Record Details",
         save_btn: "💾 Save & Sync Firebase",
-        lbl_name_ar: "Employee Name (Arabic)",
-        lbl_name_en: "Employee Name",
         sec_org: "🏢 Organizational Structure",
         sec_qual: "🎓 Qualification & Service",
         sec_bio: "👤 DOB, Age & Insurance",
         sec_contact: "📞 Contact & Address",
+        lbl_name_ar: "Employee Name (Arabic)",
+        lbl_name_en: "Employee Name (English)",
         lbl_dept_ar: "Department (Arabic)",
-        lbl_dept_en: "Department",
+        lbl_dept_en: "Department (English)",
+        lbl_job: "Job Title",
         lbl_manager: "Direct Manager",
         lbl_hiredate: "Hire Date",
         lbl_service_years: "Years of Service",
@@ -125,9 +127,15 @@ function toggleLangDropdown() {
 function setLanguage(lang) {
     currentLang = lang;
     const htmlRoot = document.getElementById('html-root');
+    const tableEl = document.getElementById('main-employees-table');
+    
     if (htmlRoot) {
         htmlRoot.setAttribute('dir', currentLang === 'ar' ? 'rtl' : 'ltr');
         htmlRoot.setAttribute('lang', currentLang);
+    }
+
+    if (tableEl) {
+        tableEl.className = currentLang === 'ar' ? 'w-full text-right border-collapse glass-table' : 'w-full text-left border-collapse glass-table';
     }
 
     const flagEl = document.getElementById('lang-flag');
@@ -279,40 +287,16 @@ function viewEmployee(code) {
 
     const t = translations[currentLang];
 
-    let nameVal = '';
-    let nameOtherVal = '';
-    let deptVal = '';
-    let deptOtherVal = '';
-    let jobVal = '';
-    let directMgr = '';
-    let qual = '';
-    let qualAuth = '';
-    let insurance = '';
-    let pob = '';
-
-    if (currentLang === 'ar') {
-        nameVal = emp["اسم الموظف"] || "";
-        nameOtherVal = emp["Emp_name _En"] || "";
-        deptVal = emp["الإدارة"] || "";
-        deptOtherVal = emp["Human Resources & Administrative Affairs"] || "";
-        jobVal = emp["الوظيفة"] || "";
-        directMgr = emp["المدير المباشر"] || "";
-        qual = emp["المؤهل"] || "";
-        qualAuth = emp["جهة المؤهل"] || "";
-        insurance = emp["الحالة التأمينية"] || "";
-        pob = emp["مكان الميلاد"] || "";
-    } else {
-        nameVal = emp["Emp_name _En"] || "";
-        nameOtherVal = emp["اسم الموظف"] || "";
-        deptVal = emp["Human Resources & Administrative Affairs"] || "";
-        deptOtherVal = emp["الإدارة"] || "";
-        jobVal = emp["Job title"] || "";
-        directMgr = emp["Direct manager"] || "";
-        qual = emp["Qualification"] || "";
-        qualAuth = emp["Qulification Issuing Authority"] || "";
-        insurance = emp["Insurance Status"] || "";
-        pob = emp["POB"] || "";
-    }
+    const nameVal = emp["اسم الموظف"] || "";
+    const nameOtherVal = emp["Emp_name _En"] || "";
+    const deptVal = emp["الإدارة"] || "";
+    const deptOtherVal = emp["Human Resources & Administrative Affairs"] || "";
+    const jobVal = currentLang === 'ar' ? (emp["الوظيفة"] || "") : (emp["Job title"] || emp["الوظيفة"] || "");
+    const directMgr = emp["المدير المباشر"] || emp["Direct manager"] || "";
+    const qual = emp["المؤهل"] || emp["Qualification"] || "";
+    const qualAuth = emp["جهة المؤهل"] || emp["Qulification Issuing Authority"] || "";
+    const insurance = emp["الحالة التأمينية"] || emp["Insurance Status"] || "";
+    const pob = emp["مكان الميلاد"] || emp["POB"] || "";
     
     const hireDate = emp["تاريخ التعيين"] || emp.Date_of_Hiring || "";
     const yearsService = emp["سنوات الخدمة"] || emp["Years of service"] || "";
