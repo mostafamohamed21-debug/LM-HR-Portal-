@@ -75,9 +75,9 @@ function toggleLanguage() {
     document.getElementById('lang-btn-text').textContent = translations[currentLang].lang_btn;
 }
 
-// جلب بيانات الموظفين من ملف الـ JSON المسمى: clean_employees_data_2
+// جلب بيانات الموظفين من ملف الـ JSON المسمى: clean_employees_data
 document.addEventListener("DOMContentLoaded", () => {
-    fetch('clean_employees_data_2')
+    fetch('clean_employees_data')
         .then(response => {
             if (!response.ok) throw new Error("تعذر قراءة ملف البيانات");
             return response.json();
