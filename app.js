@@ -214,17 +214,21 @@ function renderTable(dataList) {
 
     dataList.forEach(emp => {
         const empCode = emp.الكود || emp.Code || '--';
-        const empName = currentLang === 'ar' 
-            ? (emp["اسم الموظف"] || emp.اسم_الموظف || emp.Name || '--')
-            : (emp["Emp_name _En"] || emp.Emp_name_En || emp.Name || '--');
+        
+        // فلترة صارمة تمنع خلط اللغات في الجدول الرئيسي
+        let empName = '';
+        let empDept = '';
+        let empJob = '';
 
-        const empDept = currentLang === 'ar'
-            ? (emp["الإدارة"] || emp.Department || '--')
-            : (emp["Human Resources & Administrative Affairs"] || emp["Human Resources"] || emp.Department || '--');
-
-        const empJob = currentLang === 'ar'
-            ? (emp["الوظيفة"] || '--')
-            : (emp["Job title"] || emp.Job_title || '--');
+        if (currentLang === 'ar') {
+            empName = emp["اسم الموظف"] || emp.اسم_الموظف || '--';
+            empDept = emp["الإدارة"] || '--';
+            empJob = emp["الوظيفة"] || '--';
+        } else {
+            empName = emp["Emp_name _En"] || emp.Emp_name_En || emp.Name || emp["اسم الموظف"] || '--';
+            empDept = emp["Human Resources & Administrative Affairs"] || emp["Human Resources"] || emp.Department || emp["الإدارة"] || '--';
+            empJob = emp["Job title"] || emp.Job_title || emp["الوظيفة"] || '--';
+        }
 
         const empHireDate = emp["تاريخ التعيين"] || emp.Date_of_Hiring || '--';
 
@@ -276,24 +280,46 @@ function viewEmployee(code) {
 
     const t = translations[currentLang];
 
-    // فلترة صارمة: منع خلط اللغات نهائياً بناءً على اختيار AR أو EN
-    const nameVal = currentLang === 'ar' ? (emp["اسم الموظف"] || "") : (emp["Emp_name _En"] || "");
-    const nameOtherVal = currentLang === 'ar' ? (emp["Emp_name _En"] || "") : (emp["اسم الموظف"] || "");
-    
-    const deptVal = currentLang === 'ar' ? (emp["الإدارة"] || "") : (emp["Human Resources & Administrative Affairs"] || emp["Department"] || "");
-    const deptOtherVal = currentLang === 'ar' ? (emp["Human Resources & Administrative Affairs"] || "") : (emp["الإدارة"] || "");
-    
-    const jobVal = currentLang === 'ar' ? (emp["الوظيفة"] || "") : (emp["Job title"] || "");
+    // فلترة دقيقة ومنفصلة تماماً حسب وضع AR أو EN لعدم حدوث أي اختلاط
+    let nameVal = '';
+    let nameOtherVal = '';
+    let deptVal = '';
+    let deptOtherVal = '';
+    let jobVal = '';
+    let directMgr = '';
+    let qual = '';
+    let qualAuth = '';
+    let insurance = '';
+    let pob = '';
+
+    if (currentLang === 'ar') {
+        nameVal = emp["اسم الموظف"] || "";
+        nameOtherVal = emp["Emp_name _En"] || "";
+        deptVal = emp["الإدارة"] || "";
+        deptOtherVal = emp["Human Resources & Administrative Affairs"] || "";
+        jobVal = emp["الوظيفة"] || "";
+        directMgr = emp["المدير المباشر"] || "";
+        qual = emp["المؤهل"] || "";
+        qualAuth = emp["جهة المؤهل"] || "";
+        insurance = emp["الحالة التأمينية"] || "";
+        pob = emp["مكان الميلاد"] || "";
+    } else {
+        nameVal = emp["Emp_name _En"] || emp["اسم الموظف"] || "";
+        nameOtherVal = emp["اسم الموظف"] || "";
+        deptVal = emp["Human Resources & Administrative Affairs"] || emp["الإدارة"] || "";
+        deptOtherVal = emp["الإدارة"] || "";
+        jobVal = emp["Job title"] || emp["الوظيفة"] || "";
+        directMgr = emp["Direct manager"] || emp["المدير المباشر"] || "";
+        qual = emp["Qualification"] || emp["المؤهل"] || "";
+        qualAuth = emp["Qulification Issuing Authority"] || emp["جهة المؤهل"] || "";
+        insurance = emp["Insurance Status"] || emp["الحالة التأمينية"] || "";
+        pob = emp["POB"] || emp["مكان الميلاد"] || "";
+    }
     
     const hireDate = emp["تاريخ التعيين"] || emp.Date_of_Hiring || "";
-    const directMgr = currentLang === 'ar' ? (emp["المدير المباشر"] || "") : (emp["Direct manager"] || emp["المدير المباشر"] || "");
-    const qual = currentLang === 'ar' ? (emp["المؤهل"] || "") : (emp["Qualification"] || emp["المؤهل"] || "");
-    const qualAuth = currentLang === 'ar' ? (emp["جهة المؤهل"] || "") : (emp["Qulification Issuing Authority"] || emp["جهة المؤهل"] || "");
     const yearsService = emp["سنوات الخدمة"] || emp["Years of service"] || "";
-    const insurance = currentLang === 'ar' ? (emp["الحالة التأمينية"] || "") : (emp["Insurance Status"] || emp["الحالة التأمينية"] || "");
     const dob = emp["تاريخ الميلاد"] || emp.DOB || "";
     const age = emp["السن حتى تاريخه"] || emp["Age to date"] || "";
-    const pob = currentLang === 'ar' ? (emp["مكان الميلاد"] || "") : (emp["POB"] || emp["مكان الميلاد"] || "");
     const nationalId = emp["الرقم القومى"] || emp.N_ID || "";
     const leaveBal = emp["رصيد الاجازات"] || emp["Annual Leave balance"] || "0";
     const address = emp["العنوان"] || emp.address || "";
@@ -371,7 +397,7 @@ function viewEmployee(code) {
 
                 <!-- المؤهلات والخدمة -->
                 <div class="glass-card p-5 rounded-2xl space-y-3 border border-sky-500/30 shadow-xl">
-                    <h3 class="text-xs font-bold text-indigo-400 border-b border-sky-500/20 pb-2">${t.sec_qual}</h3>
+                    <h3 class="text-xs font-bold text-sky-400 border-b border-sky-500/20 pb-2">${t.sec_qual}</h3>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_hiredate}</label>
@@ -394,7 +420,7 @@ function viewEmployee(code) {
 
                 <!-- الميلاد والسن -->
                 <div class="glass-card p-5 rounded-2xl space-y-3 border border-sky-500/30 shadow-xl">
-                    <h3 class="text-xs font-bold text-emerald-400 border-b border-sky-500/20 pb-2">${t.sec_bio}</h3>
+                    <h3 class="text-xs font-bold text-sky-400 border-b border-sky-500/20 pb-2">${t.sec_bio}</h3>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_dob}</label>
@@ -402,7 +428,7 @@ function viewEmployee(code) {
                         </div>
                         <div>
                             <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_age}</label>
-                            <input type="text" id="edit-age" value="${age}" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-amber-400 text-xs font-bold focus:outline-none">
+                            <input type="text" id="edit-age" value="${age}" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sky-300 text-xs font-bold focus:outline-none">
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
@@ -423,7 +449,7 @@ function viewEmployee(code) {
 
                 <!-- التواصل والعنوان -->
                 <div class="glass-card p-5 rounded-2xl col-span-1 md:col-span-3 space-y-3 border border-sky-500/30 shadow-xl">
-                    <h3 class="text-xs font-bold text-amber-400 border-b border-sky-500/20 pb-2">${t.sec_contact}</h3>
+                    <h3 class="text-xs font-bold text-sky-400 border-b border-sky-500/20 pb-2">${t.sec_contact}</h3>
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                         <div>
                             <label class="block text-[11px] text-slate-400 mb-1">${t.lbl_mobile}</label>
