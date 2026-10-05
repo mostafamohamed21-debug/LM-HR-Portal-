@@ -75,7 +75,6 @@ function toggleLanguage() {
     document.getElementById('lang-btn-text').textContent = translations[currentLang].lang_btn;
 }
 
-// جلب بيانات الموظفين من ملف الـ JSON المسمى: clean_employees_data
 document.addEventListener("DOMContentLoaded", () => {
     fetch('clean_employees_data')
         .then(response => {
@@ -83,7 +82,6 @@ document.addEventListener("DOMContentLoaded", () => {
             return response.json();
         })
         .then(resData => {
-            // معالجة هيكل الـ JSON الخاص بك (سواء كان بداخله مفتاح employees أو مصفوفة مباشرة)[cite: 16]
             const rawEmployees = resData.employees ? resData.employees : resData;
             allEmployees = Array.isArray(rawEmployees) ? rawEmployees : Object.values(rawEmployees);
 
@@ -96,7 +94,7 @@ document.addEventListener("DOMContentLoaded", () => {
         })
         .catch(error => {
             console.error("خطأ:", error);
-            document.getElementById('employees-table-body').innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-400">فشل تحميل ملف البيانات (clean_employees_data_2)، تأكد أنه في نفس مجلد المشروع ومُشغل عبر السيرفر المحلي.</td></tr>`;
+            document.getElementById('employees-table-body').innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-400">فشل تحميل ملف البيانات (clean_employees_data)، تأكد أنه في نفس مجلد المشروع.</td></tr>`;
         });
 });
 
