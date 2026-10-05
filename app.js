@@ -41,24 +41,26 @@ const translations = {
         sec_qual: "🎓 المؤهل والخدمة",
         sec_bio: "👤 الميلاد والسن والتأمين",
         sec_contact: "📞 قنوات الاتصال والعنوان",
+        lbl_code: "الكود",
         lbl_name: "اسم الموظف",
         lbl_dept: "الإدارة",
-        lbl_job: "الوظيفة",
         lbl_manager: "المدير المباشر",
+        lbl_qual: "المؤهل",
+        lbl_qual_date: "تاريخ الحصول على المؤهل",
+        lbl_qual_auth: "جهة المؤهل",
+        lbl_job: "الوظيفة",
         lbl_hiredate: "تاريخ التعيين",
         lbl_service_years: "سنوات الخدمة",
-        lbl_qual: "المؤهل الدراسي",
-        lbl_qual_auth: "جهة التخرج",
+        lbl_insurance: "الحالة التأمينية",
         lbl_dob: "تاريخ الميلاد",
         lbl_age: "السن حتى تاريخه",
         lbl_pob: "مكان الميلاد",
-        lbl_insurance: "الحالة التأمينية",
-        lbl_national_id: "الرقم القومي",
+        lbl_national_id: "الرقم القومى",
+        lbl_leave_bal: "رصيد الاجازات",
+        lbl_address: "العنوان",
         lbl_mobile: "رقم الهاتف",
-        lbl_emergency: "رقم الطوارئ",
-        lbl_email: "البريد الإلكتروني",
-        lbl_leave_bal: "رصيد الإجازات",
-        lbl_address: "العنوان بالتفصيل"
+        lbl_emergency: "رقم هاتف الطوارئ",
+        lbl_email: "الايميل"
     },
     en: {
         page_title: "HR Central Portal | Lacto Misr",
@@ -78,7 +80,7 @@ const translations = {
         th_name: "Employee Name",
         th_dept: "Department",
         th_job: "Job Title",
-        th_hire: "Hire Date",
+        th_hire: "Date of Hiring",
         th_actions: "Actions",
         loading: "Loading database records...",
         action_btn: "View Profile",
@@ -91,30 +93,32 @@ const translations = {
         sec_qual: "🎓 Qualification & Service",
         sec_bio: "👤 DOB, Age & Insurance",
         sec_contact: "📞 Contact & Address",
-        lbl_name: "Employee Name",
+        lbl_code: "Code",
+        lbl_name: "Emp_name _En",
         lbl_dept: "Department",
-        lbl_job: "Job Title",
-        lbl_manager: "Direct Manager",
-        lbl_hiredate: "Hire Date",
-        lbl_service_years: "Years of Service",
+        lbl_manager: "Direct manager",
         lbl_qual: "Qualification",
-        lbl_qual_auth: "Issuing Authority",
-        lbl_dob: "Date of Birth",
-        lbl_age: "Age to Date",
-        lbl_pob: "Place of Birth",
+        lbl_qual_date: "Qualification Date",
+        lbl_qual_auth: "Qulification Issuing Authority",
+        lbl_job: "Job title",
+        lbl_hiredate: "Date_of_Hiring",
+        lbl_service_years: "Years of service",
         lbl_insurance: "Insurance Status",
-        lbl_national_id: "National ID",
-        lbl_mobile: "Mobile Number",
-        lbl_emergency: "Emergency Phone",
-        lbl_email: "Email Address",
-        lbl_leave_bal: "Leave Balance",
-        lbl_address: "Detailed Address"
+        lbl_dob: "DOB",
+        lbl_age: "Age to date",
+        lbl_pob: "POB",
+        lbl_national_id: "N_ID",
+        lbl_leave_bal: "Annual Leave balance",
+        lbl_address: "address",
+        lbl_mobile: "mobile number",
+        lbl_emergency: "Emg_Phone_No",
+        lbl_email: "Email"
     }
 };
 
 let currentLang = 'ar';
 let allEmployees = [];
-let activeViewingCode = null; // يحفظ الكود الحالي للموظف المفتوح لو حصل تبديل لغة
+let activeViewingCode = null;
 
 function toggleLangDropdown() {
     const dropdown = document.getElementById('lang-dropdown');
@@ -164,7 +168,6 @@ function setLanguage(lang) {
         }
     });
 
-    // لو المستخدم جوه ملف موظف حالياً، نعمل ريفريش للملف بنفس اللغة الجديدة بدلاً من الخروج للجدول
     if (activeViewingCode) {
         viewEmployee(activeViewingCode, true);
     } else {
@@ -225,10 +228,10 @@ function renderTable(dataList) {
     dataList.forEach(emp => {
         const empCode = emp.الكود || emp.Code || '--';
         
-        let empName = currentLang === 'ar' ? (emp["اسم الموظف"] || emp.اسم_الموظف || emp["Emp_name _En"] || '--') : (emp["Emp_name _En"] || emp.Emp_name_En || emp["اسم الموظف"] || '--');
-        let empDept = currentLang === 'ar' ? (emp["الإدارة"] || emp["Human Resources & Administrative Affairs"] || '--') : (emp["Human Resources & Administrative Affairs"] || emp["الإدارة"] || '--');
-        let empJob = currentLang === 'ar' ? (emp["الوظيفة"] || emp["Job title"] || '--') : (emp["Job title"] || emp["الوظيفة"] || '--');
-        const empHireDate = emp["تاريخ التعيين"] || emp.Date_of_Hiring || '--';
+        let empName = currentLang === 'ar' ? (emp["اسم الموظف"] || '--') : (emp["Emp_name _En"] || '--');
+        let empDept = currentLang === 'ar' ? (emp["الإدارة"] || '--') : (emp["Department"] || '--');
+        let empJob = currentLang === 'ar' ? (emp["الوظيفة"] || '--') : (emp["Job title"] || '--');
+        let empHireDate = currentLang === 'ar' ? (emp["تاريخ التعيين"] || '--') : (emp["Date_of_Hiring"] || '--');
 
         const row = document.createElement('tr');
         row.className = "hover:bg-slate-800/40 transition text-slate-300";
@@ -279,26 +282,27 @@ function viewEmployee(code, isLangSwitch = false) {
 
     const t = translations[currentLang];
 
-    // جلب القيم حسب اللغة الحالية بشكل قاطع لمنع أي تداخل
-    const nameVal = currentLang === 'ar' ? (emp["اسم الموظف"] || emp["Emp_name _En"] || "") : (emp["Emp_name _En"] || emp["اسم الموظف"] || "");
-    const deptVal = currentLang === 'ar' ? (emp["الإدارة"] || emp["Human Resources & Administrative Affairs"] || "") : (emp["Human Resources & Administrative Affairs"] || emp["الإدارة"] || "");
-    const jobVal = currentLang === 'ar' ? (emp["الوظيفة"] || emp["Job title"] || "") : (emp["Job title"] || emp["الوظيفة"] || "");
+    // جلب الحقول من الشيت بالحرف الواحد وبدقة تامة حسب اللغة
+    const nameVal = currentLang === 'ar' ? (emp["اسم الموظف"] || "") : (emp["Emp_name _En"] || "");
+    const deptVal = currentLang === 'ar' ? (emp["الإدارة"] || "") : (emp["Department"] || "");
+    const jobVal = currentLang === 'ar' ? (emp["الوظيفة"] || "") : (emp["Job title"] || "");
     const directMgr = emp["المدير المباشر"] || emp["Direct manager"] || "";
     const qual = emp["المؤهل"] || emp["Qualification"] || "";
+    const qualDate = emp["تاريخ الحصول على المؤهل"] || emp["Qualification Date"] || "";
     const qualAuth = emp["جهة المؤهل"] || emp["Qulification Issuing Authority"] || "";
     const insurance = emp["الحالة التأمينية"] || emp["Insurance Status"] || "";
     const pob = emp["مكان الميلاد"] || emp["POB"] || "";
     
-    const hireDate = emp["تاريخ التعيين"] || emp.Date_of_Hiring || "";
+    const hireDate = emp["تاريخ التعيين"] || emp["Date_of_Hiring"] || "";
     const yearsService = emp["سنوات الخدمة"] || emp["Years of service"] || "";
-    const dob = emp["تاريخ الميلاد"] || emp.DOB || "";
+    const dob = emp["تاريخ الميلاد"] || emp["DOB"] || "";
     const age = emp["السن حتى تاريخه"] || emp["Age to date"] || "";
-    const nationalId = emp["الرقم القومى"] || emp.N_ID || "";
+    const nationalId = emp["الرقم القومى"] || emp["N_ID"] || "";
     const leaveBal = emp["رصيد الاجازات"] || emp["Annual Leave balance"] || "0";
-    const address = emp["العنوان"] || emp.address || "";
+    const address = emp["العنوان"] || emp["address"] || "";
     const mobile = emp["رقم الهاتف"] || emp["mobile number"] || "";
-    const emgPhone = emp["رقم هاتف الطوارئ"] || emp.Emg_Phone_No || "";
-    const email = emp["الايميل"] || emp.Email || "";
+    const emgPhone = emp["رقم هاتف الطوارئ"] || emp["Emg_Phone_No"] || "";
+    const email = emp["الايميل"] || emp["Email"] || "";
     
     const empPhoto = emp.photo || 'background.jpg';
 
@@ -486,29 +490,44 @@ function saveEmployeeProfileChanges(code) {
     const emp = allEmployees.find(e => String(e.الكود || e.Code) === String(code));
     if (emp) {
         const fieldKeyName = currentLang === 'ar' ? "اسم الموظف" : "Emp_name _En";
-        const fieldKeyDept = currentLang === 'ar' ? "الإدارة" : "Human Resources & Administrative Affairs";
+        const fieldKeyDept = currentLang === 'ar' ? "الإدارة" : "Department";
         const fieldKeyJob = currentLang === 'ar' ? "الوظيفة" : "Job title";
+        const fieldKeyHire = currentLang === 'ar' ? "تاريخ التعيين" : "Date_of_Hiring";
 
         const updatedData = {};
         updatedData[fieldKeyName] = document.getElementById('edit-name').value;
         updatedData[fieldKeyDept] = document.getElementById('edit-dept').value;
         updatedData[fieldKeyJob] = document.getElementById('edit-job').value;
+        updatedData[fieldKeyHire] = document.getElementById('edit-hiredate').value;
         
         updatedData["المدير المباشر"] = document.getElementById('edit-manager').value;
-        updatedData["تاريخ التعيين"] = document.getElementById('edit-hiredate').value;
+        updatedData["Direct manager"] = document.getElementById('edit-manager').value;
         updatedData["سنوات الخدمة"] = document.getElementById('edit-service').value;
+        updatedData["Years of service"] = document.getElementById('edit-service').value;
         updatedData["المؤهل"] = document.getElementById('edit-qual').value;
+        updatedData["Qualification"] = document.getElementById('edit-qual').value;
         updatedData["جهة المؤهل"] = document.getElementById('edit-qualauth').value;
+        updatedData["Qulification Issuing Authority"] = document.getElementById('edit-qualauth').value;
         updatedData["تاريخ الميلاد"] = document.getElementById('edit-dob').value;
+        updatedData["DOB"] = document.getElementById('edit-dob').value;
         updatedData["السن حتى تاريخه"] = document.getElementById('edit-age').value;
+        updatedData["Age to date"] = document.getElementById('edit-age').value;
         updatedData["مكان الميلاد"] = document.getElementById('edit-pob').value;
+        updatedData["POB"] = document.getElementById('edit-pob').value;
         updatedData["الحالة التأمينية"] = document.getElementById('edit-insurance').value;
+        updatedData["Insurance Status"] = document.getElementById('edit-insurance').value;
         updatedData["الرقم القومى"] = document.getElementById('edit-nid').value;
+        updatedData["N_ID"] = document.getElementById('edit-nid').value;
         updatedData["رقم الهاتف"] = document.getElementById('edit-mobile').value;
+        updatedData["mobile number"] = document.getElementById('edit-mobile').value;
         updatedData["رقم هاتف الطوارئ"] = document.getElementById('edit-emg').value;
+        updatedData["Emg_Phone_No"] = document.getElementById('edit-emg').value;
         updatedData["الايميل"] = document.getElementById('edit-email').value;
+        updatedData["Email"] = document.getElementById('edit-email').value;
         updatedData["رصيد الاجازات"] = document.getElementById('edit-leave').value;
+        updatedData["Annual Leave balance"] = document.getElementById('edit-leave').value;
         updatedData["العنوان"] = document.getElementById('edit-address').value;
+        updatedData["address"] = document.getElementById('edit-address').value;
         updatedData["photo"] = emp.photo || 'background.jpg';
 
         Object.assign(emp, updatedData);
