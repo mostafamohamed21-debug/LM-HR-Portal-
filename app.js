@@ -15,24 +15,29 @@ function excelDateToJSDate(serial) {
 let allEmployees = [];
 let currentLang = 'ar';
 
-// الترجمات الأساسية للواجهة
+// القواميس والترجمات الشاملة للواجهة وتفاصيل الملف
 const translations = {
     ar: {
         no_results: "لا توجد نتائج مطابقة للبحث",
-        action_btn: "عرض الملف"
+        action_btn: "عرض الملف",
+        back_to_list: "← العودة لقائمة الموظفين",
+        profile_title: "الملف الوظيفي الشامل",
+        profile_subtitle: "بيانات السجل الوظيفي للموظف"
     },
     en: {
         no_results: "No matching results found",
-        action_btn: "View Profile"
+        action_btn: "View Profile",
+        back_to_list: "← Back to Employees",
+        profile_title: "Comprehensive Employee Profile",
+        profile_subtitle: "Employee's Complete Record Details"
     }
 };
 
-// تحميل البيانات عند فتح الصفحة
+// تحميل البيانات عند فتح الصفحة وربط الأحداث
 document.addEventListener('DOMContentLoaded', () => {
     fetch('clean_employees_data.json')
         .then(response => response.json())
         .then(data => {
-            // تصفية السجلات الفارغة إن وجدت
             allEmployees = data.filter(emp => (emp["الكود"] || emp["code"]) && (emp["اسم الموظف "] || emp["emp_name _en"]));
             renderTable(allEmployees);
             updateDashboardStats();
@@ -53,9 +58,23 @@ document.addEventListener('DOMContentLoaded', () => {
             renderTable(filtered);
         });
     }
+
+    // ربط زر تبديل اللغة (إن وجد في الصفحة بالـ ID أو Class)
+    const langToggleBtn = document.getElementById('lang-toggle') || document.querySelector('.lang-switcher');
+    if (langToggleBtn) {
+        langToggleBtn.addEventListener('click', toggleLanguage);
+    }
 });
 
-// عرض جدول الموظفين بمرونة تامة للأسماء والتواريخ
+// وظيفة تبديل اللغة وتحديث الواجهة
+function toggleLanguage() {
+    currentLang = currentLang === 'ar' ? 'en' : 'ar';
+    document.documentElement.lang = currentLang;
+    document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+    renderTable(allEmployees);
+}
+
+// عرض جدول الموظفين
 function renderTable(dataList) {
     const tableBody = document.getElementById('employees-table-body');
     if (!tableBody) return;
@@ -76,13 +95,13 @@ function renderTable(dataList) {
         let empHireDate = typeof rawHireDate === 'number' ? excelDateToJSDate(rawHireDate) : rawHireDate;
 
         if (currentLang === 'ar') {
-            empName = emp["اسم الموظف "] || emp["اسم الموظف"] || emp["emp_name _en"] || '--';
-            empDept = emp["الإدارة "] || emp["الإدارة"] || emp["department"] || '--';
-            empJob = emp["الوظيفة"] || emp["الوظيفة "] || emp["job title"] || '--';
+            empName = (emp["اسم الموظف "] || emp["اسم الموظف"] || '--').trim();
+            empDept = (emp["الإدارة "] || emp["الإدارة"] || emp["department"] || '--').trim();
+            empJob = (emp["الوظيفة"] || emp["الوظيفة "] || emp["job title"] || '--').trim();
         } else {
-            empName = emp["emp_name _en"] || emp["اسم الموظف "] || emp["اسم الموظف"] || '--';
-            empDept = emp["department"] || emp["Department"] || emp["الإدارة "] || '--';
-            empJob = emp["job title"] || emp["Job title"] || emp["الوظيفة"] || '--';
+            empName = (emp["emp_name _en"] || emp["اسم الموظف "] || emp["اسم الموظف"] || '--').trim();
+            empDept = (emp["department"] || emp["Department"] || emp["الإدارة "] || '--').trim();
+            empJob = (emp["job title"] || emp["Job title"] || emp["الوظيفة"] || '--').trim();
         }
 
         const row = document.createElement('tr');
@@ -101,21 +120,57 @@ function renderTable(dataList) {
     });
 }
 
-// عرض ملف الموظف بالتفصيل
+// عرض ملف الموظف تفصيلياً عند الضغط على زر عرض الملف
 function viewEmployee(code) {
-    const emp = allEmployees.find(e => String(e["الكود"] === code || e["code"] === code || e["الكود"] == code || e["code"] == code));
+    const emp = allEmployees.find(e => String(e["الكود"] || e["code"]) === String(code));
     if (!emp) return;
 
-    // يمكنك استدعاء واجهة عرض الملف الشخصي هنا وتعبئة الحقول ببيانات الموظف `emp`
-    console.log("Viewing employee:", emp);
-    // مثال لتعبئة الاسم لو عنصر عرض الملف موجود
-    const nameField = document.getElementById('profile-emp-name');
-    if (nameField) {
-        nameField.innerText = currentLang === 'ar' ? (emp["اسم الموظف "] || emp["اسم الموظف"]) : emp["emp_name _en"];
+    // إخفاء الجدول وإظهار قسم تفاصيل الملف (أو العكس حسب تصميم الـ HTML عندك)
+    const listView = document.getElementById('employees-list-view') || document.getElementById('main-table-container');
+    const profileView = document.getElementById('employee-profile-view') || document.getElementById('profile-container');
+    
+    if (listView && profileView) {
+        listView.style.display = 'none';
+        profileView.style.display = 'block';
+    }
+
+    // تعبئة حقول الملف الشخصي
+    setTextContent('profile-emp-name', currentLang === 'ar' ? (emp["اسم الموظف "] || emp["اسم الموظف"]) : emp["emp_name _en"]);
+    setTextContent('profile-emp-code', emp["الكود"] || emp["code"]);
+    setTextContent('profile-department', currentLang === 'ar' ? (emp["الإدارة "] || emp["الإدارة"]) : emp["department"]);
+    setTextContent('profile-job-title', currentLang === 'ar' ? emp["الوظيفة"] : emp["job title"]);
+    setTextContent('profile-direct-manager', currentLang === 'ar' ? emp["المدير المباشر "] : emp["direct manager"]);
+    setTextContent('profile-hire-date', excelDateToJSDate(emp["تاريخ التعيين "] || emp["تاريخ التعيين"] || emp["date_of_hiring "]));
+    setTextContent('profile-years-service', emp["سنوات الخدمة "] || emp["years of service"]);
+    setTextContent('profile-qualification', currentLang === 'ar' ? emp["المؤهل"] : emp["qualification"]);
+    setTextContent('profile-qulification-auth', currentLang === 'ar' ? emp["جهة المؤهل "] : emp["qulification issuing authority"]);
+    setTextContent('profile-dob', excelDateToJSDate(emp["تاريخ الميلاد"] || emp["dob"]));
+    setTextContent('profile-age', emp["السن حتى تاريخه "] || emp["age to date"]);
+    setTextContent('profile-insurance-status', currentLang === 'ar' ? emp["الحالة التأمينية "] : emp["insurance status"]);
+    setTextContent('profile-pob', currentLang === 'ar' ? emp["مكان الميلاد"] : emp["pob"]);
+}
+
+// العودة للقائمة الرئيسية من داخل صفحة الملف
+function backToEmployeesList() {
+    const listView = document.getElementById('employees-list-view') || document.getElementById('main-table-container');
+    const profileView = document.getElementById('employee-profile-view') || document.getElementById('profile-container');
+    
+    if (listView && profileView) {
+        profileView.style.display = 'none';
+        listView.style.display = 'block';
     }
 }
 
-// تحديث إحصائيات لوحة القيادة
+// دالة مساعدة لتعبئة النصوص بأمان
+function textContent(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.innerText = text || '--';
+}
+function setTextContent(id, text) {
+    textContent(id, text);
+}
+
+// تحديث الإحصائيات في لوحة القيادة
 function updateDashboardStats() {
     const totalCountEl = document.getElementById('total-employees-count');
     if (totalCountEl) {
