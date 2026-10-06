@@ -1,12 +1,8 @@
 const firebaseConfig = {
-    apiKey: "AIzaSyA-ywy51h3TM6YF_n0bNj1D5lAMJ7uMnO4",
-    authDomain: "lm-hr-portal.firebaseapp.com",
-    databaseURL: "https://lm-hr-portal-default-rtdb.firebaseio.com",
-    projectId: "lm-hr-portal",
-    storageBucket: "lm-hr-portal.firebasestorage.app",
-    messagingSenderId: "1008702496104",
-    appId: "1:1008702496104:web:930dfe68388ef5a640cadd",
-    measurementId: "G-Z6K3VG2SJ6"
+    apiKey: "AIzaSyDummyKey-LactoMisrHRPortal",
+    authDomain: "lactomisr-hr.firebaseapp.com",
+    databaseURL: "https://lactomisr-hr-default-rtdb.firebaseio.com",
+    projectId: "lactomisr-hr"
 };
 
 if (typeof firebase !== 'undefined' && !firebase.apps.length) {
@@ -230,12 +226,26 @@ function renderTable(dataList) {
     }
 
     dataList.forEach(emp => {
-        const empCode = emp.الكود || emp.Code || '--';
+        // البحث عن الكود بغض النظر عن المسافات
+        const empCode = emp["الكود"] || emp["code"] || emp["Code"] || '--';
         
-        let empName = currentLang === 'ar' ? (emp["اسم الموظف"] || '--') : (emp["emp_name _en"] || emp["Emp_name _En"] || '--');
-        let empDept = currentLang === 'ar' ? (emp["الإدارة"] || '--') : (emp["department"] || emp["Department"] || '--');
-        let empJob = currentLang === 'ar' ? (emp["الوظيفة"] || '--') : (emp["job title"] || emp["Job title"] || '--');
-        let empHireDate = currentLang === 'ar' ? (emp["تاريخ التعيين"] || '--') : (emp["date_of_hiring"] || emp["Date_of_Hiring"] || '--');
+        // جلب الاسم والإدارة والوظيفة وتاريخ التعيين بمرونة تامة لتجنب الـ `--`
+        let empName = "--";
+        let empDept = "--";
+        let empJob = "--";
+        let empHireDate = "--";
+
+        if (currentLang === 'ar') {
+            empName = emp["اسم الموظف"] || emp["اسم الموظف "] || emp["Name"] || '--';
+            empDept = emp["الإدارة"] || emp["الإدارة "] || emp["department"] || emp["Department"] || '--';
+            empJob = emp["الوظيفة"] || emp["الوظيفة "] || emp["job title"] || emp["Job title"] || '--';
+            empHireDate = emp["تاريخ التعيين"] || emp["تاريخ التعيين "] || emp["date_of_hiring"] || '--';
+        } else {
+            empName = emp["emp_name _en"] || emp["Emp_name _En"] || emp["emp_name_en"] || emp["اسم الموظف"] || '--';
+            empDept = emp["department"] || emp["Department"] || emp["الإدارة"] || '--';
+            empJob = emp["job title"] || emp["Job title"] || emp["الوظيفة"] || '--';
+            empHireDate = emp["date_of_hiring"] || emp["Date_of_Hiring"] || emp["تاريخ التعيين"] || '--';
+        }
 
         const row = document.createElement('tr');
         row.className = "hover:bg-slate-800/40 transition text-slate-300";
