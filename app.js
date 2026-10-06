@@ -6,7 +6,79 @@ function excelDateToJSDate(serial) {
     const date_info = new Date(utc_value);
     if (isNaN(date_info.getTime())) return serial;
     
+    const year = date_info.getUTCFullYear();// دوال تحويل وتنسيق تواريخ إكسيل
+function excelDateToJSDate(serial) {
+    if (!serial || typeof serial !== 'number') return serial || '--';
+    const utc_days = Math.floor(serial - 25569);
+    const utc_value = utc_days * 86400 * 1000;
+    const date_info = new Date(utc_value);
+    if (isNaN(date_info.getTime())) return serial;
+    
     const year = date_info.getUTCFullYear();
+    const month = String(date_info.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date_info.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+// إعدادات فايربيس الرسمية الخاصة بك
+const firebaseConfig = {
+    apiKey: "AIzaSyA-ywy51h3TM6YF_n0bNj1D5lAMJ7uMnO4",
+    authDomain: "lm-hr-portal.firebaseapp.com",
+    databaseURL: "https://lm-hr-portal-default-rtdb.firebaseio.com",
+    projectId: "lm-hr-portal",
+    storageBucket: "lm-hr-portal.firebasestorage.app",
+    messagingSenderId: "1008702496104",
+    appId: "1:1008702496104:web:930dfe68388ef5a640cadd",
+    measurementId: "G-Z6K3VG2SJ6"
+};
+
+// تهيئة Firebase
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+    firebase.analytics();
+}
+const db = firebase.database();
+
+let allEmployees = [];
+let currentLang = 'ar';
+let activeEmployeeCode = null;
+
+// قاموس الترجمات الشامل
+const translations = {
+    ar: {
+        admin: "مسؤول النظام",
+        control_panel: "غرفة التحكم",
+        nav_home: "الرئيسية والموظفين",
+        nav_depts: "الإدارات والأقسام",
+        nav_attendance: "الحضور والإنصراف",
+        nav_reports: "التقارير والإحصائيات",
+        total_emp: "إجمالي العاملين",
+        active_depts: "الإدارات النشطة",
+        system_status: "حالة النظام",
+        connected: "مستقر (متصل بـ Firebase)",
+        emp_list: "قائمة العاملين بالقاعدة",
+        search_placeholder: "بحث بالاسم أو الكود...",
+        th_code: "الكود",
+        th_name: "اسم الموظف",
+        th_dept: "الإدارة",
+        th_job: "الوظيفة",
+        th_hire: "تاريخ التعيين",
+        th_actions: "الإجراءات",
+        loading: "جاري جلب البيانات من القاعدة...",
+        no_results: "لا توجد نتائج مطابقة للبحث",
+        action_btn: "عرض الملف",
+        back_btn: "← العودة للقائمة",
+        profile_title: "الملف الوظيفي الشامل",
+        edit_btn: "تعديل البيانات",
+        save_btn: "حفظ",
+        change_photo: "تعديل الصورة",
+        sec_job: "البيانات الوظيفية",
+        manager_label: "المدير المباشر",
+        service_years: "سنوات الخدمة",
+        sec_qual: "المؤهل العلمي",
+        qual_label: "المؤهل",
+        qual_auth: "جهة المؤهل",
+        sec_personal: "ال
     const month = String(date_info.getUTCMonth() + 1).padStart(2, '0');
     const day = String(date_info.getUTCDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
