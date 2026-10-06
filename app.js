@@ -15,12 +15,51 @@ function excelDateToJSDate(serial) {
 let allEmployees = [];
 let currentLang = 'ar';
 
+// قاموس الترجمات الشامل للواجهة وعناصر الـ HTML
 const translations = {
     ar: {
+        admin: "مسؤول النظام",
+        control_panel: "غرفة التحكم",
+        nav_home: "الرئيسية والموظفين",
+        nav_depts: "الإدارات والأقسام",
+        nav_attendance: "الحضور والإنصراف",
+        nav_reports: "التقارير والإحصائيات",
+        total_emp: "إجمالي العاملين",
+        active_depts: "الإدارات النشطة",
+        system_status: "حالة النظام",
+        connected: "مستقر (متصل بـ Firebase)",
+        emp_list: "قائمة العاملين بالقاعدة",
+        search_placeholder: "بحث بالاسم أو الكود...",
+        th_code: "الكود",
+        th_name: "اسم الموظف",
+        th_dept: "الإدارة",
+        th_job: "الوظيفة",
+        th_hire: "تاريخ التعيين",
+        th_actions: "الإجراءات",
+        loading: "جاري جلب البيانات من القاعدة...",
         no_results: "لا توجد نتائج مطابقة للبحث",
         action_btn: "عرض الملف"
     },
     en: {
+        admin: "System Admin",
+        control_panel: "Control Room",
+        nav_home: "Home & Employees",
+        nav_depts: "Departments",
+        nav_attendance: "Attendance & Departure",
+        nav_reports: "Reports & Analytics",
+        total_emp: "Total Employees",
+        active_depts: "Active Departments",
+        system_status: "System Status",
+        connected: "Stable (Connected to Firebase)",
+        emp_list: "Database Employees List",
+        search_placeholder: "Search by name or code...",
+        th_code: "Code",
+        th_name: "Employee Name",
+        th_dept: "Department",
+        th_job: "Job Title",
+        th_hire: "Hire Date",
+        th_actions: "Actions",
+        loading: "Fetching data from database...",
         no_results: "No matching results found",
         action_btn: "View Profile"
     }
@@ -36,47 +75,73 @@ document.addEventListener('DOMContentLoaded', () => {
             updateDashboardStats();
         })
         .catch(error => console.error('Error loading employee data:', error));
-
-    // البحث الفوري
-    const searchInput = document.getElementById('search-input');
-    if (searchInput) {
-        searchInput.addEventListener('input', (e) => {
-            const query = e.target.value.toLowerCase().trim();
-            const filtered = allEmployees.filter(emp => {
-                const code = String(emp["الكود"] || emp["code"] || '').toLowerCase();
-                const nameAr = String(emp["اسم الموظف "] || emp["اسم الموظف"] || '').toLowerCase();
-                const nameEn = String(emp["emp_name _en"] || '').toLowerCase();
-                return code.includes(query) || nameAr.includes(query) || nameEn.includes(query);
-            });
-            renderTable(filtered);
-        });
-    }
-
-    // نظام ذكي عام للتعامل مع أي زرار في الصفحة بالضغط (اللغة، الرجوع، إلخ)
-    document.addEventListener('click', (e) => {
-        const target = e.target.closest('button') || e.target;
-        
-        // لو الضغطة على زرار اللغة (أو أي عنصر فيه AR / EN أو كلمة lang)
-        if (target && (target.id.includes('lang') || target.classList.contains('lang') || target.innerText.includes('AR') || target.innerText.includes('EN'))) {
-            toggleLanguage();
-        }
-        
-        // لو الضغطة على زرار العودة للقائمة
-        if (target && (target.innerText.includes('العودة') || target.innerText.includes('Back') || target.id.includes('back'))) {
-            backToEmployeesList();
-        }
-    });
 });
 
-// تبديل اللغة
-function toggleLanguage() {
-    currentLang = currentLang === 'ar' ? 'en' : 'ar';
-    document.documentElement.lang = currentLang;
-    document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+// فتح وإغلاق القائمة المنسدلة للغة
+function toggleLangDropdown() {
+    const dropdown = document.getElementById('lang-dropdown');
+    if (dropdown) {
+        dropdown.classList.toggle('hidden');
+    }
+}
+
+// تغيير اللغة (عربي / إنجليزي)
+function setLanguage(lang) {
+    currentLang = lang;
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    
+    // إخفاء القائمة المنسدلة بعد الاختيار
+    const dropdown = document.getElementById('lang-dropdown');
+    if (dropdown) dropdown.classList.add('hidden');
+
+    // تحديث علم وعلم الدولة في زر اللغة العلوي
+    const langFlag = document.getElementById('lang-flag');
+    const langCode = document.getElementById('lang-code');
+    if (langFlag && langCode) {
+        if (lang === 'ar') {
+            langFlag.innerText = '🇪🇬';
+            langCode.innerText = 'AR';
+        } else {
+            langFlag.innerText = '🇬🇧';
+            langCode.innerText = 'EN';
+        }
+    }
+
+    // تطبيق الترجمات على عناصر الـ HTML التي تحتوي على خاصية data-translate
+    document.querySelectorAll('[data-translate]').forEach(el => {
+        const key = el.getAttribute('data-translate');
+        if (translations[currentLang][key]) {
+            el.innerText = translations[currentLang][key];
+        }
+    });
+
+    // تطبيق ترجمة مكان الكتابة في حقل البحث
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        searchInput.placeholder = translations[currentLang]['search_placeholder'];
+    }
+
+    // إعادة رسم الجدول باللغة الجديدة
     renderTable(allEmployees);
 }
 
-// عرض جدول الموظفين
+// البحث الفوري
+function filterEmployees() {
+    const searchInput = document.getElementById('search-input');
+    if (!searchInput) return;
+    const query = searchInput.value.toLowerCase().trim();
+    
+    const filtered = allEmployees.filter(emp => {
+        const code = String(emp["الكود"] || emp["code"] || '').toLowerCase();
+        const nameAr = String(emp["اسم الموظف "] || emp["اسم الموظف"] || '').toLowerCase();
+        const nameEn = String(emp["emp_name _en"] || '').toLowerCase();
+        return code.includes(query) || nameAr.includes(query) || nameEn.includes(query);
+    });
+    renderTable(filtered);
+}
+
+// عرض جدول الموظفين مع دعم كامل للغتين وتاريخ إكسيل
 function renderTable(dataList) {
     const tableBody = document.getElementById('employees-table-body');
     if (!tableBody) return;
@@ -122,49 +187,32 @@ function renderTable(dataList) {
     });
 }
 
-// عرض ملف الموظف بالتفصيل
+// عرض ملف الموظف (يمكنك تخصيصها لفتح Modal أو الانتقال لصفحة التفاصيل)
 function viewEmployee(code) {
     const emp = allEmployees.find(e => String(e["الكود"] || e["code"]) === String(code));
     if (!emp) return;
-
-    // بحث ذكي عن حاوية الجدول وحاوية الملف بغض النظر عن الـ ID
-    const views = document.querySelectorAll('section, div');
-    views.forEach(el => {
-        if (el.id.includes('profile') || el.className.includes('profile')) {
-            el.style.display = 'block';
-        } else if (el.id.includes('list') || el.id.includes('table') || el.className.includes('table')) {
-            // لو الحاوية تخص الجدول نخفيها أو العكس
-        }
-    });
-
-    // تعبئة البيانات في الحقول لو وجدت
-    setVal('profile-emp-name', currentLang === 'ar' ? (emp["اسم الموظف "] || emp["اسم الموظف"]) : emp["emp_name _en"]);
-    setVal('profile-emp-code', emp["الكود"] || emp["code"]);
-    setVal('profile-department', currentLang === 'ar' ? (emp["الإدارة "] || emp["الإدارة"]) : emp["department"]);
-    setVal('profile-job-title', currentLang === 'ar' ? emp["الوظيفة"] : emp["job title"]);
-    setVal('profile-direct-manager', currentLang === 'ar' ? emp["المدير المباشر "] : emp["direct manager"]);
-    setVal('profile-hire-date', excelDateToJSDate(emp["تاريخ التعيين "] || emp["تاريخ التعيين"]));
-    setVal('profile-years-service', emp["سنوات الخدمة "] || emp["years of service"]);
-    setVal('profile-qualification', currentLang === 'ar' ? emp["المؤهل"] : emp["qualification"]);
-    setVal('profile-qulification-auth', currentLang === 'ar' ? emp["جهة المؤهل "] : emp["qulification issuing authority"]);
-    setVal('profile-dob', excelDateToJSDate(emp["تاريخ الميلاد"] || emp["dob"]));
-    setVal('profile-age', emp["السن حتى تاريخه "] || emp["age to date"]);
-    setVal('profile-insurance-status', currentLang === 'ar' ? emp["الحالة التأمينية "] : emp["insurance status"]);
-    setVal('profile-pob', currentLang === 'ar' ? emp["مكان الميلاد"] : emp["pob"]);
+    
+    const name = currentLang === 'ar' ? (emp["اسم الموظف "] || emp["اسم الموظف"]) : emp["emp_name _en"];
+    const dept = currentLang === 'ar' ? (emp["الإدارة "] || emp["الإدارة"]) : emp["department"];
+    const job = currentLang === 'ar' ? emp["الوظيفة"] : emp["job title"];
+    
+    alert(`${currentLang === 'ar' ? 'بيانات الموظف' : 'Employee Profile'}:\n- ID: ${code}\n- Name: ${name}\n- Dept: ${dept}\n- Job: ${job}`);
 }
 
-function backToEmployeesList() {
-    location.reload(); // أبسط وأضمن طريقة للرجوع للقائمة الرئيسية وإعادة ضبط الحالة بالكامل
-}
-
-function setVal(id, val) {
-    const el = document.getElementById(id) || document.querySelector(`.${id}`);
-    if (el) el.innerText = val || '--';
-}
-
+// تحديث الإحصائيات في لوحة القيادة
 function updateDashboardStats() {
-    const totalCountEl = document.getElementById('total-employees-count') || document.querySelector('.total-employees');
+    const totalCountEl = document.getElementById('total-employees-count');
     if (totalCountEl) {
         totalCountEl.innerText = allEmployees.length;
     }
 }
+
+// إغلاق القائمة المنسدلة للغة عند الضغط في أي مكان خارجها
+window.addEventListener('click', (e) => {
+    if (!e.target.closest('button[onclick="toggleLangDropdown()"]')) {
+        const dropdown = document.getElementById('lang-dropdown');
+        if (dropdown && !dropdown.classList.contains('hidden')) {
+            dropdown.classList.add('hidden');
+        }
+    }
+});
