@@ -15,25 +15,18 @@ function excelDateToJSDate(serial) {
 let allEmployees = [];
 let currentLang = 'ar';
 
-// القواميس والترجمات الشاملة للواجهة وتفاصيل الملف
 const translations = {
     ar: {
         no_results: "لا توجد نتائج مطابقة للبحث",
-        action_btn: "عرض الملف",
-        back_to_list: "← العودة لقائمة الموظفين",
-        profile_title: "الملف الوظيفي الشامل",
-        profile_subtitle: "بيانات السجل الوظيفي للموظف"
+        action_btn: "عرض الملف"
     },
     en: {
         no_results: "No matching results found",
-        action_btn: "View Profile",
-        back_to_list: "← Back to Employees",
-        profile_title: "Comprehensive Employee Profile",
-        profile_subtitle: "Employee's Complete Record Details"
+        action_btn: "View Profile"
     }
 };
 
-// تحميل البيانات عند فتح الصفحة وربط الأحداث
+// تحميل البيانات عند فتح الصفحة
 document.addEventListener('DOMContentLoaded', () => {
     fetch('clean_employees_data.json')
         .then(response => response.json())
@@ -44,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .catch(error => console.error('Error loading employee data:', error));
 
-    // ربط خانة البحث
+    // البحث الفوري
     const searchInput = document.getElementById('search-input');
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
@@ -59,14 +52,23 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ربط زر تبديل اللغة (إن وجد في الصفحة بالـ ID أو Class)
-    const langToggleBtn = document.getElementById('lang-toggle') || document.querySelector('.lang-switcher');
-    if (langToggleBtn) {
-        langToggleBtn.addEventListener('click', toggleLanguage);
-    }
+    // نظام ذكي عام للتعامل مع أي زرار في الصفحة بالضغط (اللغة، الرجوع، إلخ)
+    document.addEventListener('click', (e) => {
+        const target = e.target.closest('button') || e.target;
+        
+        // لو الضغطة على زرار اللغة (أو أي عنصر فيه AR / EN أو كلمة lang)
+        if (target && (target.id.includes('lang') || target.classList.contains('lang') || target.innerText.includes('AR') || target.innerText.includes('EN'))) {
+            toggleLanguage();
+        }
+        
+        // لو الضغطة على زرار العودة للقائمة
+        if (target && (target.innerText.includes('العودة') || target.innerText.includes('Back') || target.id.includes('back'))) {
+            backToEmployeesList();
+        }
+    });
 });
 
-// وظيفة تبديل اللغة وتحديث الواجهة
+// تبديل اللغة
 function toggleLanguage() {
     currentLang = currentLang === 'ar' ? 'en' : 'ar';
     document.documentElement.lang = currentLang;
@@ -95,7 +97,7 @@ function renderTable(dataList) {
         let empHireDate = typeof rawHireDate === 'number' ? excelDateToJSDate(rawHireDate) : rawHireDate;
 
         if (currentLang === 'ar') {
-            empName = (emp["اسم الموظف "] || emp["اسم الموظف"] || '--').trim();
+            empName = (emp["اسم الموظف "] || emp["اسم الموظف"] || emp["emp_name _en"] || '--').trim();
             empDept = (emp["الإدارة "] || emp["الإدارة"] || emp["department"] || '--').trim();
             empJob = (emp["الوظيفة"] || emp["الوظيفة "] || emp["job title"] || '--').trim();
         } else {
@@ -120,59 +122,48 @@ function renderTable(dataList) {
     });
 }
 
-// عرض ملف الموظف تفصيلياً عند الضغط على زر عرض الملف
+// عرض ملف الموظف بالتفصيل
 function viewEmployee(code) {
     const emp = allEmployees.find(e => String(e["الكود"] || e["code"]) === String(code));
     if (!emp) return;
 
-    // إخفاء الجدول وإظهار قسم تفاصيل الملف (أو العكس حسب تصميم الـ HTML عندك)
-    const listView = document.getElementById('employees-list-view') || document.getElementById('main-table-container');
-    const profileView = document.getElementById('employee-profile-view') || document.getElementById('profile-container');
-    
-    if (listView && profileView) {
-        listView.style.display = 'none';
-        profileView.style.display = 'block';
-    }
+    // بحث ذكي عن حاوية الجدول وحاوية الملف بغض النظر عن الـ ID
+    const views = document.querySelectorAll('section, div');
+    views.forEach(el => {
+        if (el.id.includes('profile') || el.className.includes('profile')) {
+            el.style.display = 'block';
+        } else if (el.id.includes('list') || el.id.includes('table') || el.className.includes('table')) {
+            // لو الحاوية تخص الجدول نخفيها أو العكس
+        }
+    });
 
-    // تعبئة حقول الملف الشخصي
-    setTextContent('profile-emp-name', currentLang === 'ar' ? (emp["اسم الموظف "] || emp["اسم الموظف"]) : emp["emp_name _en"]);
-    setTextContent('profile-emp-code', emp["الكود"] || emp["code"]);
-    setTextContent('profile-department', currentLang === 'ar' ? (emp["الإدارة "] || emp["الإدارة"]) : emp["department"]);
-    setTextContent('profile-job-title', currentLang === 'ar' ? emp["الوظيفة"] : emp["job title"]);
-    setTextContent('profile-direct-manager', currentLang === 'ar' ? emp["المدير المباشر "] : emp["direct manager"]);
-    setTextContent('profile-hire-date', excelDateToJSDate(emp["تاريخ التعيين "] || emp["تاريخ التعيين"] || emp["date_of_hiring "]));
-    setTextContent('profile-years-service', emp["سنوات الخدمة "] || emp["years of service"]);
-    setTextContent('profile-qualification', currentLang === 'ar' ? emp["المؤهل"] : emp["qualification"]);
-    setTextContent('profile-qulification-auth', currentLang === 'ar' ? emp["جهة المؤهل "] : emp["qulification issuing authority"]);
-    setTextContent('profile-dob', excelDateToJSDate(emp["تاريخ الميلاد"] || emp["dob"]));
-    setTextContent('profile-age', emp["السن حتى تاريخه "] || emp["age to date"]);
-    setTextContent('profile-insurance-status', currentLang === 'ar' ? emp["الحالة التأمينية "] : emp["insurance status"]);
-    setTextContent('profile-pob', currentLang === 'ar' ? emp["مكان الميلاد"] : emp["pob"]);
+    // تعبئة البيانات في الحقول لو وجدت
+    setVal('profile-emp-name', currentLang === 'ar' ? (emp["اسم الموظف "] || emp["اسم الموظف"]) : emp["emp_name _en"]);
+    setVal('profile-emp-code', emp["الكود"] || emp["code"]);
+    setVal('profile-department', currentLang === 'ar' ? (emp["الإدارة "] || emp["الإدارة"]) : emp["department"]);
+    setVal('profile-job-title', currentLang === 'ar' ? emp["الوظيفة"] : emp["job title"]);
+    setVal('profile-direct-manager', currentLang === 'ar' ? emp["المدير المباشر "] : emp["direct manager"]);
+    setVal('profile-hire-date', excelDateToJSDate(emp["تاريخ التعيين "] || emp["تاريخ التعيين"]));
+    setVal('profile-years-service', emp["سنوات الخدمة "] || emp["years of service"]);
+    setVal('profile-qualification', currentLang === 'ar' ? emp["المؤهل"] : emp["qualification"]);
+    setVal('profile-qulification-auth', currentLang === 'ar' ? emp["جهة المؤهل "] : emp["qulification issuing authority"]);
+    setVal('profile-dob', excelDateToJSDate(emp["تاريخ الميلاد"] || emp["dob"]));
+    setVal('profile-age', emp["السن حتى تاريخه "] || emp["age to date"]);
+    setVal('profile-insurance-status', currentLang === 'ar' ? emp["الحالة التأمينية "] : emp["insurance status"]);
+    setVal('profile-pob', currentLang === 'ar' ? emp["مكان الميلاد"] : emp["pob"]);
 }
 
-// العودة للقائمة الرئيسية من داخل صفحة الملف
 function backToEmployeesList() {
-    const listView = document.getElementById('employees-list-view') || document.getElementById('main-table-container');
-    const profileView = document.getElementById('employee-profile-view') || document.getElementById('profile-container');
-    
-    if (listView && profileView) {
-        profileView.style.display = 'none';
-        listView.style.display = 'block';
-    }
+    location.reload(); // أبسط وأضمن طريقة للرجوع للقائمة الرئيسية وإعادة ضبط الحالة بالكامل
 }
 
-// دالة مساعدة لتعبئة النصوص بأمان
-function textContent(id, text) {
-    const el = document.getElementById(id);
-    if (el) el.innerText = text || '--';
-}
-function setTextContent(id, text) {
-    textContent(id, text);
+function setVal(id, val) {
+    const el = document.getElementById(id) || document.querySelector(`.${id}`);
+    if (el) el.innerText = val || '--';
 }
 
-// تحديث الإحصائيات في لوحة القيادة
 function updateDashboardStats() {
-    const totalCountEl = document.getElementById('total-employees-count');
+    const totalCountEl = document.getElementById('total-employees-count') || document.querySelector('.total-employees');
     if (totalCountEl) {
         totalCountEl.innerText = allEmployees.length;
     }
