@@ -1,8 +1,12 @@
 const firebaseConfig = {
-    apiKey: "AIzaSyDummyKey-LactoMisrHRPortal",
-    authDomain: "lactomisr-hr.firebaseapp.com",
-    databaseURL: "https://lactomisr-hr-default-rtdb.firebaseio.com",
-    projectId: "lactomisr-hr"
+    apiKey: "AIzaSyA-ywy51h3TM6YF_n0bNj1D5lAMJ7uMnO4",
+    authDomain: "lm-hr-portal.firebaseapp.com",
+    databaseURL: "https://lm-hr-portal-default-rtdb.firebaseio.com",
+    projectId: "lm-hr-portal",
+    storageBucket: "lm-hr-portal.firebasestorage.app",
+    messagingSenderId: "1008702496104",
+    appId: "1:1008702496104:web:930dfe68388ef5a640cadd",
+    measurementId: "G-Z6K3VG2SJ6"
 };
 
 if (typeof firebase !== 'undefined' && !firebase.apps.length) {
