@@ -6,9 +6,10 @@
     <title id="page-title">البورتال المركزي - شؤون العاملين | Lacto Misr</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Firebase SDK -->
+    <!-- Firebase SDKs (Compat v9 for Realtime Database & Analytics) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
     <!-- خط Cairo -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -68,7 +69,7 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
-    <!-- شاشة تسجيل الدخول الأولية -->
+    <!-- شاشة تسجيل الدخول -->
     <div id="login-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md">
         <div class="glass-card p-8 rounded-3xl w-full max-w-md border border-sky-500/30 shadow-2xl text-center space-y-6">
             <div class="w-16 h-16 mx-auto flex items-center justify-center">
@@ -149,16 +150,15 @@
                 </nav>
             </div>
             <div class="p-4 border-t border-sky-500/20 text-[10px] text-slate-400 text-center truncate">
-                <span class="nav-text">Portal v5.0 - Pro Edition</span>
+                <span class="nav-text">Portal v5.2 - Pro Edition</span>
             </div>
         </aside>
 
         <!-- Content Area -->
         <main class="flex-1 p-6 overflow-y-auto">
             
-            <!-- قسم قائمة الموظفين (الرئيسية) -->
+            <!-- جدول القائمة الرئيسية -->
             <div id="employees-list-view">
-                <!-- Quick Stats -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                     <div class="glass-card p-5 rounded-2xl border-r-4 border-sky-500 shadow-xl">
                         <p class="text-xs text-slate-400 font-semibold" data-translate="total_emp">إجمالي العاملين</p>
@@ -174,7 +174,6 @@
                     </div>
                 </div>
 
-                <!-- Table Section -->
                 <div class="glass-card rounded-2xl overflow-hidden shadow-2xl">
                     <div class="p-4 border-b border-sky-500/20 flex flex-col md:flex-row justify-between items-center gap-4">
                         <h2 class="font-bold text-lg text-sky-200" data-translate="emp_list">قائمة العاملين بالقاعدة</h2>
@@ -202,27 +201,30 @@
                 </div>
             </div>
 
-            <!-- قسم الملف الوظيفي الشامل (يفتح عند الضغط على عرض الملف) -->
+            <!-- صفحة الملف الوظيفي (للعرض الافتراضي، وتفتح للتعديل عند الضغط على زرار التعديل) -->
             <div id="employee-profile-view" class="hidden space-y-6">
                 <div class="flex justify-between items-center glass-card p-4 rounded-2xl">
                     <button onclick="backToEmployeesList()" class="px-4 py-2 bg-sky-600/30 hover:bg-sky-600 text-sky-200 rounded-xl text-sm border border-sky-400/30 transition shadow-lg" data-translate="back_btn">← العودة للقائمة</button>
-                    <h2 class="text-xl font-bold text-sky-300" data-translate="profile_title">الملف الوظيفي الشامل</h2>
+                    <div class="flex gap-3">
+                        <button id="btn-edit" onclick="enableEditing()" class="px-5 py-2 bg-sky-600/40 hover:bg-sky-600 text-white font-bold rounded-xl text-sm border border-sky-400/30 transition shadow-lg" data-translate="edit_btn">تعديل البيانات</button>
+                        <button id="btn-save" onclick="confirmSave()" class="hidden px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition shadow-lg" data-translate="save_btn">حفظ</button>
+                    </div>
                 </div>
 
-                <!-- كارد بيانات الموظف والصورة -->
+                <!-- بيانات الموظف والصورة (افتراضياً disabled للعرض فقط) -->
                 <div class="glass-card p-6 rounded-3xl shadow-2xl grid grid-cols-1 lg:grid-cols-4 gap-6 items-center">
                     <div class="flex flex-col items-center justify-center space-y-3">
                         <div class="w-36 h-36 rounded-2xl overflow-hidden border-2 border-sky-500/50 shadow-xl bg-slate-900">
                             <img id="profile-img" src="default-avatar.png" alt="Employee Photo" class="w-full h-full object-cover">
                         </div>
                         <input type="file" id="photo-upload-input" accept="image/*" class="hidden" onchange="uploadEmployeePhoto(event)">
-                        <button onclick="document.getElementById('photo-upload-input').click()" class="px-3 py-1.5 bg-sky-600/20 hover:bg-sky-600 text-sky-300 rounded-lg text-xs border border-sky-400/30 transition" data-translate="change_photo">تعديل الصورة</button>
+                        <button id="btn-photo" onclick="document.getElementById('photo-upload-input').click()" class="hidden px-3 py-1.5 bg-sky-600/20 hover:bg-sky-600 text-sky-300 rounded-lg text-xs border border-sky-400/30 transition" data-translate="change_photo">تعديل الصورة</button>
                     </div>
 
                     <div class="lg:col-span-3 space-y-4">
                         <div>
                             <label class="text-xs text-sky-400 font-semibold" data-translate="th_name">اسم الموظف</label>
-                            <input type="text" id="prof-name" class="w-full mt-1 px-4 py-2.5 bg-slate-900/90 border border-sky-500/30 rounded-xl text-white font-bold focus:ring-2 focus:ring-sky-500">
+                            <input type="text" id="prof-name" disabled class="w-full mt-1 px-4 py-2.5 bg-slate-900/50 border border-slate-700 rounded-xl text-white font-bold disabled:opacity-80">
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
@@ -231,31 +233,31 @@
                             </div>
                             <div>
                                 <label class="text-xs text-slate-400" data-translate="th_dept">الإدارة</label>
-                                <input type="text" id="prof-dept" class="w-full mt-1 px-4 py-2 bg-slate-900/90 border border-sky-500/30 rounded-xl text-slate-200">
+                                <input type="text" id="prof-dept" disabled class="w-full mt-1 px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 disabled:opacity-80">
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- تفاصيل الخانات الباقية وتعديلها -->
+                <!-- باقي التفاصيل -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="glass-card p-5 rounded-2xl space-y-4">
                         <h3 class="text-sm font-bold text-sky-400 border-b border-sky-500/20 pb-2" data-translate="sec_job">البيانات الوظيفية</h3>
                         <div>
                             <label class="text-xs text-slate-400" data-translate="th_job">الوظيفة</label>
-                            <input type="text" id="prof-job" class="w-full mt-1 px-3 py-2 bg-slate-900 border border-sky-500/30 rounded-xl text-slate-200 text-sm">
+                            <input type="text" id="prof-job" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
                         </div>
                         <div>
                             <label class="text-xs text-slate-400" data-translate="manager_label">المدير المباشر</label>
-                            <input type="text" id="prof-manager" class="w-full mt-1 px-3 py-2 bg-slate-900 border border-sky-500/30 rounded-xl text-slate-200 text-sm">
+                            <input type="text" id="prof-manager" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
                         </div>
                         <div>
                             <label class="text-xs text-slate-400" data-translate="th_hire">تاريخ التعيين</label>
-                            <input type="text" id="prof-hire" class="w-full mt-1 px-3 py-2 bg-slate-900 border border-sky-500/30 rounded-xl text-slate-200 text-sm font-mono">
+                            <input type="text" id="prof-hire" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm font-mono disabled:opacity-80">
                         </div>
                         <div>
                             <label class="text-xs text-slate-400" data-translate="service_years">سنوات الخدمة</label>
-                            <input type="text" id="prof-service" class="w-full mt-1 px-3 py-2 bg-slate-900 border border-sky-500/30 rounded-xl text-slate-200 text-sm">
+                            <input type="text" id="prof-service" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
                         </div>
                     </div>
 
@@ -263,11 +265,11 @@
                         <h3 class="text-sm font-bold text-sky-400 border-b border-sky-500/20 pb-2" data-translate="sec_qual">المؤهل العلمي</h3>
                         <div>
                             <label class="text-xs text-slate-400" data-translate="qual_label">المؤهل</label>
-                            <input type="text" id="prof-qual" class="w-full mt-1 px-3 py-2 bg-slate-900 border border-sky-500/30 rounded-xl text-slate-200 text-sm">
+                            <input type="text" id="prof-qual" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
                         </div>
                         <div>
                             <label class="text-xs text-slate-400" data-translate="qual_auth">جهة المؤهل</label>
-                            <input type="text" id="prof-qual-auth" class="w-full mt-1 px-3 py-2 bg-slate-900 border border-sky-500/30 rounded-xl text-slate-200 text-sm">
+                            <input type="text" id="prof-qual-auth" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
                         </div>
                     </div>
 
@@ -275,33 +277,39 @@
                         <h3 class="text-sm font-bold text-sky-400 border-b border-sky-500/20 pb-2" data-translate="sec_personal">البيانات الشخصية</h3>
                         <div>
                             <label class="text-xs text-slate-400" data-translate="dob_label">تاريخ الميلاد</label>
-                            <input type="text" id="prof-dob" class="w-full mt-1 px-3 py-2 bg-slate-900 border border-sky-500/30 rounded-xl text-slate-200 text-sm font-mono">
+                            <input type="text" id="prof-dob" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm font-mono disabled:opacity-80">
                         </div>
                         <div>
                             <label class="text-xs text-slate-400" data-translate="age_label">السن حتى تاريخه</label>
-                            <input type="text" id="prof-age" class="w-full mt-1 px-3 py-2 bg-slate-900 border border-sky-500/30 rounded-xl text-slate-200 text-sm">
+                            <input type="text" id="prof-age" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
                         </div>
                         <div>
                             <label class="text-xs text-slate-400" data-translate="insurance_label">الحالة التأمينية</label>
-                            <input type="text" id="prof-insurance" class="w-full mt-1 px-3 py-2 bg-slate-900 border border-sky-500/30 rounded-xl text-slate-200 text-sm">
+                            <input type="text" id="prof-insurance" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
                         </div>
                         <div>
                             <label class="text-xs text-slate-400" data-translate="pob_label">مكان الميلاد</label>
-                            <input type="text" id="prof-pob" class="w-full mt-1 px-3 py-2 bg-slate-900 border border-sky-500/30 rounded-xl text-slate-200 text-sm">
+                            <input type="text" id="prof-pob" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
                         </div>
                     </div>
-                </div>
-
-                <!-- زر حفظ التعديلات -->
-                <div class="flex justify-end pt-4">
-                    <button onclick="saveEmployeeChanges()" class="px-6 py-3 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl transition shadow-lg shadow-sky-600/30" data-translate="save_btn">حفظ التعديلات</button>
                 </div>
             </div>
 
         </main>
     </div>
 
-    <!-- Toast Notification (نظام الرسائل الشيك) -->
+    <!-- نافذة تأكيد الحفظ (Modal) بنفس تصميم السايت بدون ألوان فرح -->
+    <div id="confirm-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+        <div class="glass-card p-6 rounded-2xl max-w-sm w-full border border-sky-500/30 text-center space-y-4">
+            <h3 id="confirm-title" class="text-lg font-bold text-white">هل ترغب في حفظ التعديلات؟</h3>
+            <div class="flex justify-center gap-3 pt-2">
+                <button onclick="executeSave()" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-xs transition" data-translate="yes_btn">نعم</button>
+                <button onclick="closeConfirmModal()" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition" data-translate="cancel_btn">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification (رسالة اتمام الحفظ الشيك) -->
     <div id="toast-notification" class="fixed bottom-6 left-6 z-50 transform translate-y-32 opacity-0 transition-all duration-300 glass-card px-6 py-3 rounded-2xl border border-sky-500/40 shadow-2xl flex items-center gap-3">
         <span class="text-sky-400 text-lg">✓</span>
         <span id="toast-message" class="text-sm font-bold text-white">تم الحفظ بنجاح</span>
