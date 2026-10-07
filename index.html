@@ -13,6 +13,13 @@
     <!-- خط Cairo -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+       @keyframes leafFadeIn {
+           0% { opacity: 0; transform: translateY(15px) scale(0.95); }
+           100% { opacity: 1; transform: translateY(0) scale(1); }
+           }
+           .animate-fade-in {
+           animation: leafFadeIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
         body {
             font-family: 'Cairo', sans-serif;
             background: linear-gradient(rgba(5, 11, 24, 0.93), rgba(5, 11, 24, 0.98)), url('background.jpg') no-repeat center center fixed;
@@ -69,23 +76,58 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
-    <!-- شاشة تسجيل الدخول -->
-    <div id="login-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md">
-        <div class="glass-card p-8 rounded-3xl w-full max-w-md border border-sky-500/30 shadow-2xl text-center space-y-6">
-            <div class="w-16 h-16 mx-auto flex items-center justify-center">
-                <img src="logo.png" alt="Logo" class="w-full h-full object-contain logo-soft-3d">
+    <!-- شاشة تسجيل الدخول المطورة (Split Screen with Leaf Animation & Eye Toggle) -->
+<div id="login-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-xl">
+    <div class="glass-card p-10 rounded-3xl w-full max-w-2xl border border-sky-500/40 shadow-2xl grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+        
+        <!-- القسم الأيسر: اللوجو واسم الشركة والسلوجن بـ Animation -->
+        <div class="flex flex-col items-center text-center space-y-4 border-b md:border-b-0 md:border-l border-sky-500/20 pb-6 md:pb-0 md:pl-6">
+            <div class="w-20 h-20 flex items-center justify-center">
+                <img src="logo.png" alt="Lacto Misr Logo" class="w-full h-full object-contain logo-soft-3d">
             </div>
-            <div>
-                <h2 class="text-2xl font-bold text-sky-300">Lacto Misr HR Portal</h2>
-                <p class="text-xs text-slate-400 mt-1">تسجيل دخول مسؤول النظام</p>
-            </div>
-            <div class="space-y-4">
-                <input type="text" id="login-user" placeholder="اسم المستخدم أو البريد" class="w-full px-4 py-3 bg-slate-900/90 border border-sky-500/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200">
-                <input type="password" id="login-pass" placeholder="كلمة المرور" class="w-full px-4 py-3 bg-slate-900/90 border border-sky-500/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200">
-                <button onclick="handleLogin()" class="w-full py-3 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl transition shadow-lg shadow-sky-600/30">دخول للنظام</button>
+            <div class="space-y-1 animate-fade-in">
+                <h2 class="text-2xl font-bold text-sky-300 tracking-wide">Lacto Misr HR</h2>
+                <p id="login-slogan" class="text-xs text-sky-400/80 font-medium px-2">شركاء فى رحلة نمو طفلك</p>
             </div>
         </div>
+
+        <!-- القسم الأيمن: خانات الدخول الذكية -->
+        <div class="space-y-4">
+            <div class="text-right">
+                <h3 class="text-lg font-bold text-white" data-translate="login_title">تسجيل الدخول</h3>
+                <p class="text-xs text-slate-400" data-translate="login_subtitle">أدخل كود الموظف وكلمة المرور</p>
+            </div>
+
+            <div class="space-y-3">
+                <!-- كود الموظف -->
+                <div>
+                    <input type="text" id="login-emp-code" data-translate-placeholder="code_placeholder" placeholder="كود الموظف" class="w-full px-4 py-3 bg-slate-900/90 border border-sky-500/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200 placeholder-slate-500">
+                </div>
+
+                <!-- كلمة المرور مع زرار العين الشقية -->
+                <div class="relative">
+                    <input type="password" id="login-password" data-translate-placeholder="pass_placeholder" placeholder="كلمة المرور" class="w-full px-4 py-3 bg-slate-900/90 border border-sky-500/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200 placeholder-slate-500 pr-10">
+                    <button type="button" onclick="togglePasswordVisibility()" class="absolute left-3 top-3.5 text-slate-400 hover:text-sky-300 transition focus:outline-none">
+                        <span id="eye-icon">👁️</span>
+                    </button>
+                </div>
+
+                <!-- تذكرني ونسيت كلمة المرور -->
+                <div class="flex items-center justify-between text-xs text-slate-300 pt-1">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="remember-me" class="rounded bg-slate-900 border-sky-500/30 text-sky-600 focus:ring-0">
+                        <span data-translate="remember_me">تذكرني</span>
+                    </label>
+                    <a href="#" onclick="handleForgotPassword(); return false;" class="text-sky-400 hover:underline" data-translate="forgot_pass">نسيت كلمة المرور؟</a>
+                </div>
+
+                <!-- زر الدخول -->
+                <button onclick="handleLogin()" class="w-full py-3 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl transition shadow-lg shadow-sky-600/30" data-translate="login_btn">دخول للنظام</button>
+            </div>
+        </div>
+
     </div>
+</div>
 
     <!-- Top Header -->
     <header class="glass-card shadow-xl px-6 py-4 flex justify-between items-center border-b z-30">
