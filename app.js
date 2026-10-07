@@ -24,6 +24,49 @@ const firebaseConfig = {
     measurementId: "G-Z6K3VG2SJ6"
 };
 
+     // تبديل إظهار وإخفاء كلمة المرور (العين الشقية)
+function togglePasswordVisibility() {
+    const passInput = document.getElementById('login-password');
+    const eyeIcon = document.getElementById('eye-icon');
+    if (passInput.type === 'password') {
+        passInput.type = 'text';
+        eyeIcon.innerText = '🙈';
+    } else {
+        passInput.type = 'password';
+        eyeIcon.innerText = '👁️';
+    }
+}
+
+// دالة نسيت كلمة المرور
+function handleForgotPassword() {
+    const msg = currentLang === 'ar' ? "يرجى مراجعة مسؤول النظام (HR) لإعادة تعيين كلمة المرور المؤقتة." : "Please contact System Admin (HR) to reset your temporary password.";
+    alert(msg);
+}
+
+// تحديث النصوص والسلوجن عند تغيير اللغة
+// (ضضيف المفاتيح دي جوه قاموس translations عندك بالعربي والإنجليزي)
+/*
+   ar: {
+       login_title: "تسجيل الدخول",
+       login_subtitle: "أدخل كود الموظف وكلمة المرور",
+       code_placeholder: "كود الموظف",
+       pass_placeholder: "كلمة المرور",
+       remember_me: "تذكرني",
+       forgot_pass: "نسيت كلمة المرور؟",
+       login_btn: "دخول للنظام",
+       slogan_text: "شركاء فى رحلة نمو طفلك"
+   },
+   en: {
+       login_title: "System Login",
+       login_subtitle: "Enter employee code and password",
+       code_placeholder: "Employee Code",
+       pass_placeholder: "Password",
+       remember_me: "Remember Me",
+       forgot_pass: "Forgot Password?",
+       login_btn: "Login to System",
+       slogan_text: "Partners in your child's growth journey"
+   }
+*/
 // تهيئة Firebase
 if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
