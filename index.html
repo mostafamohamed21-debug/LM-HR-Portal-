@@ -6,6 +6,7 @@
     <title id="page-title">البورتال المركزي - شؤون العاملين | Lacto Misr</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <!-- Firebase SDKs (Compat v9 for Realtime Database & Analytics) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
@@ -72,62 +73,134 @@
             opacity: 1;
             pointer-events: auto;
         }
+
+        /* ===== ESS INTRO + NEW LOGIN EXPERIENCE ===== */
+        .hidden { display: none !important; }
+        #intro-screen {
+            position: fixed; inset: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(rgba(11,15,25,.92),rgba(11,15,25,.97)),url('background.jpg') center/cover no-repeat;
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            display:flex; flex-direction:column; justify-content:center; align-items:center;
+            z-index:99999; perspective:1200px; overflow:hidden;
+            transition:opacity 1.2s ease, visibility 1.2s ease;
+        }
+        #intro-screen.fade-out { opacity:0; visibility:hidden; pointer-events:none; }
+        .intro-content-wrapper { display:flex; flex-direction:column; align-items:center; gap:1.2rem; text-align:center; padding:0 1rem; width:100%; }
+        .intro-title-container { width:100%; display:flex; gap:.15rem; flex-wrap:nowrap; justify-content:center; align-items:center; direction:ltr; }
+        .intro-char { font-family:'Plus Jakarta Sans',sans-serif; font-size:clamp(1.2rem,4vw,2rem); font-weight:800; background:linear-gradient(135deg,#38bdf8,#0284c7); -webkit-background-clip:text; -webkit-text-fill-color:transparent; text-shadow:0 0 20px rgba(56,189,248,.6); display:inline-block; }
+        .intro-space { width:.4rem; }
+        .intro-subtitle { font-family:'Great Vibes',cursive; font-size:clamp(1.5rem,5vw,2.5rem); color:#38bdf8; text-shadow:0 0 20px rgba(56,189,248,.6); opacity:0; line-height:1.4; width:100%; text-align:center; white-space:nowrap; }
+        #introFooter { position:absolute; bottom:-20vh; width:100%; text-align:center; opacity:0; display:flex; flex-direction:column; gap:.5rem; z-index:10; }
+        #copyrightText { font-size:.9rem; color:#94a3b8; font-family:'Cairo',sans-serif; font-weight:600; letter-spacing:1px; }
+
+        #login-modal { background:linear-gradient(rgba(5,11,24,.55),rgba(5,11,24,.88)),url('background.jpg') center/cover no-repeat !important; backdrop-filter:blur(8px); }
+        #login-lang-switcher { position:absolute; top:1.25rem; right:1.25rem; z-index:20; }
+        [dir="ltr"] #login-lang-switcher { right:auto; left:1.25rem; }
+        .ess-lang-btn { display:flex; align-items:center; gap:.35rem; padding:.55rem .8rem; border-radius:.8rem; background:rgba(15,23,42,.82); border:1px solid rgba(56,189,248,.45); color:#38bdf8; font-size:.75rem; font-weight:800; box-shadow:0 6px 20px rgba(0,0,0,.3),0 0 12px rgba(56,189,248,.08); backdrop-filter:blur(12px); cursor:pointer; transition:.25s ease; }
+        .ess-lang-btn:hover { transform:translateY(-1px) scale(1.02); border-color:#38bdf8; background:rgba(56,189,248,.12); }
+        .ess-lang-menu { position:absolute; top:calc(100% + 8px); min-width:110px; padding:.35rem; border-radius:.9rem; background:rgba(15,23,42,.96); border:1px solid rgba(56,189,248,.4); box-shadow:0 20px 45px rgba(0,0,0,.55); display:none; overflow:hidden; }
+        .ess-lang-menu.show { display:block; }
+        [dir="rtl"] .ess-lang-menu { right:0; }
+        [dir="ltr"] .ess-lang-menu { left:0; }
+        .ess-lang-option { width:100%; border:0; background:transparent; color:#e2e8f0; padding:.55rem .65rem; border-radius:.6rem; cursor:pointer; text-align:left; font-size:.75rem; font-weight:700; }
+        .ess-lang-option:hover { background:rgba(56,189,248,.14); color:#38bdf8; }
+        [dir="rtl"] .ess-lang-option { text-align:right; }
+
+        #login-brand-stage { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:1; }
+        #login-brand { width:min(46vw,420px); min-width:250px; display:flex; flex-direction:column; align-items:center; text-align:center; opacity:0; transform:scale(1.55); transition:transform 1.15s cubic-bezier(.16,1,.3,1), opacity .9s ease, left 1.15s ease, right 1.15s ease; }
+        #login-brand.intro-ready { opacity:1; }
+        #login-brand.compact { transform:scale(1); }
+        [dir="rtl"] #login-brand.compact { position:absolute; right:8%; left:auto; }
+        [dir="ltr"] #login-brand.compact { position:absolute; left:8%; right:auto; }
+        .login-brand-logo { width:min(32vw,280px); height:min(32vw,280px); min-width:170px; min-height:170px; object-fit:contain; filter:drop-shadow(0 0 25px rgba(56,189,248,.42)); }
+        .login-brand-name { margin-top:.8rem; font-size:clamp(1.35rem,3vw,2.1rem); font-weight:900; color:#fff; letter-spacing:.03em; text-shadow:0 0 18px rgba(56,189,248,.35); }
+        .login-brand-slogan { margin-top:.25rem; font-size:clamp(.75rem,1.4vw,.95rem); color:#38bdf8; font-weight:700; }
+        #login-panel { position:relative; z-index:5; width:min(420px,92vw); margin-top:3rem; opacity:0; transform:translateY(24px) scale(.98); transition:opacity .9s ease .25s, transform .9s cubic-bezier(.16,1,.3,1) .25s; }
+        #login-panel.visible { opacity:1; transform:translateY(0) scale(1); }
+        #login-panel .login-inner { background:rgba(15,23,42,.72); backdrop-filter:blur(22px); border:1px solid rgba(56,189,248,.34); box-shadow:0 25px 70px rgba(0,0,0,.45), inset 0 1px 1px rgba(255,255,255,.05); border-radius:1.5rem; padding:1.7rem; }
+        [dir="rtl"] #login-panel.compact-mode { margin-right:50%; }
+        [dir="ltr"] #login-panel.compact-mode { margin-left:50%; }
+        .login-error { min-height:1.25rem; color:#f87171; font-size:.72rem; font-weight:700; text-align:center; }
+        .portal-action-btn { background:linear-gradient(135deg,#38bdf8,#0284c7); border:1px solid rgba(56,189,248,.65); color:#fff; box-shadow:0 8px 22px rgba(2,132,199,.25); }
+        .portal-action-btn:hover { filter:brightness(1.08); transform:translateY(-1px); }
+        .portal-ghost-btn { background:rgba(56,189,248,.1); border:1px solid rgba(56,189,248,.35); color:#7dd3fc; }
+        .portal-danger-btn { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.4); color:#fca5a5; }
+        .modal-panel { max-height:88vh; overflow:auto; }
+        .dynamic-field-card { background:rgba(15,23,42,.55); border:1px solid rgba(56,189,248,.14); border-radius:1rem; padding:1rem; }
+        .firebase-key-badge { font-family:'Share Tech Mono',monospace; color:#7dd3fc; font-size:.68rem; }
+        .login-top-note { color:#94a3b8; font-size:.7rem; text-align:center; margin-bottom:.7rem; }
+        @media (max-width: 900px) {
+            #login-brand.compact { position:relative !important; inset:auto !important; transform:scale(.86); margin:0 auto; }
+            #login-panel.compact-mode { margin:0 auto !important; }
+            #login-brand-stage { position:relative; height:48vh; align-items:center; }
+            #login-panel { margin:0 auto; }
+            .login-brand-logo { width:190px; height:190px; }
+        }
+
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
 
-    <!-- شاشة تسجيل الدخول المطورة (Split Screen with Leaf Animation & Eye Toggle) -->
-<div id="login-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-xl">
-    <div class="glass-card p-10 rounded-3xl w-full max-w-2xl border border-sky-500/40 shadow-2xl grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-        
-        <!-- القسم الأيسر: اللوجو واسم الشركة والسلوجن بـ Animation -->
-        <div class="flex flex-col items-center text-center space-y-4 border-b md:border-b-0 md:border-l border-sky-500/20 pb-6 md:pb-0 md:pl-6">
-            <div class="w-20 h-20 flex items-center justify-center">
-                <img src="logo.png" alt="Lacto Misr Logo" class="w-full h-full object-contain logo-soft-3d">
-            </div>
-            <div class="space-y-1 animate-fade-in">
-                <h2 class="text-2xl font-bold text-sky-300 tracking-wide">Lacto Misr HR</h2>
-                <p id="login-slogan" class="text-xs text-sky-400/80 font-medium px-2">شركاء فى رحلة نمو طفلك</p>
-            </div>
+    <!-- ESS-style Intro -->
+    <div id="intro-screen">
+        <div class="intro-content-wrapper">
+            <div class="intro-title-container" id="introTitle"></div>
+            <div class="intro-subtitle" id="introSubtitle" data-ar="شركاء في رحلة نمو طفلك." data-en="Partners in your child's growth journey.">شركاء في رحلة نمو طفلك.</div>
         </div>
-
-        <!-- القسم الأيمن: خانات الدخول الذكية -->
-        <div class="space-y-4">
-            <div class="text-right">
-                <h3 class="text-lg font-bold text-white" data-translate="login_title">تسجيل الدخول</h3>
-                <p class="text-xs text-slate-400" data-translate="login_subtitle">أدخل كود الموظف وكلمة المرور</p>
-            </div>
-
-            <div class="space-y-3">
-                <!-- كود الموظف -->
-                <div>
-                    <input type="text" id="login-emp-code" data-translate-placeholder="code_placeholder" placeholder="كود الموظف" class="w-full px-4 py-3 bg-slate-900/90 border border-sky-500/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200 placeholder-slate-500">
-                </div>
-
-                <!-- كلمة المرور مع زرار العين الشقية -->
-                <div class="relative">
-                    <input type="password" id="login-password" data-translate-placeholder="pass_placeholder" placeholder="كلمة المرور" class="w-full px-4 py-3 bg-slate-900/90 border border-sky-500/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200 placeholder-slate-500 pr-10">
-                    <button type="button" onclick="togglePasswordVisibility()" class="absolute left-3 top-3.5 text-slate-400 hover:text-sky-300 transition focus:outline-none">
-                        <span id="eye-icon">👁️</span>
-                    </button>
-                </div>
-
-                <!-- تذكرني ونسيت كلمة المرور -->
-                <div class="flex items-center justify-between text-xs text-slate-300 pt-1">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="remember-me" class="rounded bg-slate-900 border-sky-500/30 text-sky-600 focus:ring-0">
-                        <span data-translate="remember_me">تذكرني</span>
-                    </label>
-                    <a href="#" onclick="handleForgotPassword(); return false;" class="text-sky-400 hover:underline" data-translate="forgot_pass">نسيت كلمة المرور؟</a>
-                </div>
-
-                <!-- زر الدخول -->
-                <button onclick="handleLogin()" class="w-full py-3 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl transition shadow-lg shadow-sky-600/30" data-translate="login_btn">دخول للنظام</button>
-            </div>
+        <div id="introFooter">
+            <div id="copyrightText" data-ar="© 2026 جميع حقوق الإنشاء والطبع محفوظة" data-en="© 2026 All Creation & Copyrights Reserved">© 2026 جميع حقوق الإنشاء والطبع محفوظة</div>
+            <div style="font-family:'Great Vibes',cursive;font-size:1rem;color:#38bdf8;text-shadow:0 0 10px rgba(56,189,248,.6);">Powered by HR Department</div>
         </div>
-
     </div>
-</div>
+
+    <!-- New borderless login experience -->
+    <div id="login-modal" class="fixed inset-0 z-50 flex flex-col items-center justify-center">
+        <div id="login-lang-switcher">
+            <button class="ess-lang-btn" onclick="toggleLoginLangMenu(event)">
+                🌐 <span id="login-lang-short">AR</span> ▼
+            </button>
+            <div id="login-lang-menu" class="ess-lang-menu">
+                <button class="ess-lang-option" onclick="setLanguage('ar')">🇪🇬 AR</button>
+                <button class="ess-lang-option" onclick="setLanguage('en')">🇬🇧 EN</button>
+            </div>
+        </div>
+
+        <div id="login-brand-stage">
+            <div id="login-brand">
+                <img src="logo.png" alt="Lacto Misr Logo" class="login-brand-logo">
+                <div id="login-brand-name" class="login-brand-name">Lacto Misr</div>
+                <div id="login-brand-slogan" class="login-brand-slogan">شركاء في رحلة نمو طفلك</div>
+            </div>
+        </div>
+
+        <div id="login-panel">
+            <div class="login-inner">
+                <div class="text-center mb-5">
+                    <h3 class="text-xl font-extrabold text-white" data-translate="login_title">تسجيل الدخول</h3>
+                    <p class="text-xs text-slate-400 mt-1" data-translate="login_subtitle">أدخل كود الموظف وكلمة المرور</p>
+                </div>
+
+                <div class="space-y-3.5">
+                    <input type="text" id="login-emp-code" data-translate-placeholder="code_placeholder" placeholder="كود الموظف" autocomplete="username" class="w-full px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200 placeholder-slate-500">
+                    <div class="relative">
+                        <input type="password" id="login-password" data-translate-placeholder="pass_placeholder" placeholder="كلمة المرور" autocomplete="current-password" class="w-full px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200 placeholder-slate-500 pr-12">
+                        <button type="button" onclick="togglePasswordVisibility()" class="absolute left-3 top-2.5 w-9 h-9 rounded-full bg-sky-400/10 border border-sky-400/30 text-sky-300 hover:bg-sky-400/20 transition focus:outline-none"><span id="eye-icon">👁️</span></button>
+                    </div>
+
+                    <div class="flex items-center justify-between text-xs text-slate-300 pt-1 gap-3">
+                        <label class="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="remember-me" class="rounded bg-slate-900 border-sky-500/30 text-sky-600 focus:ring-0">
+                            <span data-translate="remember_me">تذكرني</span>
+                        </label>
+                        <a href="#" onclick="openForgotPassModal(); return false;" class="text-sky-400 hover:text-sky-300 hover:underline" data-translate="forgot_pass">نسيت كلمة المرور؟</a>
+                    </div>
+
+                    <button onclick="handleLogin()" class="portal-action-btn w-full py-3 font-bold rounded-xl transition" data-translate="login_btn">دخول للنظام</button>
+                    <div id="login-error" class="login-error"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Top Header -->
     <header class="glass-card shadow-xl px-6 py-4 flex justify-between items-center border-b z-30">
@@ -138,28 +211,18 @@
             <span class="text-2xl font-bold text-sky-400 tracking-wider">Lacto Misr HR</span>
         </div>
         
-        <div class="flex items-center space-x-4 space-x-reverse relative">
-            <!-- زر اللغة -->
+        <div class="flex items-center gap-3 relative">
             <div class="relative">
-                <button onclick="toggleLangDropdown()" class="flex items-center gap-1.5 px-2 py-1 text-xs font-bold text-sky-300 hover:text-sky-100 transition focus:outline-none">
-                    <span class="text-lg neon-blue-icon">🌐</span>
-                    <span id="current-lang-display" class="flex items-center gap-1">
-                        <span id="lang-flag">🇪🇬</span> <span id="lang-code">AR</span>
-                    </span>
-                    <span class="text-[9px] text-sky-400">▼</span>
+                <button onclick="toggleLangDropdown(event)" class="ess-lang-btn">
+                    🌐 <span id="lang-code">AR</span> ▼
                 </button>
-                
-                <div id="lang-dropdown" class="hidden absolute left-0 mt-2 w-32 glass-card rounded-xl shadow-2xl border border-sky-500/30 overflow-hidden z-50">
-                    <button onclick="setLanguage('ar')" class="w-full flex items-center gap-2 px-3 py-2 text-xs text-right text-slate-200 hover:bg-sky-600/30 transition">
-                        <span>🇪🇬</span> <span class="font-bold">AR</span>
-                    </button>
-                    <button onclick="setLanguage('en')" class="w-full flex items-center gap-2 px-3 py-2 text-xs text-left text-slate-200 hover:bg-sky-600/30 transition">
-                        <span>🇬🇧</span> <span class="font-bold">EN</span>
-                    </button>
+                <div id="lang-dropdown" class="ess-lang-menu">
+                    <button onclick="setLanguage('ar')" class="ess-lang-option">🇪🇬 AR</button>
+                    <button onclick="setLanguage('en')" class="ess-lang-option">🇬🇧 EN</button>
                 </div>
             </div>
-
-            <span class="font-semibold text-slate-300 text-sm" data-translate="admin">مسؤول النظام</span>
+            <span id="current-user-label" class="font-semibold text-slate-300 text-sm hidden md:inline" data-translate="admin">مسؤول النظام</span>
+            <button onclick="handleLogout()" class="portal-danger-btn px-3 py-2 rounded-xl text-xs font-bold transition" data-translate="logout_btn">تسجيل الخروج</button>
         </div>
     </header>
 
@@ -219,7 +282,10 @@
                 <div class="glass-card rounded-2xl overflow-hidden shadow-2xl">
                     <div class="p-4 border-b border-sky-500/20 flex flex-col md:flex-row justify-between items-center gap-4">
                         <h2 class="font-bold text-lg text-sky-200" data-translate="emp_list">قائمة العاملين بالقاعدة</h2>
-                        <input type="text" id="search-input" onkeyup="filterEmployees()" data-translate-placeholder="search_placeholder" placeholder="بحث بالاسم أو الكود..." class="px-4 py-2 bg-slate-900/80 border border-sky-500/30 rounded-xl text-sm w-full md:w-72 focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200 placeholder-slate-500">
+                        <div class="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+                            <input type="text" id="search-input" onkeyup="filterEmployees()" data-translate-placeholder="search_placeholder" placeholder="بحث بالاسم أو الكود..." class="px-4 py-2 bg-slate-900/80 border border-sky-500/30 rounded-xl text-sm w-full md:w-72 focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200 placeholder-slate-500">
+                            <button onclick="openAddEmployeeModal()" class="portal-action-btn px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition" data-translate="add_employee_btn">+ إضافة موظف</button>
+                        </div>
                     </div>
                     <div class="overflow-x-auto">
                         <table id="main-employees-table" class="w-full border-collapse glass-table">
@@ -335,9 +401,84 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- All Firebase fields + custom fields -->
+                <div class="glass-card p-5 rounded-2xl space-y-4">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div>
+                            <h3 class="text-sm font-bold text-sky-400" data-translate="firebase_fields_title">حقول Firebase</h3>
+                            <p class="text-[11px] text-slate-500 mt-1" data-translate="firebase_fields_hint">كل الحقول الموجودة فعلياً على سجل الموظف تظهر هنا ويمكن تعديلها.</p>
+                        </div>
+                        <button onclick="openAddCustomFieldModal()" class="portal-ghost-btn px-4 py-2 rounded-xl text-xs font-bold transition" data-translate="add_custom_field_btn">+ إضافة خانة إضافية</button>
+                    </div>
+                    <div id="dynamic-fields-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+                </div>
             </div>
 
         </main>
+    </div>
+
+    <!-- Add Employee Modal -->
+    <div id="add-employee-modal" class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
+        <div class="glass-card modal-panel p-6 rounded-3xl w-full max-w-5xl border border-sky-500/35 shadow-2xl">
+            <div class="flex items-center justify-between gap-3 mb-5">
+                <div>
+                    <h3 class="text-lg font-extrabold text-white" data-translate="add_employee_title">إضافة موظف جديد</h3>
+                    <p class="text-xs text-slate-400 mt-1" data-translate="add_employee_hint">سيتم إنشاء السجل مباشرة داخل Firebase.</p>
+                </div>
+                <button onclick="closeAddEmployeeModal()" class="portal-ghost-btn w-9 h-9 rounded-full">✕</button>
+            </div>
+            <div id="add-employee-fields" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            <div id="add-employee-error" class="min-h-5 text-center text-xs text-red-400 mt-3"></div>
+            <div class="flex justify-end gap-2 mt-5">
+                <button onclick="closeAddEmployeeModal()" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300" data-translate="cancel_btn">إلغاء</button>
+                <button onclick="saveNewEmployee()" class="portal-action-btn px-5 py-2 rounded-xl text-xs font-bold" data-translate="save_employee_btn">حفظ الموظف</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Custom Field Modal -->
+    <div id="custom-field-modal" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
+        <div class="glass-card p-6 rounded-3xl w-full max-w-md border border-sky-500/35 shadow-2xl">
+            <div class="flex items-center justify-between mb-5">
+                <h3 class="text-lg font-extrabold text-white" data-translate="custom_field_title">إضافة خانة إضافية</h3>
+                <button onclick="closeAddCustomFieldModal()" class="portal-ghost-btn w-9 h-9 rounded-full">✕</button>
+            </div>
+            <label class="text-xs text-slate-400" data-translate="field_name_label">اسم الخانة</label>
+            <input id="custom-field-name" class="w-full mt-1 px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-white" placeholder="مثال: الرقم التأميني">
+            <label class="text-xs text-slate-400 block mt-4" data-translate="field_value_label">القيمة</label>
+            <input id="custom-field-value" class="w-full mt-1 px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-white" placeholder="القيمة">
+            <div id="custom-field-error" class="min-h-5 text-center text-xs text-red-400 mt-3"></div>
+            <div class="flex justify-end gap-2 mt-4">
+                <button onclick="closeAddCustomFieldModal()" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300" data-translate="cancel_btn">إلغاء</button>
+                <button onclick="saveCustomField()" class="portal-action-btn px-5 py-2 rounded-xl text-xs font-bold" data-translate="save_btn">حفظ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Forgot Password Modal -->
+    <div id="forgot-pass-modal" class="hidden fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
+        <div class="glass-card p-6 rounded-3xl w-full max-w-md border border-sky-500/35 shadow-2xl">
+            <div class="flex items-center justify-between mb-5">
+                <div>
+                    <h3 class="text-lg font-extrabold text-white" data-translate="forgot_title">استعادة كلمة المرور</h3>
+                    <p class="text-xs text-slate-400 mt-1" data-translate="forgot_hint">سيتم إرسال رمز تحقق إلى البريد الإلكتروني المسجل.</p>
+                </div>
+                <button onclick="closeForgotPassModal()" class="portal-ghost-btn w-9 h-9 rounded-full">✕</button>
+            </div>
+            <div class="space-y-3">
+                <input id="forgot-emp-code" class="w-full px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-white" data-translate-placeholder="forgot_code_placeholder" placeholder="كود الموظف">
+                <input id="forgot-email" type="email" class="w-full px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-white" data-translate-placeholder="forgot_email_placeholder" placeholder="البريد الإلكتروني (يُطلب فقط إذا لم يكن مسجلاً)">
+                <div id="forgot-code-step" class="hidden space-y-3">
+                    <input id="forgot-verification-code" inputmode="numeric" maxlength="6" class="w-full px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-white text-center tracking-[.5em]" data-translate-placeholder="verification_placeholder" placeholder="رمز التحقق">
+                    <input id="forgot-new-password" type="password" class="w-full px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-white" data-translate-placeholder="new_password_placeholder" placeholder="كلمة المرور الجديدة">
+                    <button onclick="verifyAndResetPassword()" class="portal-action-btn w-full py-3 rounded-xl text-xs font-bold" data-translate="verify_reset_btn">تحقق وتغيير كلمة المرور</button>
+                </div>
+                <button id="forgot-send-btn" onclick="sendPasswordVerificationCode()" class="portal-action-btn w-full py-3 rounded-xl text-xs font-bold" data-translate="send_code_btn">إرسال رمز التحقق</button>
+                <div id="forgot-message" class="min-h-5 text-center text-xs font-bold"></div>
+                <p class="text-[10px] text-slate-500 text-center" data-translate="forgot_email_note">يجب تفعيل خدمة البريد في Firebase (Trigger Email/Cloud Function) لكي يصل الرمز فعلياً إلى البريد.</p>
+            </div>
+        </div>
     </div>
 
     <!-- نافذة تأكيد الحفظ (Modal) بنفس تصميم السايت بدون ألوان فرح -->
@@ -352,7 +493,7 @@
     </div>
 
     <!-- Toast Notification (رسالة اتمام الحفظ الشيك) -->
-    <div id="toast-notification" class="fixed bottom-6 left-6 z-50 transform translate-y-32 opacity-0 transition-all duration-300 glass-card px-6 py-3 rounded-2xl border border-sky-500/40 shadow-2xl flex items-center gap-3">
+    <div id="toast-notification" class="fixed bottom-6 left-6 md:left-6 z-50 transform translate-y-32 opacity-0 transition-all duration-300 glass-card px-6 py-3 rounded-2xl border border-sky-500/40 shadow-2xl flex items-center gap-3">
         <span class="text-sky-400 text-lg">✓</span>
         <span id="toast-message" class="text-sm font-bold text-white">تم الحفظ بنجاح</span>
     </div>
