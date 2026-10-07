@@ -45,7 +45,7 @@
             color: #38bdf8;
         }
 
-        /* --- تنسيق شاشة الانترو والتلاشي --- */
+        /* --- تنسيق شاشة الانترو والتلاشي الآمنة --- */
         #intro-screen {
             position: fixed;
             top: 0;
@@ -58,6 +58,7 @@
             align-items: center;
             z-index: 99999;
             transition: opacity 0.6s ease, visibility 0.6s ease;
+            cursor: pointer;
         }
 
         #intro-screen.fade-out {
@@ -68,8 +69,8 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
 
-    <!-- 1. شاشة الإنترو (Splash Screen) -->
-    <div id="intro-screen">
+    <!-- 1. شاشة الإنترو -->
+    <div id="intro-screen" onclick="dismissIntro()" title="اضغط لتخطي الشاشة">
         <div class="text-center">
             <div class="text-6xl mb-4">🏢</div>
             <h1 class="text-3xl font-bold text-sky-400 mb-2">LACTO MISR S.A.E</h1>
@@ -80,7 +81,6 @@
     <!-- 2. الهيدر العلوى وقائمة اللغات -->
     <header class="bg-slate-900 border-b border-slate-800 px-6 py-4 flex justify-between items-center shadow-lg">
         <div class="flex items-center gap-4">
-            <!-- زر قائمة تغيير اللغة المدمج -->
             <div class="lang-dropdown-container">
                 <button class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 text-white rounded-lg text-sm border border-slate-700 hover:border-sky-500 transition shadow" onclick="toggleLangMenu(event)">
                     🌐 <span id="current-lang-short">AR</span> ▼
@@ -95,7 +95,7 @@
         <div class="text-xl font-bold text-sky-400 tracking-wider">Lacto Misr HR</div>
     </header>
 
-    <!-- 3. المحتوى الرئيسي (عرض قائمة العاملين) -->
+    <!-- 3. المحتوى الرئيسي -->
     <main class="p-6 max-w-7xl mx-auto">
         
         <!-- إحصائيات سريعة -->
@@ -114,7 +114,7 @@
             </div>
         </div>
 
-        <!-- قسم عرض جدول الموظفين -->
+        <!-- جدول الموظفين -->
         <div id="employees-list-view" class="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl">
             <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                 <h2 class="text-lg font-semibold text-white" data-translate="emp_list">قائمة العاملين بالقاعدة</h2>
@@ -133,14 +133,12 @@
                             <th class="p-3.5 text-center" data-translate="th_actions">الإجراءات</th>
                         </tr>
                     </thead>
-                    <tbody id="employees-table-body">
-                        <!-- البيانات ستضاف هنا تلقائياً عبر الـ JS -->
-                    </tbody>
+                    <tbody id="employees-table-body"></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- قسم عرض ملف الموظف (مخفي افتراضياً) -->
+        <!-- ملف الموظف -->
         <div id="employee-profile-view" style="display: none;" class="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl">
             <button onclick="backToEmployeesList()" class="mb-6 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sky-400 rounded-xl text-sm transition border border-slate-700" data-translate="back_btn">← العودة للقائمة</button>
             
@@ -167,11 +165,9 @@
                 </div>
             </div>
 
-            <!-- أزرار التحكم بالملف -->
             <div class="mt-8 flex gap-4">
                 <button id="btn-edit" onclick="enableEditing()" class="px-6 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-sm font-semibold transition shadow-lg" data-translate="edit_btn">تعديل البيانات</button>
                 <button id="btn-save" onclick="confirmSave()" class="hidden px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold transition shadow-lg" data-translate="save_btn">حفظ</button>
-                <input type="file" id="btn-photo" class="hidden" onchange="uploadEmployeePhoto(event)">
             </div>
         </div>
 
@@ -182,12 +178,12 @@
         <span id="toast-message">تم بنجاح</span>
     </div>
 
-    <!-- Firebase App & Database SDKs -->
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-analytics.js"></script>
 
-    <!-- ربط ملف الـ JavaScript الخاص بك -->
+    <!-- ربط ملف الـ JavaScript الخارجي -->
     <script src="script.js"></script>
 </body>
 </html>
