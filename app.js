@@ -1,3 +1,14 @@
+// إخفاء شاشة الإنترو بعد التحميل بسلاسة
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        const introSplash = document.getElementById('intro-splash');
+        if (introSplash) {
+            introSplash.classList.add('fade-out');
+            setTimeout(() => introSplash.remove(), 600);
+        }
+    }, 1500); // مدة عرض الإنترو 1.5 ثانية
+});
+
 // دوال تحويل وتنسيق تواريخ إكسيل
 function excelDateToJSDate(serial) {
     if (!serial || typeof serial !== 'number') return serial || '--';
@@ -18,10 +29,14 @@ function togglePasswordVisibility() {
     const svgIcon = document.getElementById('eye-icon-svg');
     if (passInput.type === 'password') {
         passInput.type = 'text';
-        svgIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a10.05 10.05 0 012.336-3.882m3.612-2.316A9.99 9.99 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.02 10.02 0 01-4.132 5.411m0 0L21 21" /><path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18" />`;
+        if (svgIcon) {
+            svgIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a10.05 10.05 0 012.336-3.882m3.612-2.316A9.99 9.99 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.02 10.02 0 01-4.132 5.411m0 0L21 21" /><path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18" />`;
+        }
     } else {
         passInput.type = 'password';
-        svgIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />`;
+        if (svgIcon) {
+            svgIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />`;
+        }
     }
 }
 
@@ -34,7 +49,8 @@ function closeForgotPassModal() {
     const modal = document.getElementById('forgot-pass-modal');
     if (modal) modal.classList.add('hidden');
 }
-// إعدادات فايربيس الرسمية
+
+// إعدادات فايربيس الرسمية[cite: 13]
 const firebaseConfig = {
     apiKey: "AIzaSyA-ywy51h3TM6YF_n0bNj1D5lAMJ7uMnO4",
     authDomain: "lm-hr-portal.firebaseapp.com",
@@ -46,7 +62,7 @@ const firebaseConfig = {
     measurementId: "G-Z6K3VG2SJ6"
 };
 
-// تهيئة Firebase
+// تهيئة Firebase[cite: 13]
 if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
     firebase.analytics();
@@ -57,7 +73,7 @@ let allEmployees = [];
 let currentLang = 'ar';
 let activeEmployeeCode = null;
 
-// قاموس الترجمات الشامل للواجهة
+// قاموس الترجمات الشامل للواجهة[cite: 13]
 const translations = {
     ar: {
         admin: "مسؤول النظام",
@@ -147,7 +163,7 @@ const translations = {
     }
 };
 
-// تسجيل الدخول وإخفاء شاشة اللوجن
+// تسجيل الدخول وإخفاء شاشة اللوجن[cite: 13]
 function handleLogin() {
     const loginModal = document.getElementById('login-modal');
     if (loginModal) {
@@ -159,7 +175,7 @@ function handleLogin() {
     }
 }
 
-// تحميل البيانات عند فتح الصفحة
+// تحميل البيانات عند فتح الصفحة[cite: 13]
 document.addEventListener('DOMContentLoaded', () => {
     fetch('clean_employees_data.json')
         .then(response => response.json())
@@ -171,13 +187,13 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch(error => console.error('Error loading employee data:', error));
 });
 
-// فتح وإغلاق القائمة المنسدلة للغة
+// فتح وإغلاق القائمة المنسدلة للغة[cite: 13]
 function toggleLangDropdown() {
     const dropdown = document.getElementById('lang-dropdown');
     if (dropdown) dropdown.classList.toggle('hidden');
 }
 
-// تغيير اللغة
+// تغيير اللغة[cite: 13]
 function setLanguage(lang) {
     currentLang = lang;
     document.documentElement.lang = lang;
@@ -210,7 +226,7 @@ function setLanguage(lang) {
     }
 }
 
-// البحث الفوري
+// البحث الفوري[cite: 13]
 function filterEmployees() {
     const searchInput = document.getElementById('search-input');
     if (!searchInput) return;
@@ -225,7 +241,7 @@ function filterEmployees() {
     renderTable(filtered);
 }
 
-// عرض جدول الموظفين
+// عرض جدول الموظفين[cite: 13]
 function renderTable(dataList) {
     const tableBody = document.getElementById('employees-table-body');
     if (!tableBody) return;
@@ -261,7 +277,7 @@ function renderTable(dataList) {
     });
 }
 
-// عرض ملف الموظف الكامل
+// عرض ملف الموظف الكامل[cite: 13]
 function viewEmployee(code) {
     activeEmployeeCode = code;
     const emp = allEmployees.find(e => String(e["الكود"] || e["code"]) === String(code));
@@ -270,7 +286,6 @@ function viewEmployee(code) {
     document.getElementById('employees-list-view').style.display = 'none';
     document.getElementById('employee-profile-view').style.display = 'block';
 
-    // تعبئة البيانات وجعلها مغلقة افتراضياً (disabled)
     setFieldVal('prof-code', code);
     setFieldVal('prof-name', (currentLang === 'ar' ? (emp["اسم الموظف "] || emp["اسم الموظف"]) : (emp["emp_name _en"] || emp["اسم الموظف "])));
     setFieldVal('prof-dept', (currentLang === 'ar' ? (emp["الإدارة "] || emp["الإدارة"]) : (emp["department "] || emp["department"])));
@@ -287,11 +302,10 @@ function viewEmployee(code) {
 
     document.getElementById('profile-img').src = emp["photoUrl"] || 'default-avatar.png';
     
-    // إخفاء زرار الحفظ وإظهار زرار التعديل عند فتح الملف
     document.getElementById('btn-save').classList.add('hidden');
     document.getElementById('btn-edit').classList.remove('hidden');
     document.getElementById('btn-photo').classList.add('hidden');
-    setFieldsEditable(true); // قفل الحانات افتراضياً
+    setFieldsEditable(true);
 }
 
 function setFieldVal(id, val) {
@@ -299,9 +313,8 @@ function setFieldVal(id, val) {
     if (el) el.value = val || '';
 }
 
-// تفعيل وضع التعديل عند الضغط على زر "تعديل البيانات"
 function enableEditing() {
-    setFieldsEditable(false); // إزالة الـ disabled
+    setFieldsEditable(false);
     document.getElementById('btn-edit').classList.add('hidden');
     document.getElementById('btn-save').classList.remove('hidden');
     document.getElementById('btn-photo').classList.remove('hidden');
@@ -324,14 +337,12 @@ function setFieldsEditable(isDisabled) {
     });
 }
 
-// العودة للقائمة الرئيسية
 function backToEmployeesList() {
     activeEmployeeCode = null;
     document.getElementById('employee-profile-view').style.display = 'none';
     document.getElementById('employees-list-view').style.display = 'block';
 }
 
-// رفع وتحديث الصورة الشخصية وحفظها في Firebase مباشر
 function uploadEmployeePhoto(event) {
     const file = event.target.files[0];
     if (!file || activeEmployeeCode === null) return;
@@ -353,7 +364,6 @@ function uploadEmployeePhoto(event) {
     reader.readAsDataURL(file);
 }
 
-// إظهار نافذة تأكيد الحفظ
 function confirmSave() {
     const modal = document.getElementById('confirm-modal');
     if (modal) {
@@ -367,7 +377,6 @@ function closeConfirmModal() {
     if (modal) modal.classList.add('hidden');
 }
 
-// التنفيذ الفعلي للحفظ في Firebase
 function executeSave() {
     closeConfirmModal();
     if (activeEmployeeCode === null) return;
@@ -392,12 +401,11 @@ function executeSave() {
         photoUrl: document.getElementById('profile-img').src
     };
 
-    // حفظ في Firebase Realtime Database
     if (typeof firebase !== 'undefined' && firebase.database) {
         firebase.database().ref('employees/' + activeEmployeeCode).update(updatedData)
         .then(() => {
             showToast();
-            setFieldsEditable(true); // إعادة قفل الخانات بعد الحفظ
+            setFieldsEditable(true);
             document.getElementById('btn-save').classList.add('hidden');
             document.getElementById('btn-edit').classList.remove('hidden');
             document.getElementById('btn-photo').classList.add('hidden');
@@ -409,7 +417,6 @@ function executeSave() {
     }
 }
 
-// إظهار رسالة الحفظ الشيك (Toast Notification)
 function showToast() {
     const toast = document.getElementById('toast-notification');
     const msg = document.getElementById('toast-message');
@@ -422,13 +429,11 @@ function showToast() {
     }
 }
 
-// تحديث الإحصائيات
 function updateDashboardStats() {
     const totalCountEl = document.getElementById('total-employees-count');
     if (totalCountEl) totalCountEl.innerText = allEmployees.length;
 }
 
-// إغلاق القائمة المنسدلة للغة عند الضغط خارجها
 window.addEventListener('click', (e) => {
     if (!e.target.closest('button[onclick="toggleLangDropdown()"]')) {
         const dropdown = document.getElementById('lang-dropdown');
