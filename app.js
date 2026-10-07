@@ -12,6 +12,28 @@ function excelDateToJSDate(serial) {
     return `${year}-${month}-${day}`;
 }
 
+// التبديل الاحترافي للعين الشقية مع SVG
+function togglePasswordVisibility() {
+    const passInput = document.getElementById('login-password');
+    const svgIcon = document.getElementById('eye-icon-svg');
+    if (passInput.type === 'password') {
+        passInput.type = 'text';
+        svgIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a10.05 10.05 0 012.336-3.882m3.612-2.316A9.99 9.99 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.02 10.02 0 01-4.132 5.411m0 0L21 21" /><path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18" />`;
+    } else {
+        passInput.type = 'password';
+        svgIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />`;
+    }
+}
+
+// دوال مودال نسيت كلمة المرور
+function openForgotPassModal() {
+    const modal = document.getElementById('forgot-pass-modal');
+    if (modal) modal.classList.remove('hidden');
+}
+function closeForgotPassModal() {
+    const modal = document.getElementById('forgot-pass-modal');
+    if (modal) modal.classList.add('hidden');
+}
 // إعدادات فايربيس الرسمية
 const firebaseConfig = {
     apiKey: "AIzaSyA-ywy51h3TM6YF_n0bNj1D5lAMJ7uMnO4",
