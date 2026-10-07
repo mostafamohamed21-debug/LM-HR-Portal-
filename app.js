@@ -171,11 +171,19 @@ const translations = {
 };
 
 // تسجيل الدخول
+// دالة تسجيل الدخول المضبوطة
 function handleLogin() {
     const loginModal = document.getElementById('login-modal');
     if (loginModal) {
+        loginModal.style.transition = 'opacity 0.3s ease';
         loginModal.style.opacity = '0';
-        setTimeout(() => loginModal.style.display = 'none', 300);
+        setTimeout(() => {
+            loginModal.style.display = 'none';
+        }, 300);
+    } else {
+        // لو الـ ID مش مطبق، نقفل أي شاشة دخول مفتوحة بالـ class
+        const modals = document.querySelectorAll('#login-modal, .login-modal');
+        modals.forEach(m => m.style.display = 'none');
     }
 }
 
