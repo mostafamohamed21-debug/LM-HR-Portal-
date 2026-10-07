@@ -1,328 +1,321 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" id="html-root">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>بوابة الشركة المركزية - Portal</title>
-    <!-- استدعاء خط Cairo -->
+    <title id="page-title">البورتال المركزي - شؤون العاملين | Lacto Misr</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase SDKs (Compat v9 for Realtime Database & Analytics) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
+    <!-- خط Cairo -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
-    <!-- FontAwesome للأيقونات -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- كود الـ CSS بالكامل هنا -->
     <style>
-        :root {
-            --primary-color: #2c3e50;
-            --accent-color: #3498db;
-            --bg-color: #121212;
-            --card-bg: #1e1e1e;
-            --text-color: #e0e0e0;
-            --border-color: #333333;
-            --input-bg: #2a2a2a;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Cairo', sans-serif;
-        }
-
         body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            overflow-x: hidden;
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(rgba(5, 11, 24, 0.93), rgba(5, 11, 24, 0.98)), url('background.jpg') no-repeat center center fixed;
+            background-size: cover;
+            color: #e2e8f0;
         }
-
-        /* صفحة الانترو الخاصة بالـ Portal */
-        #portal-intro {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #1a252f 0%, #121212 100%);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            transition: opacity 0.8s ease, visibility 0.8s ease;
+        .glass-card {
+            background: rgba(15, 23, 42, 0.82);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(56, 189, 248, 0.22);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
-
-        #portal-intro.fade-out {
-            opacity: 0;
-            visibility: hidden;
+        .glass-table th, .glass-table td {
+            border-color: rgba(56, 189, 248, 0.1) !important;
         }
-
-        .intro-logo-container {
-            width: 150px;
-            height: 150px;
-            margin-bottom: 25px;
-            animation: pulseIntro 2s infinite ease-in-out;
-        }
-
-        .intro-logo-container img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            filter: drop-shadow(0 0 15px rgba(52, 152, 219, 0.5));
-        }
-
-        .intro-title {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: #ffffff;
-            margin-bottom: 10px;
-            text-align: center;
-            letter-spacing: 1px;
-        }
-
-        .intro-subtitle {
-            font-size: 1.1rem;
-            color: var(--accent-color);
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .intro-loader {
-            width: 200px;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 2px;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .intro-loader::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            height: 100%;
-            width: 50%;
-            background: var(--accent-color);
-            border-radius: 2px;
-            animation: loadingProgress 1.5s infinite ease-in-out;
-        }
-
-        @keyframes pulseIntro {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-
-        @keyframes loadingProgress {
-            0% { left: -50%; }
-            100% { left: 100%; }
-        }
-
-        /* زرار اللغة */
-        .lang-switch-btn {
-            position: absolute;
-            top: 25px;
-            left: 25px;
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            color: var(--text-color);
-            padding: 8px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+        .neon-blue-icon {
+            color: #38bdf8;
+            filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.7));
             transition: all 0.3s ease;
-            z-index: 100;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
         }
-
-        .lang-switch-btn:hover {
-            background: var(--accent-color);
-            color: #fff;
-            border-color: var(--accent-color);
+        .sidebar-item:hover .neon-blue-icon {
+            filter: drop-shadow(0 0 12px rgba(56, 189, 248, 1));
+            transform: scale(1.1);
         }
-
-        /* تصميم الشاشة المقسومة نصفين */
-        .login-wrapper {
-            display: flex;
-            width: 900px;
-            max-width: 90%;
-            height: 520px;
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
-            overflow: hidden;
-            position: relative;
+        @keyframes rotate3D {
+            0% { transform: perspective(800px) rotateY(0deg); }
+            100% { transform: perspective(800px) rotateY(360deg); }
         }
-
-        /* الجزء الأيمن: خانات تسجيل الدخول */
-        .login-form-section {
-            flex: 1;
-            padding: 40px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
+        .logo-soft-3d {
+            animation: rotate3D 7s linear infinite;
+            border-radius: 12px;
+            filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.6));
         }
-
-        .login-form-section h2 {
-            margin-bottom: 8px;
-            font-size: 1.8rem;
-            color: #fff;
+        .sidebar-collapsed {
+            width: 80px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-
-        .login-form-section p {
-            color: #888;
-            font-size: 0.9rem;
-            margin-bottom: 25px;
+        .sidebar-collapsed:hover {
+            width: 270px;
         }
-
-        .input-group {
-            margin-bottom: 20px;
+        .sidebar-collapsed .nav-text,
+        .sidebar-collapsed .sidebar-title {
+            opacity: 0;
+            white-space: nowrap;
+            transition: opacity 0.2s ease-in-out;
+            pointer-events: none;
         }
-
-        .input-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-size: 0.85rem;
-            color: #aaa;
-        }
-
-        .input-group input {
-            width: 100%;
-            padding: 12px 15px;
-            background: var(--input-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            color: var(--text-color);
-            font-size: 1rem;
-            outline: none;
-            transition: border-color 0.3s;
-        }
-
-        .input-group input:focus {
-            border-color: var(--accent-color);
-        }
-
-        .submit-btn {
-            width: 100%;
-            padding: 12px;
-            background: var(--accent-color);
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-
-        .submit-btn:hover {
-            background: #2980b9;
-        }
-
-        /* الجزء الأيسر: اللوجو الشقي */
-        .login-brand-section {
-            flex: 1;
-            background: linear-gradient(145deg, #1f2937, #111827);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 40px;
-            text-align: center;
-            border-right: 1px solid var(--border-color);
-        }
-
-        html[lang="en"] .login-wrapper {
-            direction: ltr;
-        }
-
-        .spinning-logo {
-            width: 110px;
-            height: 110px;
-            margin-bottom: 20px;
-            animation: spinLogo 12s linear infinite;
-        }
-
-        .spinning-logo img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-
-        @keyframes spinLogo {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .brand-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #fff;
-            margin-bottom: 5px;
-        }
-
-        .brand-slogan {
-            font-size: 0.85rem;
-            color: #9ca3af;
+        .sidebar-collapsed:hover .nav-text,
+        .sidebar-collapsed:hover .sidebar-title {
+            opacity: 1;
+            pointer-events: auto;
         }
     </style>
 </head>
-<body>
+<body class="min-h-screen flex flex-col">
 
-    <!-- صفحة الانترو للـ Portal -->
-    <div id="portal-intro">
-        <div class="intro-logo-container">
-            <img src="logo.png" alt="Company Logo">
-        </div>
-        <div class="intro-title" id="intro-title-text">بوابة الشركة المركزية</div>
-        <div class="intro-subtitle" id="intro-subtitle-text">جاري تحميل النظام الإداري المتكامل...</div>
-        <div class="intro-loader"></div>
-    </div>
-
-    <!-- زرار تغيير اللغة -->
-    <button class="lang-switch-btn" id="langToggleBtn" onclick="toggleLanguage()">
-        <i class="fa-solid fa-globe"></i> <span id="langText">English</span>
-    </button>
-
-    <!-- شاشة تسجيل الدخول مقسومة نصفين -->
-    <div class="login-wrapper">
-        <!-- الجزء الأيسر (اللوجو الشقي + اسم الشركة والسلوجن) -->
-        <div class="login-brand-section">
-            <div class="spinning-logo">
-                <img src="logo.png" alt="Spinning Logo">
+    <!-- شاشة تسجيل الدخول -->
+    <div id="login-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md">
+        <div class="glass-card p-8 rounded-3xl w-full max-w-md border border-sky-500/30 shadow-2xl text-center space-y-6">
+            <div class="w-16 h-16 mx-auto flex items-center justify-center">
+                <img src="logo.png" alt="Logo" class="w-full h-full object-contain logo-soft-3d">
             </div>
-            <div class="brand-title" id="brandTitleText">بوابة الشركة المركزية</div>
-            <div class="brand-slogan" id="brandSloganText">نظام الإدارة والتحكم الشامل</div>
-        </div>
-
-        <!-- الجزء الأيمن (خانات تسجيل الدخول) -->
-        <div class="login-form-section">
-            <h2 id="loginHeader">تسجيل الدخول</h2>
-            <p id="loginSubText">أدخل بيانات الحساب الخاصة بك للمتابعة</p>
-            
-            <form onsubmit="event.preventDefault();">
-                <div class="input-group">
-                    <label id="labelUser">اسم المستخدم / البريد الإلكتروني</label>
-                    <input type="text" id="userInput" placeholder="name@company.com">
-                </div>
-                <div class="input-group">
-                    <label id="labelPass">كلمة المرور</label>
-                    <input type="password" id="passInput" placeholder="••••••••">
-                </div>
-                <button type="submit" class="submit-btn" id="submitBtnText">تسجيل الدخول</button>
-            </form>
+            <div>
+                <h2 class="text-2xl font-bold text-sky-300">Lacto Misr HR Portal</h2>
+                <p class="text-xs text-slate-400 mt-1">تسجيل دخول مسؤول النظام</p>
+            </div>
+            <div class="space-y-4">
+                <input type="text" id="login-user" placeholder="اسم المستخدم أو البريد" class="w-full px-4 py-3 bg-slate-900/90 border border-sky-500/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200">
+                <input type="password" id="login-pass" placeholder="كلمة المرور" class="w-full px-4 py-3 bg-slate-900/90 border border-sky-500/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200">
+                <button onclick="handleLogin()" class="w-full py-3 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl transition shadow-lg shadow-sky-600/30">دخول للنظام</button>
+            </div>
         </div>
     </div>
 
-    <!-- ربط ملف الـ JavaScript الخارجي -->
-    <script src="script.js"></script>
+    <!-- Top Header -->
+    <header class="glass-card shadow-xl px-6 py-4 flex justify-between items-center border-b z-30">
+        <div class="flex items-center space-x-4 space-x-reverse">
+            <div class="w-10 h-10 flex items-center justify-center">
+                <img src="logo.png" alt="Company Logo" class="w-full h-full object-contain logo-soft-3d">
+            </div>
+            <span class="text-2xl font-bold text-sky-400 tracking-wider">Lacto Misr HR</span>
+        </div>
+        
+        <div class="flex items-center space-x-4 space-x-reverse relative">
+            <!-- زر اللغة -->
+            <div class="relative">
+                <button onclick="toggleLangDropdown()" class="flex items-center gap-1.5 px-2 py-1 text-xs font-bold text-sky-300 hover:text-sky-100 transition focus:outline-none">
+                    <span class="text-lg neon-blue-icon">🌐</span>
+                    <span id="current-lang-display" class="flex items-center gap-1">
+                        <span id="lang-flag">🇪🇬</span> <span id="lang-code">AR</span>
+                    </span>
+                    <span class="text-[9px] text-sky-400">▼</span>
+                </button>
+                
+                <div id="lang-dropdown" class="hidden absolute left-0 mt-2 w-32 glass-card rounded-xl shadow-2xl border border-sky-500/30 overflow-hidden z-50">
+                    <button onclick="setLanguage('ar')" class="w-full flex items-center gap-2 px-3 py-2 text-xs text-right text-slate-200 hover:bg-sky-600/30 transition">
+                        <span>🇪🇬</span> <span class="font-bold">AR</span>
+                    </button>
+                    <button onclick="setLanguage('en')" class="w-full flex items-center gap-2 px-3 py-2 text-xs text-left text-slate-200 hover:bg-sky-600/30 transition">
+                        <span>🇬🇧</span> <span class="font-bold">EN</span>
+                    </button>
+                </div>
+            </div>
+
+            <span class="font-semibold text-slate-300 text-sm" data-translate="admin">مسؤول النظام</span>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="flex flex-1 overflow-hidden">
+        
+        <!-- Sidebar -->
+        <aside class="sidebar-collapsed glass-card hidden md:flex flex-col justify-between border-l z-20 overflow-hidden shadow-2xl">
+            <div class="p-4 space-y-6">
+                <div class="text-sm font-bold text-sky-300 text-center border-b border-sky-500/20 pb-3 truncate">
+                    <span class="text-xl neon-blue-icon">🎛️</span> <span class="sidebar-title" data-translate="control_panel">غرفة التحكم</span>
+                </div>
+                <nav class="space-y-3 text-sm">
+                    <a href="#" onclick="backToEmployeesList(); return false;" class="sidebar-item flex items-center gap-3.5 px-3 py-2.5 rounded-xl bg-sky-600/30 text-sky-300 font-semibold border border-sky-500/40 shadow-md">
+                        <svg class="w-5 h-5 neon-blue-icon shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                        <span class="nav-text" data-translate="nav_home">الرئيسية والموظفين</span>
+                    </a>
+                    <a href="#" class="sidebar-item flex items-center gap-3.5 px-3 py-2.5 rounded-xl hover:bg-slate-800/60 text-slate-300 transition">
+                        <svg class="w-5 h-5 neon-blue-icon shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                        <span class="nav-text" data-translate="nav_depts">الإدارات والأقسام</span>
+                    </a>
+                    <a href="#" class="sidebar-item flex items-center gap-3.5 px-3 py-2.5 rounded-xl hover:bg-slate-800/60 text-slate-300 transition">
+                        <svg class="w-5 h-5 neon-blue-icon shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span class="nav-text" data-translate="nav_attendance">الحضور والإنصراف</span>
+                    </a>
+                    <a href="#" class="sidebar-item flex items-center gap-3.5 px-3 py-2.5 rounded-xl hover:bg-slate-800/60 text-slate-300 transition">
+                        <svg class="w-5 h-5 neon-blue-icon shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        <span class="nav-text" data-translate="nav_reports">التقارير والإحصائيات</span>
+                    </a>
+                </nav>
+            </div>
+            <div class="p-4 border-t border-sky-500/20 text-[10px] text-slate-400 text-center truncate">
+                <span class="nav-text">Portal v5.2 - Pro Edition</span>
+            </div>
+        </aside>
+
+        <!-- Content Area -->
+        <main class="flex-1 p-6 overflow-y-auto">
+            
+            <!-- جدول القائمة الرئيسية -->
+            <div id="employees-list-view">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div class="glass-card p-5 rounded-2xl border-r-4 border-sky-500 shadow-xl">
+                        <p class="text-xs text-slate-400 font-semibold" data-translate="total_emp">إجمالي العاملين</p>
+                        <h3 id="total-employees-count" class="text-3xl font-bold mt-1 text-sky-300">352</h3>
+                    </div>
+                    <div class="glass-card p-5 rounded-2xl border-r-4 border-sky-500 shadow-xl">
+                        <p class="text-xs text-slate-400 font-semibold" data-translate="active_depts">الإدارات النشطة</p>
+                        <h3 class="text-3xl font-bold mt-1 text-sky-300">12</h3>
+                    </div>
+                    <div class="glass-card p-5 rounded-2xl border-r-4 border-sky-500 shadow-xl">
+                        <p class="text-xs text-slate-400 font-semibold" data-translate="system_status">حالة النظام</p>
+                        <h3 class="text-3xl font-bold mt-1 text-sky-300" data-translate="connected">مستقر (متصل بـ Firebase)</h3>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-2xl overflow-hidden shadow-2xl">
+                    <div class="p-4 border-b border-sky-500/20 flex flex-col md:flex-row justify-between items-center gap-4">
+                        <h2 class="font-bold text-lg text-sky-200" data-translate="emp_list">قائمة العاملين بالقاعدة</h2>
+                        <input type="text" id="search-input" onkeyup="filterEmployees()" data-translate-placeholder="search_placeholder" placeholder="بحث بالاسم أو الكود..." class="px-4 py-2 bg-slate-900/80 border border-sky-500/30 rounded-xl text-sm w-full md:w-72 focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200 placeholder-slate-500">
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table id="main-employees-table" class="w-full border-collapse glass-table">
+                            <thead>
+                                <tr class="bg-slate-900/60 text-sky-400 border-b text-xs uppercase tracking-wider">
+                                    <th class="p-3.5" data-translate="th_code">الكود</th>
+                                    <th class="p-3.5" data-translate="th_name">اسم الموظف</th>
+                                    <th class="p-3.5" data-translate="th_dept">الإدارة</th>
+                                    <th class="p-3.5" data-translate="th_job">الوظيفة</th>
+                                    <th class="p-3.5" data-translate="th_hire">تاريخ التعيين</th>
+                                    <th class="p-3.5 text-center" data-translate="th_actions">الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody id="employees-table-body" class="divide-y divide-sky-500/10 text-sm">
+                                <tr>
+                                    <td colspan="6" class="p-6 text-center text-slate-400" data-translate="loading">جاري جلب البيانات من القاعدة...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- صفحة الملف الوظيفي (للعرض الافتراضي، وتفتح للتعديل عند الضغط على زرار التعديل) -->
+            <div id="employee-profile-view" class="hidden space-y-6">
+                <div class="flex justify-between items-center glass-card p-4 rounded-2xl">
+                    <button onclick="backToEmployeesList()" class="px-4 py-2 bg-sky-600/30 hover:bg-sky-600 text-sky-200 rounded-xl text-sm border border-sky-400/30 transition shadow-lg" data-translate="back_btn">← العودة للقائمة</button>
+                    <div class="flex gap-3">
+                        <button id="btn-edit" onclick="enableEditing()" class="px-5 py-2 bg-sky-600/40 hover:bg-sky-600 text-white font-bold rounded-xl text-sm border border-sky-400/30 transition shadow-lg" data-translate="edit_btn">تعديل البيانات</button>
+                        <button id="btn-save" onclick="confirmSave()" class="hidden px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition shadow-lg" data-translate="save_btn">حفظ</button>
+                    </div>
+                </div>
+
+                <!-- بيانات الموظف والصورة (افتراضياً disabled للعرض فقط) -->
+                <div class="glass-card p-6 rounded-3xl shadow-2xl grid grid-cols-1 lg:grid-cols-4 gap-6 items-center">
+                    <div class="flex flex-col items-center justify-center space-y-3">
+                        <div class="w-36 h-36 rounded-2xl overflow-hidden border-2 border-sky-500/50 shadow-xl bg-slate-900">
+                            <img id="profile-img" src="default-avatar.png" alt="Employee Photo" class="w-full h-full object-cover">
+                        </div>
+                        <input type="file" id="photo-upload-input" accept="image/*" class="hidden" onchange="uploadEmployeePhoto(event)">
+                        <button id="btn-photo" onclick="document.getElementById('photo-upload-input').click()" class="hidden px-3 py-1.5 bg-sky-600/20 hover:bg-sky-600 text-sky-300 rounded-lg text-xs border border-sky-400/30 transition" data-translate="change_photo">تعديل الصورة</button>
+                    </div>
+
+                    <div class="lg:col-span-3 space-y-4">
+                        <div>
+                            <label class="text-xs text-sky-400 font-semibold" data-translate="th_name">اسم الموظف</label>
+                            <input type="text" id="prof-name" disabled class="w-full mt-1 px-4 py-2.5 bg-slate-900/50 border border-slate-700 rounded-xl text-white font-bold disabled:opacity-80">
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-xs text-slate-400" data-translate="th_code">الكود</label>
+                                <input type="text" id="prof-code" disabled class="w-full mt-1 px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-sky-400 font-mono">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-400" data-translate="th_dept">الإدارة</label>
+                                <input type="text" id="prof-dept" disabled class="w-full mt-1 px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 disabled:opacity-80">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- باقي التفاصيل -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="glass-card p-5 rounded-2xl space-y-4">
+                        <h3 class="text-sm font-bold text-sky-400 border-b border-sky-500/20 pb-2" data-translate="sec_job">البيانات الوظيفية</h3>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="th_job">الوظيفة</label>
+                            <input type="text" id="prof-job" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="manager_label">المدير المباشر</label>
+                            <input type="text" id="prof-manager" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="th_hire">تاريخ التعيين</label>
+                            <input type="text" id="prof-hire" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm font-mono disabled:opacity-80">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="service_years">سنوات الخدمة</label>
+                            <input type="text" id="prof-service" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                    </div>
+
+                    <div class="glass-card p-5 rounded-2xl space-y-4">
+                        <h3 class="text-sm font-bold text-sky-400 border-b border-sky-500/20 pb-2" data-translate="sec_qual">المؤهل العلمي</h3>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="qual_label">المؤهل</label>
+                            <input type="text" id="prof-qual" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="qual_auth">جهة المؤهل</label>
+                            <input type="text" id="prof-qual-auth" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                    </div>
+
+                    <div class="glass-card p-5 rounded-2xl space-y-4">
+                        <h3 class="text-sm font-bold text-sky-400 border-b border-sky-500/20 pb-2" data-translate="sec_personal">البيانات الشخصية</h3>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="dob_label">تاريخ الميلاد</label>
+                            <input type="text" id="prof-dob" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm font-mono disabled:opacity-80">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="age_label">السن حتى تاريخه</label>
+                            <input type="text" id="prof-age" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="insurance_label">الحالة التأمينية</label>
+                            <input type="text" id="prof-insurance" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="pob_label">مكان الميلاد</label>
+                            <input type="text" id="prof-pob" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- نافذة تأكيد الحفظ (Modal) بنفس تصميم السايت بدون ألوان فرح -->
+    <div id="confirm-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+        <div class="glass-card p-6 rounded-2xl max-w-sm w-full border border-sky-500/30 text-center space-y-4">
+            <h3 id="confirm-title" class="text-lg font-bold text-white">هل ترغب في حفظ التعديلات؟</h3>
+            <div class="flex justify-center gap-3 pt-2">
+                <button onclick="executeSave()" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-xs transition" data-translate="yes_btn">نعم</button>
+                <button onclick="closeConfirmModal()" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition" data-translate="cancel_btn">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification (رسالة اتمام الحفظ الشيك) -->
+    <div id="toast-notification" class="fixed bottom-6 left-6 z-50 transform translate-y-32 opacity-0 transition-all duration-300 glass-card px-6 py-3 rounded-2xl border border-sky-500/40 shadow-2xl flex items-center gap-3">
+        <span class="text-sky-400 text-lg">✓</span>
+        <span id="toast-message" class="text-sm font-bold text-white">تم الحفظ بنجاح</span>
+    </div>
+
+    <!-- ربط ملف الـ JS -->
+    <script src="app.js"></script>
 </body>
 </html>
