@@ -1,4 +1,4 @@
-// --- دالة إخفاء الإنترو الآمنة ---
+// --- دالة إخفاء الإنترو (مع مؤقت وحماية للضغط اليدوي) ---
 function dismissIntro() {
     const introScreen = document.getElementById('intro-screen');
     if (introScreen) {
@@ -7,9 +7,11 @@ function dismissIntro() {
     }
 }
 
+// تشغيل إخفاء الإنترو تلقائياً بعد 2.5 ثانية من تحميل الصفحة
 window.addEventListener('load', () => {
     setTimeout(dismissIntro, 2500);
 });
+// مؤقت احتياطي لضمان اختفائه مهما حصل
 setTimeout(dismissIntro, 4000);
 
 // دوال تحويل وتنسيق تواريخ إكسيل
@@ -26,6 +28,30 @@ function excelDateToJSDate(serial) {
     return `${year}-${month}-${day}`;
 }
 
+// التبديل الاحترافي للعين الشقية مع SVG
+function togglePasswordVisibility() {
+    const passInput = document.getElementById('login-password');
+    const svgIcon = document.getElementById('eye-icon');
+    if (!passInput) return;
+    if (passInput.type === 'password') {
+        passInput.type = 'text';
+        if (svgIcon) svgIcon.innerText = '🙈';
+    } else {
+        passInput.type = 'password';
+        if (svgIcon) svgIcon.innerText = '👁️';
+    }
+}
+
+// دوال مودال نسيت كلمة المرور
+function openForgotPassModal() {
+    const modal = document.getElementById('forgot-pass-modal');
+    if (modal) modal.classList.remove('hidden');
+}
+function closeForgotPassModal() {
+    const modal = document.getElementById('forgot-pass-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
 // إعدادات فايربيس الرسمية
 const firebaseConfig = {
     apiKey: "AIzaSyA-ywy51h3TM6YF_n0bNj1D5lAMJ7uMnO4",
@@ -38,6 +64,7 @@ const firebaseConfig = {
     measurementId: "G-Z6K3VG2SJ6"
 };
 
+// تهيئة Firebase
 if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
     firebase.analytics();
@@ -45,10 +72,10 @@ if (!firebase.apps.length) {
 const db = firebase.database();
 
 let allEmployees = [];
-let currentLang = 'ar';
+let currentLang = localStorage.getItem('lacto_lang') || 'ar';
 let activeEmployeeCode = null;
 
-// قاموس الترجمات الشامل
+// قاموس الترجمات الشامل للواجهة
 const translations = {
     ar: {
         admin: "مسؤول النظام",
@@ -102,6 +129,18 @@ const translations = {
     }
 };
 
+// تسجيل الدخول وإخفاء شاشة اللوجن
+function handleLogin() {
+    const loginModal = document.getElementById('login-modal');
+    if (loginModal) {
+        loginModal.style.transition = 'opacity 0.3s ease';
+        loginModal.style.opacity = '0';
+        setTimeout(() => {
+            loginModal.style.display = 'none';
+        }, 300);
+    }
+}
+
 // تحميل بيانات الموظفين عند بدء التشغيل
 document.addEventListener('DOMContentLoaded', () => {
     fetch('clean_employees_data.json')
@@ -121,7 +160,7 @@ function toggleLangMenu(event) {
   if (langMenu) langMenu.classList.toggle('show');
 }
 
-// تغيير اللغة وتحديث الواجهة
+// تغيير اللغة
 function selectLanguage(lang) {
   currentLang = lang;
   localStorage.setItem('lacto_lang', lang);
@@ -142,6 +181,7 @@ function selectLanguage(lang) {
   updateContentTranslations();
 }
 
+// دالة تحديث النصوص والترجمات (تم تصحيحها ووضعها في مكانها الصحيح)
 function updateContentTranslations() {
     document.querySelectorAll('[data-translate]').forEach(el => {
         const key = el.getAttribute('data-translate');
@@ -227,11 +267,20 @@ function viewEmployee(code) {
     setFieldVal('prof-dept', (currentLang === 'ar' ? (emp["الإدارة "] || emp["الإدارة"]) : (emp["department "] || emp["department"])));
     setFieldVal('prof-job', (currentLang === 'ar' ? (emp["الوظيفة"] || emp["الوظيفة "]) : (emp["job title "] || emp["job title"])));
     setFieldVal('prof-manager', (currentLang === 'ar' ? (emp["المدير المباشر "] || emp["المدير المباشر"]) : (emp["direct manager "] || emp["direct manager"])));
+    setFieldVal('prof-hire', excelDateToJSDate(emp["تاريخ التعيين "] || emp["تاريخ التعيين"] || emp["date_of_hiring "]));
+    setFieldVal('prof-service', emp["سنوات الخدمة "] || emp["years service"] || '');
+    setFieldVal('prof-qual', (currentLang === 'ar' ? emp["المؤهل"] : emp["qualification"]) || '');
+    setFieldVal('prof-qual-auth', (currentLang === 'ar' ? (emp["جهة المؤهل "] || emp["جهة المؤهل"]) : (emp["qulification issuing authority"] || emp["issuer"])));
+    setFieldVal('prof-dob', excelDateToJSDate(emp["تاريخ الميلاد"] || emp["dob"]));
+    setFieldVal('prof-age', emp["السن حتى تاريخه "] || emp["age to date"] || '');
+    setFieldVal('prof-insurance', (currentLang === 'ar' ? (emp["الحالة التأمينية "] || emp["الحالة التأمينية"]) : (emp["insurance status "] || emp["insurance status"])));
+    setFieldVal('prof-pob', (currentLang === 'ar' ? (emp["مكان الميلاد"] || emp["مكان الميلاد"]) : (emp["pob "] || emp["pob"])));
 
     document.getElementById('profile-img').src = emp["photoUrl"] || 'default-avatar.png';
     
     document.getElementById('btn-save').classList.add('hidden');
     document.getElementById('btn-edit').classList.remove('hidden');
+    document.getElementById('btn-photo').classList.add('hidden');
     setFieldsEditable(true);
 }
 
@@ -244,14 +293,22 @@ function enableEditing() {
     setFieldsEditable(false);
     document.getElementById('btn-edit').classList.add('hidden');
     document.getElementById('btn-save').classList.remove('hidden');
+    document.getElementById('btn-photo').classList.remove('hidden');
 }
 
 function setFieldsEditable(isDisabled) {
-    const fields = ['prof-name', 'prof-dept', 'prof-job', 'prof-manager'];
+    const fields = ['prof-name', 'prof-dept', 'prof-job', 'prof-manager', 'prof-hire', 'prof-service', 'prof-qual', 'prof-qual-auth', 'prof-dob', 'prof-age', 'prof-insurance', 'prof-pob'];
     fields.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
             el.disabled = isDisabled;
+            if (isDisabled) {
+                el.classList.add('bg-slate-900/50', 'border-slate-700');
+                el.classList.remove('bg-slate-900/90', 'border-sky-500/50');
+            } else {
+                el.classList.remove('bg-slate-900/50', 'border-slate-700');
+                el.classList.add('bg-slate-900/90', 'border-sky-500/50');
+            }
         }
     });
 }
@@ -262,9 +319,78 @@ function backToEmployeesList() {
     document.getElementById('employees-list-view').style.display = 'block';
 }
 
+function uploadEmployeePhoto(event) {
+    const file = event.target.files[0];
+    if (!file || activeEmployeeCode === null) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64Image = e.target.result;
+        document.getElementById('profile-img').src = base64Image;
+
+        const emp = allEmployees.find(e => String(e["الكود"] || e["code"]) === String(activeEmployeeCode));
+        if (emp) {
+            emp["photoUrl"] = base64Image;
+            if (typeof firebase !== 'undefined' && firebase.database) {
+                firebase.database().ref('employees/' + activeEmployeeCode).update({ photoUrl: base64Image });
+            }
+        }
+        showToast();
+    };
+    reader.readAsDataURL(file);
+}
+
 function confirmSave() {
+    const modal = document.getElementById('confirm-modal');
+    if (modal) {
+        document.getElementById('confirm-title').innerText = translations[currentLang]['confirm_title'];
+        modal.classList.remove('hidden');
+    }
+}
+
+function closeConfirmModal() {
+    const modal = document.getElementById('confirm-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function executeSave() {
+    closeConfirmModal();
     if (activeEmployeeCode === null) return;
-    showToast();
+
+    const emp = allEmployees.find(e => String(e["الكود"] || e["code"]) === String(activeEmployeeCode));
+    if (!emp) return;
+
+    const updatedData = {
+        code: activeEmployeeCode,
+        name: document.getElementById('prof-name').value,
+        department: document.getElementById('prof-dept').value,
+        jobTitle: document.getElementById('prof-job').value,
+        directManager: document.getElementById('prof-manager').value,
+        hireDate: document.getElementById('prof-hire').value,
+        yearsService: document.getElementById('prof-service').value,
+        qualification: document.getElementById('prof-qual').value,
+        qualAuth: document.getElementById('prof-qual-auth').value,
+        dob: document.getElementById('prof-dob').value,
+        age: document.getElementById('prof-age').value,
+        insuranceStatus: document.getElementById('prof-insurance').value,
+        pob: document.getElementById('prof-pob').value,
+        photoUrl: document.getElementById('profile-img').src
+    };
+
+    if (typeof firebase !== 'undefined' && firebase.database) {
+        firebase.database().ref('employees/' + activeEmployeeCode).update(updatedData)
+        .then(() => {
+            showToast();
+            setFieldsEditable(true);
+            document.getElementById('btn-save').classList.add('hidden');
+            document.getElementById('btn-edit').classList.remove('hidden');
+            document.getElementById('btn-photo').classList.add('hidden');
+            renderTable(allEmployees);
+        })
+        .catch(error => {
+            console.error("Firebase save error:", error);
+        });
+    }
 }
 
 function showToast() {
@@ -284,7 +410,7 @@ function updateDashboardStats() {
     if (totalCountEl) totalCountEl.innerText = allEmployees.length;
 }
 
-// إغلاق قائمة اللغات عند الضغط خارجها
+// إغلاق قائمة اللغات تلقائياً عند الضغط خارجها
 window.addEventListener('click', (e) => {
     if (!e.target.closest('.lang-dropdown-container')) {
         const langMenu = document.getElementById('langMenu');
