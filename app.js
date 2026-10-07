@@ -1,4 +1,4 @@
-// تشغيل وإخفاء شاشة الإنترو النقية بسلاسة بعد 3 ثوانٍ
+// تشغيل وإخفاء شاشة الإنترو النقية بسلاسة بعد 3 ثوانٍ[cite: 13]
 window.addEventListener('load', () => {
     setTimeout(() => {
         const introScreen = document.getElementById('intro-screen');
@@ -211,21 +211,25 @@ function selectLanguage(lang) {
     langMenu.classList.remove('show');
   }
 
-  // استدعاء دالة تحديث النصوص بالكامل إذا كانت متاحة
+  // استدعاء دالة تحديث النصوص بالكامل
   if (typeof updateContentTranslations === 'function') {
     updateContentTranslations();
   }
 }
 
+// دالة تحديث النصوص والترجمات في الواجهة
+function updateContentTranslations() {
     document.querySelectorAll('[data-translate]').forEach(el => {
         const key = el.getAttribute('data-translate');
-        if (translations[currentLang][key]) {
+        if (translations[currentLang] && translations[currentLang][key]) {
             el.innerText = translations[currentLang][key];
         }
     });
 
     const searchInput = document.getElementById('search-input');
-    if (searchInput) searchInput.placeholder = translations[currentLang]['search_placeholder'];
+    if (searchInput && translations[currentLang]) {
+        searchInput.placeholder = translations[currentLang]['search_placeholder'];
+    }
 
     renderTable(allEmployees);
     
