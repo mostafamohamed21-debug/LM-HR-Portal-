@@ -16,10 +16,28 @@
        @keyframes leafFadeIn {
            0% { opacity: 0; transform: translateY(15px) scale(0.95); }
            100% { opacity: 1; transform: translateY(0) scale(1); }
-           }
-           .animate-fade-in {
+       }
+       .animate-fade-in {
            animation: leafFadeIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-            }
+       }
+       /* تنسيق شاشة الإنترو المستخرجة من الـ ESS */
+       #intro-splash {
+           position: fixed;
+           top: 0;
+           left: 0;
+           width: 100%;
+           height: 100%;
+           background: #050b18;
+           display: flex;
+           justify-content: center;
+           align-items: center;
+           z-index: 10000;
+           transition: opacity 0.6s ease, visibility 0.6s ease;
+       }
+       #intro-splash.fade-out {
+           opacity: 0;
+           visibility: hidden;
+       }
         body {
             font-family: 'Cairo', sans-serif;
             background: linear-gradient(rgba(5, 11, 24, 0.93), rgba(5, 11, 24, 0.98)), url('background.jpg') no-repeat center center fixed;
@@ -76,58 +94,65 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
-    <!-- شاشة تسجيل الدخول المطورة (Split Screen with Leaf Animation & Eye Toggle) -->
-<div id="login-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-xl">
-    <div class="glass-card p-10 rounded-3xl w-full max-w-2xl border border-sky-500/40 shadow-2xl grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-        
-        <!-- القسم الأيسر: اللوجو واسم الشركة والسلوجن بـ Animation -->
-        <div class="flex flex-col items-center text-center space-y-4 border-b md:border-b-0 md:border-l border-sky-500/20 pb-6 md:pb-0 md:pl-6">
-            <div class="w-20 h-20 flex items-center justify-center">
+    <!-- شاشة الإنترو (Intro / Splash Screen) المستخرجة من الـ ESS -->
+    <div id="intro-splash">
+        <div class="flex flex-col items-center text-center space-y-4 animate-fade-in">
+            <div class="w-24 h-24 flex items-center justify-center">
                 <img src="logo.png" alt="Lacto Misr Logo" class="w-full h-full object-contain logo-soft-3d">
             </div>
-            <div class="space-y-1 animate-fade-in">
-                <h2 class="text-2xl font-bold text-sky-300 tracking-wide">Lacto Misr HR</h2>
-                <p id="login-slogan" class="text-xs text-sky-400/80 font-medium px-2">شركاء فى رحلة نمو طفلك</p>
+            <div class="space-y-1">
+                <h1 class="text-3xl font-bold text-sky-300 tracking-wider">Lacto Misr HR</h1>
+                <p class="text-xs text-sky-400/80 font-medium">شركاء فى رحلة نمو طفلك</p>
             </div>
         </div>
-
-        <!-- القسم الأيمن: خانات الدخول الذكية -->
-        <div class="space-y-4">
-            <div class="text-right">
-                <h3 class="text-lg font-bold text-white" data-translate="login_title">تسجيل الدخول</h3>
-                <p class="text-xs text-slate-400" data-translate="login_subtitle">أدخل كود الموظف وكلمة المرور</p>
-            </div>
-
-            <div class="space-y-3">
-                <!-- كود الموظف -->
-                <div>
-                    <input type="text" id="login-emp-code" data-translate-placeholder="code_placeholder" placeholder="كود الموظف" class="w-full px-4 py-3 bg-slate-900/90 border border-sky-500/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200 placeholder-slate-500">
-                </div>
-
-                <!-- كلمة المرور مع زرار العين الشقية -->
-                <div class="relative">
-                    <input type="password" id="login-password" data-translate-placeholder="pass_placeholder" placeholder="كلمة المرور" class="w-full px-4 py-3 bg-slate-900/90 border border-sky-500/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200 placeholder-slate-500 pr-10">
-                    <button type="button" onclick="togglePasswordVisibility()" class="absolute left-3 top-3.5 text-slate-400 hover:text-sky-300 transition focus:outline-none">
-                        <span id="eye-icon">👁️</span>
-                    </button>
-                </div>
-
-                <!-- تذكرني ونسيت كلمة المرور -->
-                <div class="flex items-center justify-between text-xs text-slate-300 pt-1">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="remember-me" class="rounded bg-slate-900 border-sky-500/30 text-sky-600 focus:ring-0">
-                        <span data-translate="remember_me">تذكرني</span>
-                    </label>
-                    <a href="#" onclick="handleForgotPassword(); return false;" class="text-sky-400 hover:underline" data-translate="forgot_pass">نسيت كلمة المرور؟</a>
-                </div>
-
-                <!-- زر الدخول -->
-                <button onclick="handleLogin()" class="w-full py-3 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl transition shadow-lg shadow-sky-600/30" data-translate="login_btn">دخول للنظام</button>
-            </div>
-        </div>
-
     </div>
-</div>
+
+    <!-- شاشة تسجيل الدخول المطورة -->
+    <div id="login-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-xl">
+        <div class="glass-card p-10 rounded-3xl w-full max-w-2xl border border-sky-500/40 shadow-2xl grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+            
+            <div class="flex flex-col items-center text-center space-y-4 border-b md:border-b-0 md:border-l border-sky-500/20 pb-6 md:pb-0 md:pl-6">
+                <div class="w-20 h-20 flex items-center justify-center">
+                    <img src="logo.png" alt="Lacto Misr Logo" class="w-full h-full object-contain logo-soft-3d">
+                </div>
+                <div class="space-y-1 animate-fade-in">
+                    <h2 class="text-2xl font-bold text-sky-300 tracking-wide">Lacto Misr HR</h2>
+                    <p id="login-slogan" class="text-xs text-sky-400/80 font-medium px-2">شركاء فى رحلة نمو طفلك</p>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <div class="text-right">
+                    <h3 class="text-lg font-bold text-white" data-translate="login_title">تسجيل الدخول</h3>
+                    <p class="text-xs text-slate-400" data-translate="login_subtitle">أدخل كود الموظف وكلمة المرور</p>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <input type="text" id="login-emp-code" data-translate-placeholder="code_placeholder" placeholder="كود الموظف" class="w-full px-4 py-3 bg-slate-900/90 border border-sky-500/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200 placeholder-slate-500">
+                    </div>
+
+                    <div class="relative">
+                        <input type="password" id="login-password" data-translate-placeholder="pass_placeholder" placeholder="كلمة المرور" class="w-full px-4 py-3 bg-slate-900/90 border border-sky-500/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200 placeholder-slate-500 pr-10">
+                        <button type="button" onclick="togglePasswordVisibility()" class="absolute left-3 top-3.5 text-slate-400 hover:text-sky-300 transition focus:outline-none">
+                            <span id="eye-icon">👁️</span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between text-xs text-slate-300 pt-1">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="remember-me" class="rounded bg-slate-900 border-sky-500/30 text-sky-600 focus:ring-0">
+                            <span data-translate="remember_me">تذكرني</span>
+                        </label>
+                        <a href="#" onclick="handleForgotPassword(); return false;" class="text-sky-400 hover:underline" data-translate="forgot_pass">نسيت كلمة المرور؟</a>
+                    </div>
+
+                    <button onclick="handleLogin()" class="w-full py-3 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl transition shadow-lg shadow-sky-600/30" data-translate="login_btn">دخول للنظام</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
 
     <!-- Top Header -->
     <header class="glass-card shadow-xl px-6 py-4 flex justify-between items-center border-b z-30">
@@ -139,7 +164,6 @@
         </div>
         
         <div class="flex items-center space-x-4 space-x-reverse relative">
-            <!-- زر اللغة -->
             <div class="relative">
                 <button onclick="toggleLangDropdown()" class="flex items-center gap-1.5 px-2 py-1 text-xs font-bold text-sky-300 hover:text-sky-100 transition focus:outline-none">
                     <span class="text-lg neon-blue-icon">🌐</span>
@@ -199,7 +223,6 @@
         <!-- Content Area -->
         <main class="flex-1 p-6 overflow-y-auto">
             
-            <!-- جدول القائمة الرئيسية -->
             <div id="employees-list-view">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                     <div class="glass-card p-5 rounded-2xl border-r-4 border-sky-500 shadow-xl">
@@ -243,7 +266,6 @@
                 </div>
             </div>
 
-            <!-- صفحة الملف الوظيفي (للعرض الافتراضي، وتفتح للتعديل عند الضغط على زرار التعديل) -->
             <div id="employee-profile-view" class="hidden space-y-6">
                 <div class="flex justify-between items-center glass-card p-4 rounded-2xl">
                     <button onclick="backToEmployeesList()" class="px-4 py-2 bg-sky-600/30 hover:bg-sky-600 text-sky-200 rounded-xl text-sm border border-sky-400/30 transition shadow-lg" data-translate="back_btn">← العودة للقائمة</button>
@@ -253,7 +275,6 @@
                     </div>
                 </div>
 
-                <!-- بيانات الموظف والصورة (افتراضياً disabled للعرض فقط) -->
                 <div class="glass-card p-6 rounded-3xl shadow-2xl grid grid-cols-1 lg:grid-cols-4 gap-6 items-center">
                     <div class="flex flex-col items-center justify-center space-y-3">
                         <div class="w-36 h-36 rounded-2xl overflow-hidden border-2 border-sky-500/50 shadow-xl bg-slate-900">
@@ -281,7 +302,6 @@
                     </div>
                 </div>
 
-                <!-- باقي التفاصيل -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="glass-card p-5 rounded-2xl space-y-4">
                         <h3 class="text-sm font-bold text-sky-400 border-b border-sky-500/20 pb-2" data-translate="sec_job">البيانات الوظيفية</h3>
@@ -340,7 +360,6 @@
         </main>
     </div>
 
-    <!-- نافذة تأكيد الحفظ (Modal) بنفس تصميم السايت بدون ألوان فرح -->
     <div id="confirm-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
         <div class="glass-card p-6 rounded-2xl max-w-sm w-full border border-sky-500/30 text-center space-y-4">
             <h3 id="confirm-title" class="text-lg font-bold text-white">هل ترغب في حفظ التعديلات؟</h3>
@@ -351,7 +370,6 @@
         </div>
     </div>
 
-    <!-- Toast Notification (رسالة اتمام الحفظ الشيك) -->
     <div id="toast-notification" class="fixed bottom-6 left-6 z-50 transform translate-y-32 opacity-0 transition-all duration-300 glass-card px-6 py-3 rounded-2xl border border-sky-500/40 shadow-2xl flex items-center gap-3">
         <span class="text-sky-400 text-lg">✓</span>
         <span id="toast-message" class="text-sm font-bold text-white">تم الحفظ بنجاح</span>
