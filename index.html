@@ -13,12 +13,20 @@
     <!-- خط Cairo -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-@keyframes leafFadeIn {
-    0% { opacity: 0; transform: translateY(15px) scale(0.95); }
-    100% { opacity: 1; transform: translateY(0) scale(1); }
+@keyframes hurricaneIntro {
+    0% { transform: scale(3) rotate(-180deg); opacity: 0; }
+    50% { transform: scale(1.5) rotate(90deg); opacity: 0.8; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
 }
-.animate-fade-in {
-    animation: leafFadeIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+.animate-hurricane {
+    animation: hurricaneIntro 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes fadeInDown {
+    0% { opacity: 0; transform: translateY(-30px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-down {
+    animation: fadeInDown 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
         body {
             font-family: 'Cairo', sans-serif;
@@ -76,21 +84,110 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
-  <!-- شاشة تسجيل الدخول المطورة (Split Screen with Leaf Animation & Eye Toggle) -->
-<div id="login-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-xl">
-    <div class="glass-card p-10 rounded-3xl w-full max-w-2xl border border-sky-500/40 shadow-2xl grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-        
-        <!-- القسم الأيسر: اللوجو واسم الشركة والسلوجن بـ Animation -->
-        <div class="flex flex-col items-center text-center space-y-4 border-b md:border-b-0 md:border-l border-sky-500/20 pb-6 md:pb-0 md:pl-6">
-            <div class="w-20 h-20 flex items-center justify-center">
+ <!-- شاشة تسجيل الدخول العالمية والموحدة (Full-Screen Immersive Login) -->
+<div id="login-modal" class="fixed inset-0 z-50 flex flex-col justify-between p-8 bg-slate-950/95 backdrop-blur-2xl transition-all duration-700">
+    
+    <!-- شريط علوي يضم زرار اللغة واللوجو المبدئي -->
+    <div class="flex justify-between items-center w-full max-w-7xl mx-auto">
+        <div class="flex items-center space-x-3 space-x-reverse">
+            <div id="intro-logo-container" class="w-12 h-12 flex items-center justify-center transition-all duration-1000 transform scale-125">
                 <img src="logo.png" alt="Lacto Misr Logo" class="w-full h-full object-contain logo-soft-3d">
             </div>
-            <div class="space-y-1 animate-fade-in">
-                <h2 class="text-2xl font-bold text-sky-300 tracking-wide">Lacto Misr HR</h2>
-                <p id="login-slogan" class="text-xs text-sky-400/80 font-medium px-2">شركاء فى رحلة نمو طفلك</p>
-            </div>
+            <span class="text-xl font-bold text-sky-400 tracking-wider">Lacto Misr HR</span>
         </div>
 
+        <!-- زرار اللغة في صفحة اللوجن -->
+        <div class="relative">
+            <button onclick="toggleLangDropdown()" class="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-card text-xs font-bold text-sky-300 hover:text-sky-100 transition border border-sky-500/30">
+                <span class="text-sm">🌐</span>
+                <span id="current-lang-display" class="flex items-center gap-1">
+                    <span id="lang-flag">🇪🇬</span> <span id="lang-code">AR</span>
+                </span>
+                <span class="text-[9px] text-sky-400">▼</span>
+            </button>
+            <div id="lang-dropdown" class="hidden absolute left-0 mt-2 w-32 glass-card rounded-xl shadow-2xl border border-sky-500/30 overflow-hidden z-50">
+                <button onclick="setLanguage('ar')" class="w-full flex items-center gap-2 px-3 py-2 text-xs text-right text-slate-200 hover:bg-sky-600/30 transition">
+                    <span>🇪🇬</span> <span class="font-bold">AR</span>
+                </button>
+                <button onclick="setLanguage('en')" class="w-full flex items-center gap-2 px-3 py-2 text-xs text-left text-slate-200 hover:bg-sky-600/30 transition">
+                    <span>🇬🇧</span> <span class="font-bold">EN</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- محتوى صفحة اللوجن (منتصف الشاشة بدون بوكسات خانقة) -->
+    <div class="w-full max-w-xl mx-auto text-center space-y-8 animate-fade-in-down">
+        
+        <!-- اسم الشركة والسلوجن المطور -->
+        <div class="space-y-3">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-white tracking-wide bg-gradient-to-r from-sky-400 to-blue-600 bg-clip-text text-transparent">
+                Lacto Misr Portal
+            </h1>
+            <p id="login-slogan" class="text-sm md:text-base text-sky-300/90 font-medium tracking-wide">
+                شركاء فى رحلة نمو طفلك
+            </p>
+        </div>
+
+        <!-- خانات إدخال البيانات المنسقة ببراعة -->
+        <div class="space-y-4 text-right max-w-md mx-auto">
+            <div>
+                <label class="block text-xs text-slate-400 mb-1" data-translate="code_placeholder">كود الموظف</label>
+                <input type="text" id="login-emp-code" placeholder="أدخل كود الموظف" class="w-full px-4 py-3.5 bg-slate-900/80 border border-sky-500/30 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-100 placeholder-slate-600 shadow-inner">
+            </div>
+
+            <div>
+                <label class="block text-xs text-slate-400 mb-1" data-translate="pass_placeholder">كلمة المرور</label>
+                <div class="relative">
+                    <input type="password" id="login-password" placeholder="أدخل كلمة المرور" class="w-full px-4 py-3.5 bg-slate-900/80 border border-sky-500/30 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-100 placeholder-slate-600 shadow-inner pl-12">
+                    <!-- أيقونة العين الشقية الاحترافية (SVG Eye Toggle) -->
+                    <button type="button" onclick="togglePasswordVisibility()" class="absolute left-3 top-3.5 text-slate-400 hover:text-sky-300 transition focus:outline-none p-1">
+                        <svg id="eye-icon-svg" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- خيارات تذكرني ونسيت الباسورد -->
+            <div class="flex items-center justify-between text-xs text-slate-300 pt-1">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="remember-me" class="rounded bg-slate-900 border-sky-500/30 text-sky-600 focus:ring-0">
+                    <span data-translate="remember_me">تذكرني</span>
+                </label>
+                <a href="#" onclick="openForgotPassModal(); return false;" class="text-sky-400 hover:underline" data-translate="forgot_pass">نسيت كلمة المرور؟</a>
+            </div>
+
+            <!-- زر الدخول -->
+            <button onclick="handleLogin()" class="w-full py-3.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-2xl transition shadow-xl shadow-sky-600/30 text-base" data-translate="login_btn">
+                دخول للنظام
+            </button>
+        </div>
+
+    </div>
+
+    <!-- تذييل الصفحة -->
+    <div class="text-center text-[11px] text-slate-500 pb-2">
+        <span>Lacto Misr Central HR Portal &copy; 2026 - All Rights Reserved</span>
+    </div>
+</div>
+
+<!-- مودال نسيت كلمة المرور (Dark Modal فخم) -->
+<div id="forgot-pass-modal" class="hidden fixed inset-0 z-60 flex items-center justify-center bg-slate-950/80 backdrop-blur-md">
+    <div class="glass-card p-8 rounded-3xl max-w-md w-full border border-sky-500/40 text-center space-y-5 shadow-2xl">
+        <div class="w-12 h-12 mx-auto rounded-full bg-sky-500/20 flex items-center justify-center text-sky-400 text-xl font-bold">
+            i
+        </div>
+        <h3 class="text-lg font-bold text-white" data-translate="forgot_modal_title">إعادة تعيين كلمة المرور</h3>
+        <p id="forgot-modal-text" class="text-xs text-slate-300 leading-relaxed">
+            يرجى التوجه فوراً إلى قسم شؤون العاملين (HR) للحصول على كلمة المرور المؤقتة الخاصة بحسابك.
+        </p>
+        <button onclick="closeForgotPassModal()" class="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-xs transition shadow-lg" data-translate="close_btn">
+            فهمت، شكراً
+        </button>
+    </div>
+</div>
         <!-- القسم الأيمن: خانات الدخول الذكية -->
         <div class="space-y-4">
             <div class="text-right">
