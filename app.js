@@ -1,127 +1,13 @@
-/* --- AUDIO SYSTEM & INTRO ANIMATION (من الـ ESS) --- */
-window.audioCtx = null;
-window.playClickSound = function() {
-    try {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (!window.audioCtx) window.audioCtx = new AudioContext();
-        const ctx = window.audioCtx;
-        if (ctx.state === 'suspended') ctx.resume();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(1000, ctx.currentTime);
-        gain.gain.setValueAtTime(0.08, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.03);
-        osc.connect(gain); gain.connect(ctx.destination);
-        osc.start(); osc.stop(ctx.currentTime + 0.03);
-    } catch(e) {}
-};
-
-document.addEventListener('click', (e) => {
-    const clickSelectors = [
-        'button', 'a', '.clickable-card', '.dropdown-option', '.lang-option', 
-        '.type-btn', '.bottom-nav-item', '.ampm-badge', '.wheel-item', '.calendar-day', 
-        '.radio-option-btn', '.toggle-salary-btn', '.toggle-password', '.dropdown-selected', 
-        '.checkin-card', '.action-btn-item', '.dot', '.custom-date-input', 
-        'label.checkbox-container', '.upload-btn-label', '#chatbot-fab', '.notification-btn'
-    ].join(', ');
-
-    if (e.target.closest(clickSelectors)) {
-        window.playClickSound();
-    }
-});
-
-window.playIntroMusic = function() {
-    try {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (!window.audioCtx) window.audioCtx = new AudioContext();
-        const ctx = window.audioCtx;
-        if (ctx.state === 'suspended') ctx.resume();
-
-        function playNote(freq, startTime, duration, type = 'sine', volume = 0.015) {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = type;
-            osc.frequency.value = freq;
-            gain.gain.setValueAtTime(0, startTime);
-            gain.gain.linearRampToValueAtTime(volume, startTime + duration * 0.2);
-            gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(startTime);
-            osc.stop(startTime + duration);
+// تشغيل وإخفاء شاشة الإنترو النقية بسلاسة بعد 3 ثوانٍ
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        const introScreen = document.getElementById('intro-screen');
+        if (introScreen) {
+            introScreen.classList.add('fade-out');
+            setTimeout(() => introScreen.remove(), 1000);
         }
-
-        const t = ctx.currentTime;
-        playNote(220.00, t, 3.0, 'sine', 0.02); 
-        playNote(329.63, t + 0.5, 3.0, 'sine', 0.015); 
-        playNote(523.25, t + 1.0, 3.0, 'sine', 0.015);
-        playNote(174.61, t + 2.0, 3.0, 'sine', 0.02); 
-        playNote(349.23, t + 2.5, 3.0, 'sine', 0.015); 
-        playNote(523.25, t + 3.0, 3.0, 'sine', 0.015); 
-        playNote(196.00, t + 4.5, 4.0, 'sine', 0.02); 
-        playNote(392.00, t + 5.0, 4.0, 'sine', 0.015); 
-        playNote(587.33, t + 5.5, 4.0, 'sine', 0.015);
-        playNote(261.63, t + 7.0, 4.0, 'sine', 0.02); 
-        playNote(392.00, t + 7.5, 4.0, 'sine', 0.015); 
-        playNote(523.25, t + 8.0, 5.0, 'sine', 0.015);
-    } catch(e) {}
-};
-
-function runLeafFallIntro() {
-    const text = "LACTO MISR S.A.E";
-    const container = document.getElementById('introTitle');
-    const subtitle = document.getElementById('introSubtitle');
-    if (!container) return;
-    container.innerHTML = "";
-    const charElements = [];
-
-    for (let char of text) {
-        if (char === ' ') {
-            const space = document.createElement('span'); space.className = 'intro-space'; container.appendChild(space);
-        } else {
-            const span = document.createElement('span'); span.className = 'intro-char'; span.innerText = char;
-            container.appendChild(span); charElements.push(span);
-        }
-    }
-    const directions = [ {x:-900, y:-700}, {x:0, y:-900}, {x:900, y:-700}, {x:900, y:0}, {x:900, y:700}, {x:0, y:900}, {x:-900, y:700}, {x:-900, y:0} ];
-    charElements.forEach((el) => {
-        const randomX = (Math.random() - 0.5) * 400; const randomRotation = (Math.random() - 0.5) * 720;
-        gsap.set(el, { y: -250, x: randomX, rotation: randomRotation, opacity: 0, scale: 0.8 });
-    });
-    gsap.set(subtitle, { opacity: 0, y: 20 });
-    gsap.set('#introFooter', { opacity: 0, bottom: "-20vh" });
-
-    const tl = gsap.timeline({ 
-        onStart: () => { window.playIntroMusic(); },
-        onComplete: () => {
-            const introScreen = document.getElementById('intro-screen');
-            if (introScreen) introScreen.classList.add('fade-out');
-        } 
-    });
-
-    tl.to(charElements, { duration: 2.5, x: 0, y: 0, rotation: 360, opacity: 1, scale: 1, stagger: 0.1, ease: "power2.out" }, "start");
-    tl.to(subtitle, { duration: 1.5, opacity: 1, y: 0, ease: "power2.out" }, "start+=1.0");
-    tl.to('#introFooter', { duration: 1.5, bottom: "12%", opacity: 1, ease: "power2.out" }, "start+=1.5");
-    tl.to([subtitle, '#introFooter'], { duration: 1.5, opacity: 0, y: 20, ease: "power1.in" }, "start+=6.5");
-    charElements.forEach((el, index) => {
-        const dir = directions[index % directions.length];
-        tl.to(el, { duration: 2.0, x: dir.x, y: dir.y, opacity: 0, scale: 0.5, ease: "power1.inOut" }, `start+=7.5`);
-    });
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-    runLeafFallIntro();
-    const silentResume = () => {
-        if (window.audioCtx && window.audioCtx.state === 'suspended') window.audioCtx.resume();
-        document.removeEventListener('click', silentResume);
-        document.removeEventListener('touchstart', silentResume);
-    };
-    document.addEventListener('click', silentResume); document.addEventListener('touchstart', silentResume);
+    }, 3000);
 });
-
-
-/* --- البورتال الأساسي ووظائف Firebase[cite: 13, 14] --- */
 
 // دوال تحويل وتنسيق تواريخ إكسيل[cite: 13]
 function excelDateToJSDate(serial) {
@@ -440,4 +326,114 @@ function setFieldsEditable(isDisabled) {
             if (isDisabled) {
                 el.classList.add('bg-slate-900/50', 'border-slate-700');
                 el.classList.remove('bg-slate-900/90', 'border-sky-500/50');
+            } else {
+                el.classList.remove('bg-slate-900/50', 'border-slate-700');
+                el.classList.add('bg-slate-900/90', 'border-sky-500/50');
             }
+        }
+    });
+}
+
+function backToEmployeesList() {
+    activeEmployeeCode = null;
+    document.getElementById('employee-profile-view').style.display = 'none';
+    document.getElementById('employees-list-view').style.display = 'block';
+}
+
+function uploadEmployeePhoto(event) {
+    const file = event.target.files[0];
+    if (!file || activeEmployeeCode === null) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64Image = e.target.result;
+        document.getElementById('profile-img').src = base64Image;
+
+        const emp = allEmployees.find(e => String(e["الكود"] || e["code"]) === String(activeEmployeeCode));
+        if (emp) {
+            emp["photoUrl"] = base64Image;
+            if (typeof firebase !== 'undefined' && firebase.database) {
+                firebase.database().ref('employees/' + activeEmployeeCode).update({ photoUrl: base64Image });
+            }
+        }
+        showToast();
+    };
+    reader.readAsDataURL(file);
+}
+
+function confirmSave() {
+    const modal = document.getElementById('confirm-modal');
+    if (modal) {
+        document.getElementById('confirm-title').innerText = translations[currentLang]['confirm_title'];
+        modal.classList.remove('hidden');
+    }
+}
+
+function closeConfirmModal() {
+    const modal = document.getElementById('confirm-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function executeSave() {
+    closeConfirmModal();
+    if (activeEmployeeCode === null) return;
+
+    const emp = allEmployees.find(e => String(e["الكود"] || e["code"]) === String(activeEmployeeCode));
+    if (!emp) return;
+
+    const updatedData = {
+        code: activeEmployeeCode,
+        name: document.getElementById('prof-name').value,
+        department: document.getElementById('prof-dept').value,
+        jobTitle: document.getElementById('prof-job').value,
+        directManager: document.getElementById('prof-manager').value,
+        hireDate: document.getElementById('prof-hire').value,
+        yearsService: document.getElementById('prof-service').value,
+        qualification: document.getElementById('prof-qual').value,
+        qualAuth: document.getElementById('prof-qual-auth').value,
+        dob: document.getElementById('prof-dob').value,
+        age: document.getElementById('prof-age').value,
+        insuranceStatus: document.getElementById('prof-insurance').value,
+        pob: document.getElementById('prof-pob').value,
+        photoUrl: document.getElementById('profile-img').src
+    };
+
+    if (typeof firebase !== 'undefined' && firebase.database) {
+        firebase.database().ref('employees/' + activeEmployeeCode).update(updatedData)
+        .then(() => {
+            showToast();
+            setFieldsEditable(true);
+            document.getElementById('btn-save').classList.add('hidden');
+            document.getElementById('btn-edit').classList.remove('hidden');
+            document.getElementById('btn-photo').classList.add('hidden');
+            renderTable(allEmployees);
+        })
+        .catch(error => {
+            console.error("Firebase save error:", error);
+        });
+    }
+}
+
+function showToast() {
+    const toast = document.getElementById('toast-notification');
+    const msg = document.getElementById('toast-message');
+    if (toast && msg) {
+        msg.innerText = translations[currentLang]['toast_success'];
+        toast.classList.remove('translate-y-32', 'opacity-0');
+        setTimeout(() => {
+            toast.classList.add('translate-y-32', 'opacity-0');
+        }, 3000);
+    }
+}
+
+function updateDashboardStats() {
+    const totalCountEl = document.getElementById('total-employees-count');
+    if (totalCountEl) totalCountEl.innerText = allEmployees.length;
+}
+
+window.addEventListener('click', (e) => {
+    if (!e.target.closest('button[onclick="toggleLangDropdown()"]')) {
+        const dropdown = document.getElementById('lang-dropdown');
+        if (dropdown && !dropdown.classList.contains('hidden')) dropdown.classList.add('hidden');
+    }
+});
