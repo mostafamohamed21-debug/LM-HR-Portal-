@@ -1,4 +1,4 @@
-// تشغيل وإخفاء شاشة الإنترو النقية بسلاسة بعد 3 ثوانٍ[cite: 13]
+// تشغيل وإخفاء شاشة الإنترو النقية بسلاسة بعد 3 ثوانٍ
 window.addEventListener('load', () => {
     setTimeout(() => {
         const introScreen = document.getElementById('intro-screen');
@@ -9,7 +9,7 @@ window.addEventListener('load', () => {
     }, 3000);
 });
 
-// دوال تحويل وتنسيق تواريخ إكسيل[cite: 13]
+// دوال تحويل وتنسيق تواريخ إكسيل
 function excelDateToJSDate(serial) {
     if (!serial || typeof serial !== 'number') return serial || '--';
     const utc_days = Math.floor(serial - 25569);
@@ -23,7 +23,7 @@ function excelDateToJSDate(serial) {
     return `${year}-${month}-${day}`;
 }
 
-// التبديل الاحترافي للعين الشقية مع SVG[cite: 13]
+// التبديل الاحترافي للعين الشقية مع SVG
 function togglePasswordVisibility() {
     const passInput = document.getElementById('login-password');
     const svgIcon = document.getElementById('eye-icon');
@@ -37,7 +37,7 @@ function togglePasswordVisibility() {
     }
 }
 
-// دوال مودال نسيت كلمة المرور[cite: 13]
+// دوال مودال نسيت كلمة المرور
 function openForgotPassModal() {
     const modal = document.getElementById('forgot-pass-modal');
     if (modal) modal.classList.remove('hidden');
@@ -47,7 +47,7 @@ function closeForgotPassModal() {
     if (modal) modal.classList.add('hidden');
 }
 
-// إعدادات فايربيس الرسمية[cite: 13]
+// إعدادات فايربيس الرسمية
 const firebaseConfig = {
     apiKey: "AIzaSyA-ywy51h3TM6YF_n0bNj1D5lAMJ7uMnO4",
     authDomain: "lm-hr-portal.firebaseapp.com",
@@ -59,7 +59,7 @@ const firebaseConfig = {
     measurementId: "G-Z6K3VG2SJ6"
 };
 
-// تهيئة Firebase[cite: 13]
+// تهيئة Firebase
 if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
     firebase.analytics();
@@ -70,7 +70,7 @@ let allEmployees = [];
 let currentLang = 'ar';
 let activeEmployeeCode = null;
 
-// قاموس الترجمات الشامل للواجهة[cite: 13]
+// قاموس الترجمات الشامل للواجهة
 const translations = {
     ar: {
         admin: "مسؤول النظام",
@@ -160,7 +160,7 @@ const translations = {
     }
 };
 
-// تسجيل الدخول وإخفاء شاشة اللوجن[cite: 13]
+// تسجيل الدخول وإخفاء شاشة اللوجن
 function handleLogin() {
     const loginModal = document.getElementById('login-modal');
     if (loginModal) {
@@ -172,7 +172,7 @@ function handleLogin() {
     }
 }
 
-// تحميل بيانات الموظفين عند بدء التشغيل[cite: 13]
+// تحميل بيانات الموظفين عند بدء التشغيل
 document.addEventListener('DOMContentLoaded', () => {
     fetch('clean_employees_data.json')
         .then(response => response.json())
@@ -184,40 +184,37 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch(error => console.error('Error loading employee data:', error));
 });
 
+// فتح وإغلاق قائمة اللغات
 function toggleLangMenu(event) {
   if (event) event.stopPropagation();
   const langMenu = document.getElementById('langMenu');
   if (langMenu) langMenu.classList.toggle('show');
 }
 
-// تغيير اللغة[cite: 13]
+// تغيير اللغة وتحديث النصوص
 function selectLanguage(lang) {
   currentLang = lang;
   localStorage.setItem('lacto_lang', lang);
 
-  // تحديث اتجاه الصفحة واللغة العامة
   document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
   document.documentElement.setAttribute('lang', lang);
 
-  // تحديث النص المختصر الظاهر على الزر (AR / EN)
   const langShort = document.getElementById('current-lang-short');
   if (langShort) {
     langShort.innerText = lang.toUpperCase();
   }
 
-  // إخفاء القائمة بعد الاختيار
   const langMenu = document.getElementById('langMenu');
   if (langMenu) {
     langMenu.classList.remove('show');
   }
 
-  // استدعاء دالة تحديث النصوص بالكامل
   if (typeof updateContentTranslations === 'function') {
     updateContentTranslations();
   }
 }
 
-// دالة تحديث النصوص والترجمات في الواجهة
+// دالة تحديث الترجمات والعناصر في الصفحة
 function updateContentTranslations() {
     document.querySelectorAll('[data-translate]').forEach(el => {
         const key = el.getAttribute('data-translate');
@@ -238,7 +235,7 @@ function updateContentTranslations() {
     }
 }
 
-// البحث الفوري[cite: 13]
+// البحث الفوري
 function filterEmployees() {
     const searchInput = document.getElementById('search-input');
     if (!searchInput) return;
@@ -253,7 +250,7 @@ function filterEmployees() {
     renderTable(filtered);
 }
 
-// عرض جدول الموظفين[cite: 13]
+// عرض جدول الموظفين
 function renderTable(dataList) {
     const tableBody = document.getElementById('employees-table-body');
     if (!tableBody) return;
@@ -289,7 +286,7 @@ function renderTable(dataList) {
     });
 }
 
-// عرض ملف الموظف الكامل[cite: 13]
+// عرض ملف الموظف الكامل
 function viewEmployee(code) {
     activeEmployeeCode = code;
     const emp = allEmployees.find(e => String(e["الكود"] || e["code"]) === String(code));
@@ -446,9 +443,12 @@ function updateDashboardStats() {
     if (totalCountEl) totalCountEl.innerText = allEmployees.length;
 }
 
+// الاستماع للضغطات لإغلاق القوائم المنسدلة تلقائياً
 window.addEventListener('click', (e) => {
-    if (!e.target.closest('button[onclick="toggleLangDropdown()"]')) {
-        const dropdown = document.getElementById('lang-dropdown');
-        if (dropdown && !dropdown.classList.contains('hidden')) dropdown.classList.add('hidden');
+    if (!e.target.closest('.lang-dropdown-container')) {
+        const langMenu = document.getElementById('langMenu');
+        if (langMenu) {
+            langMenu.classList.remove('show');
+        }
     }
 });
