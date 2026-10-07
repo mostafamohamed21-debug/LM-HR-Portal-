@@ -126,18 +126,6 @@ const translations = {
     }
 };
 
-// تسجيل الدخول
-function handleLogin() {
-    const loginModal = document.getElementById('login-modal');
-    if (loginModal) {
-        loginModal.style.transition = 'opacity 0.3s ease';
-        loginModal.style.opacity = '0';
-        setTimeout(() => {
-            loginModal.style.display = 'none';
-        }, 300);
-    }
-}
-
 // تحميل بيانات الموظفين عند بدء التشغيل
 document.addEventListener('DOMContentLoaded', () => {
     fetch('clean_employees_data.json')
@@ -178,7 +166,7 @@ function selectLanguage(lang) {
   updateContentTranslations();
 }
 
-// دالة تحديث الترجمات والعناصر
+// دالة تحديث الترجمات والعناصر (مغلقة صح ومتاحة بالكامل)
 function updateContentTranslations() {
     document.querySelectorAll('[data-translate]').forEach(el => {
         const key = el.getAttribute('data-translate');
@@ -321,7 +309,7 @@ function updateDashboardStats() {
     if (totalCountEl) totalCountEl.innerText = allEmployees.length;
 }
 
-// إغلاق القائمة المنسدلة عند الضغط في أي مكان خارجها
+// إغلاق قائمة اللغات عند الضغط خارجها
 window.addEventListener('click', (e) => {
     if (!e.target.closest('.lang-dropdown-container')) {
         const langMenu = document.getElementById('langMenu');
