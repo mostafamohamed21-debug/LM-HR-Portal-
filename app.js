@@ -184,27 +184,38 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch(error => console.error('Error loading employee data:', error));
 });
 
-// فتح وإغلاق القائمة المنسدلة للغة[cite: 13]
-function toggleLangDropdown() {
-    const dropdown = document.getElementById('lang-dropdown');
-    if (dropdown) dropdown.classList.toggle('hidden');
+function toggleLangMenu(event) {
+  if (event) event.stopPropagation();
+  const langMenu = document.getElementById('langMenu');
+  if (langMenu) langMenu.classList.toggle('show');
 }
 
 // تغيير اللغة[cite: 13]
-function setLanguage(lang) {
-    currentLang = lang;
-    document.documentElement.lang = lang;
-    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
-    
-    const dropdown = document.getElementById('lang-dropdown');
-    if (dropdown) dropdown.classList.add('hidden');
+function selectLanguage(lang) {
+  currentLang = lang;
+  localStorage.setItem('lacto_lang', lang);
 
-    const langFlag = document.getElementById('lang-flag');
-    const langCode = document.getElementById('lang-code');
-    if (langFlag && langCode) {
-        langFlag.innerText = lang === 'ar' ? '🇪🇬' : '🇬🇧';
-        langCode.innerText = lang === 'ar' ? 'AR' : 'EN';
-    }
+  // تحديث اتجاه الصفحة واللغة العامة
+  document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+  document.documentElement.setAttribute('lang', lang);
+
+  // تحديث النص المختصر الظاهر على الزر (AR / EN)
+  const langShort = document.getElementById('current-lang-short');
+  if (langShort) {
+    langShort.innerText = lang.toUpperCase();
+  }
+
+  // إخفاء القائمة بعد الاختيار
+  const langMenu = document.getElementById('langMenu');
+  if (langMenu) {
+    langMenu.classList.remove('show');
+  }
+
+  // استدعاء دالة تحديث النصوص بالكامل إذا كانت متاحة
+  if (typeof updateContentTranslations === 'function') {
+    updateContentTranslations();
+  }
+}
 
     document.querySelectorAll('[data-translate]').forEach(el => {
         const key = el.getAttribute('data-translate');
