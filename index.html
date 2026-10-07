@@ -181,23 +181,15 @@
         
         <div class="flex items-center space-x-4 space-x-reverse relative">
             <!-- زر تغيير اللغة العصري والشيك -->
-<div class="relative">
-    <button onclick="toggleLangDropdown()" class="flex items-center gap-2 px-3.5 py-2 bg-slate-900/80 hover:bg-slate-800/90 border border-sky-500/30 hover:border-sky-400 rounded-xl text-xs font-bold text-sky-300 transition shadow-lg backdrop-blur-md focus:outline-none">
-        <span class="text-base">🌐</span>
-        <span id="current-lang-display" class="flex items-center gap-1.5">
-            <span id="lang-flag">🇪🇬</span> <span id="lang-code" class="font-mono">العربية</span>
-        </span>
-        <span class="text-[10px] text-sky-400">▼</span>
-    </button>
-    
-    <div id="lang-dropdown" class="hidden absolute left-0 mt-2 w-36 glass-card rounded-xl shadow-2xl border border-sky-500/30 overflow-hidden z-50">
-        <button onclick="setLanguage('ar')" class="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-right text-slate-200 hover:bg-sky-600/30 transition">
-            <span class="text-sm">🇪🇬</span> <span class="font-bold">العربية</span>
-        </button>
-        <button onclick="setLanguage('en')" class="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-left text-slate-200 hover:bg-sky-600/30 transition">
-            <span class="text-sm">🇬🇧</span> <span class="font-bold">English</span>
-        </button>
-    </div>
+<!-- Language Dropdown Button -->
+<div class="lang-dropdown-container">
+  <button class="lang-dropdown-btn" onclick="toggleLangMenu(event)">
+    🌐 <span id="current-lang-short">AR</span> ▼
+  </button>
+  <div class="lang-dropdown-menu" id="langMenu">
+    <div class="lang-option" onclick="selectLanguage('ar')">🇪🇬 AR</div>
+    <div class="lang-option" onclick="selectLanguage('en')">🇬🇧 EN</div>
+  </div>
 </div>
             <span class="font-semibold text-slate-300 text-sm" data-translate="admin">مسؤول النظام</span>
         </div>
