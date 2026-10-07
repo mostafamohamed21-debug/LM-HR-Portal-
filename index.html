@@ -6,48 +6,53 @@
     <title id="page-title">البورتال المركزي - شؤون العاملين | Lacto Misr</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- GSAP Library (مطلوبة خصيصاً لأنيميشن سقوط الحروف الخاص بالإنترو) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <!-- Firebase SDKs (Compat v9 for Realtime Database & Analytics) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
     <!-- خط Cairo -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
-    <!-- خطوط إضافية خاصة بالإنترو -->
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@800&family=Great+Vibes&display=swap" rel="stylesheet">
     <style>
-       /* تنسيقات شاشة الإنترو الأصلية المستخرجة من الـ ESS */
-       #intro-screen {
-           position: fixed;
-           top: 0; left: 0; width: 100vw; height: 100vh;
-           background: linear-gradient(rgba(11, 15, 25, 0.92), rgba(11, 15, 25, 0.96)), url('background.jpg');
-           background-size: cover; background-position: center;
-           backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-           display: flex; flex-direction: column; justify-content: center; align-items: center;
-           z-index: 9999; perspective: 1200px; overflow: hidden;
-           transition: opacity 1.2s ease, visibility 1.2s ease;
-       }
-       #intro-screen.fade-out { opacity: 0; visibility: hidden; }
-       .intro-content-wrapper { display: flex; flex-direction: column; align-items: center; gap: 1.2rem; text-align: center; padding: 0 1rem; width: 100%; }
-       .intro-title-container { width: 100%; display: flex; gap: 0.15rem; flex-wrap: nowrap; justify-content: center; align-items: center; direction: ltr; }
-       .intro-char {
-           font-family: 'Plus Jakarta Sans', sans-serif; font-size: clamp(1.2rem, 4vw, 1.8rem); font-weight: 800;
-           background: linear-gradient(135deg, #38bdf8, #0284c7);
-           -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-           text-shadow: 0 0 20px rgba(56, 189, 248, 0.6); display: inline-block;
-       }
-       .intro-space { width: 0.4rem; }
-       .intro-subtitle {
-           font-family: 'Great Vibes', cursive; font-size: clamp(1.5rem, 5vw, 2.5rem);
-           color: #38bdf8; text-shadow: 0 0 20px rgba(56, 189, 248, 0.6); opacity: 0; line-height: 1.4; width: 100%; text-align: center; white-space: nowrap;
-       }
-       #introFooter {
-           position: absolute; bottom: -20vh; width: 100%; text-align: center; opacity: 0; display: flex; flex-direction: column; gap: 0.5rem; z-index: 10;
-       }
-       #copyrightText {
-           font-size: 0.9rem; color: #94a3b8; font-family: 'Cairo', sans-serif; font-weight: 600; letter-spacing: 1px;
-       }
+        /* تنسيق شاشة الإنترو النقية (بدون مكتبات خارجية) */
+        #intro-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(rgba(11, 15, 25, 0.95), rgba(11, 15, 25, 0.98)), url('background.jpg');
+            background-size: cover; background-position: center;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 99999;
+            transition: opacity 1s ease, visibility 1s ease;
+        }
+        #intro-screen.fade-out {
+            opacity: 0;
+            visibility: hidden;
+        }
+        .intro-title {
+            font-family: 'Cairo', sans-serif;
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 800;
+            background: linear-gradient(135deg, #38bdf8, #0284c7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 25px rgba(56, 189, 248, 0.5);
+            animation: introZoomIn 1.5s ease-out forwards;
+        }
+        .intro-subtitle {
+            font-family: 'Cairo', sans-serif;
+            font-size: clamp(1.2rem, 3vw, 1.8rem);
+            color: #38bdf8;
+            margin-top: 1rem;
+            opacity: 0;
+            animation: fadeInText 1s ease-out 1.2s forwards;
+        }
+        @keyframes introZoomIn {
+            0% { transform: scale(0.7); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes fadeInText {
+            0% { opacity: 0; transform: translateY(15px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
 
        @keyframes leafFadeIn {
            0% { opacity: 0; transform: translateY(15px) scale(0.95); }
@@ -112,15 +117,10 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
-    <!-- شاشة الإنترو الأصلية (Intro Screen) -->
+    <!-- شاشة الإنترو الأساسية أول الصفحة -->
     <div id="intro-screen">
-        <div class="intro-content-wrapper">
-            <div id="introTitle" class="intro-title-container"></div>
-            <div id="introSubtitle" class="intro-subtitle">شركاء فى رحلة نمو طفلك</div>
-        </div>
-        <div id="introFooter">
-            <div id="copyrightText">Lacto Misr S.A.E - HR Portal</div>
-        </div>
+        <div class="intro-title">LACTO MISR S.A.E</div>
+        <div class="intro-subtitle">شركاء فى رحلة نمو طفلك</div>
     </div>
 
     <!-- شاشة تسجيل الدخول المطورة -->
@@ -339,4 +339,59 @@
                         </div>
                     </div>
 
-                    <div class="glass-card p-5 rounded-2xl space-y
+                    <div class="glass-card p-5 rounded-2xl space-y-4">
+                        <h3 class="text-sm font-bold text-sky-400 border-b border-sky-500/20 pb-2" data-translate="sec_qual">المؤهل العلمي</h3>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="qual_label">المؤهل</label>
+                            <input type="text" id="prof-qual" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="qual_auth">جهة المؤهل</label>
+                            <input type="text" id="prof-qual-auth" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                    </div>
+
+                    <div class="glass-card p-5 rounded-2xl space-y-4">
+                        <h3 class="text-sm font-bold text-sky-400 border-b border-sky-500/20 pb-2" data-translate="sec_personal">البيانات الشخصية</h3>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="dob_label">تاريخ الميلاد</label>
+                            <input type="text" id="prof-dob" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm font-mono disabled:opacity-80">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="age_label">السن حتى تاريخه</label>
+                            <input type="text" id="prof-age" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="insurance_label">الحالة التأمينية</label>
+                            <input type="text" id="prof-insurance" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="pob_label">مكان الميلاد</label>
+                            <input type="text" id="prof-pob" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <div id="confirm-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+        <div class="glass-card p-6 rounded-2xl max-w-sm w-full border border-sky-500/30 text-center space-y-4">
+            <h3 id="confirm-title" class="text-lg font-bold text-white">هل ترغب في حفظ التعديلات؟</h3>
+            <div class="flex justify-center gap-3 pt-2">
+                <button onclick="executeSave()" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-xs transition" data-translate="yes_btn">نعم</button>
+                <button onclick="closeConfirmModal()" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition" data-translate="cancel_btn">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-notification" class="fixed bottom-6 left-6 z-50 transform translate-y-32 opacity-0 transition-all duration-300 glass-card px-6 py-3 rounded-2xl border border-sky-500/40 shadow-2xl flex items-center gap-3">
+        <span class="text-sky-400 text-lg">✓</span>
+        <span id="toast-message" class="text-sm font-bold text-white">تم الحفظ بنجاح</span>
+    </div>
+
+    <!-- ربط ملف الـ JS -->
+    <script src="app.js"></script>
+</body>
+</html>
