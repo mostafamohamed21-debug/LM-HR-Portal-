@@ -218,14 +218,28 @@
         }
 
         /* Fixed hover sidebar: never shifts the main workspace */
-        .sidebar-collapsed{position:fixed;top:76px;bottom:0;inset-inline-start:0;width:16px;z-index:45;overflow:hidden;transition:width .24s ease}
-        .sidebar-collapsed:hover,.sidebar-collapsed:focus-within{width:270px}
+        .sidebar-collapsed{position:fixed;top:76px;bottom:0;inset-inline-start:0;width:64px;z-index:45;overflow:hidden;transition:width .24s ease}
+        .sidebar-collapsed:hover,.sidebar-collapsed:focus-within{width:330px}
         .sidebar-collapsed .nav-text,.sidebar-collapsed .sidebar-title{opacity:0}
         .sidebar-collapsed:hover .nav-text,.sidebar-collapsed:focus-within .nav-text,.sidebar-collapsed:hover .sidebar-title{opacity:1}
         .hr-nav.active {background:rgba(14,165,233,.22);color:#7dd3fc;border:1px solid rgba(56,189,248,.35)}
         .hr-kpi{padding:20px;border-radius:18px;background:rgba(15,23,42,.85);border:1px solid rgba(56,189,248,.2)}
         .hr-chart-bar{background:linear-gradient(0deg,#0369a1,#38bdf8);border-radius:6px 6px 0 0;min-height:3px}
-        @media(max-width:767px){.sidebar-collapsed{display:flex!important;position:fixed;top:76px;bottom:0;inset-inline-start:0;z-index:45;width:12px}.sidebar-collapsed:focus-within,.sidebar-collapsed:hover{width:250px;min-width:250px}}
+        @media(max-width:767px){.sidebar-collapsed{display:flex!important;position:fixed;top:76px;bottom:0;inset-inline-start:0;z-index:45;width:56px}.sidebar-collapsed:focus-within,.sidebar-collapsed:hover{width:300px;min-width:300px}}
+
+/* Expanded neon navigation */
+.sidebar-collapsed{box-shadow:8px 0 38px rgba(2,132,199,.13);background:rgba(8,18,37,.97)!important}
+.sidebar-collapsed nav{padding-top:12px}
+.sidebar-collapsed .sidebar-item{min-height:62px;gap:18px!important;padding-inline:14px!important;font-size:15px;font-weight:700;text-align:start}
+.hr-side-icon{width:28px;height:28px;min-width:28px;stroke:#67e8f9;filter:drop-shadow(0 0 7px rgba(56,189,248,.8));transition:filter .2s,transform .2s}
+.sidebar-item:hover .hr-side-icon{filter:drop-shadow(0 0 15px #38bdf8);transform:scale(1.09)}
+.sidebar-collapsed:not(:hover):not(:focus-within) .sidebar-item{padding-inline:12px!important}
+.hr-map-dot{cursor:pointer;outline:none}.hr-map-dot:focus circle,.hr-map-dot:hover circle{stroke:#fff;stroke-width:3;filter:drop-shadow(0 0 8px #38bdf8)}
+.hr-map-dot circle{transition:r .2s}.hr-map-dot:hover circle{r:12}
+.hr-panel{background:rgba(13,24,45,.88);border:1px solid rgba(56,189,248,.18);border-radius:20px;padding:20px;min-width:0}
+.hr-stat-label{font-size:12px;color:#94a3b8}.hr-stat-value{font-size:29px;color:#7dd3fc;font-weight:800;margin-top:6px}
+.hr-mini-track{height:9px;background:#182b46;border-radius:12px;overflow:hidden}.hr-mini-fill{height:100%;background:linear-gradient(90deg,#0369a1,#67e8f9);border-radius:12px}
+
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -333,10 +347,10 @@
                     <span class="text-xl neon-blue-icon">🎛️</span> <span class="sidebar-title" data-translate="control_panel">غرفة التحكم</span>
                 </div>
                 <nav class="space-y-3 text-sm" aria-label="HR navigation">
-                    <button type="button" onclick="showHRPage('dashboard')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="dashboard"><span class="text-xl">▥</span><span class="nav-text" data-ar="لوحة التحكم" data-en="Dashboard">لوحة التحكم</span></button>
-                    <button type="button" onclick="showHRPage('employees')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="employees"><span class="text-xl">♙</span><span class="nav-text" data-ar="الموظفون" data-en="Employees">الموظفون</span></button>
-                    <button type="button" onclick="showHRPage('payroll')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="payroll"><span class="text-xl">＄</span><span class="nav-text" data-ar="المرتبات" data-en="Payroll">المرتبات</span></button>
-                    <button type="button" onclick="showHRPage('notifications')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="notifications"><span class="text-xl">♧</span><span class="nav-text" data-ar="الإشعارات والطلبات" data-en="Notifications">الإشعارات والطلبات</span></button>
+                    <button type="button" onclick="showHRPage('dashboard')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="dashboard"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="nav-text" data-ar="لوحة التحكم" data-en="Dashboard">لوحة التحكم</span></button>
+                    <button type="button" onclick="showHRPage('employees')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="employees"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="nav-text" data-ar="الموظفون" data-en="Employees">الموظفون</span></button>
+                    <button type="button" onclick="showHRPage('payroll')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="payroll"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9h.01M18 15h.01"/></svg><span class="nav-text" data-ar="المرتبات" data-en="Payroll">المرتبات</span></button>
+                    <button type="button" onclick="showHRPage('notifications')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="notifications"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span class="nav-text" data-ar="الإشعارات والطلبات" data-en="Notifications">الإشعارات والطلبات</span></button>
                 </nav>
             </div>
             <div class="p-4 border-t border-sky-500/20 text-[10px] text-slate-400 text-center truncate">
@@ -575,7 +589,33 @@
         <span id="toast-message" class="text-sm font-bold text-white">تم الحفظ بنجاح</span>
     </div>
 
+
+    <!-- Independent startup recovery: never leave the portal trapped behind intro -->
+    <script>
+    (function () {
+      function recoverIntro() {
+        var intro = document.getElementById('intro-screen');
+        if (intro && !intro.classList.contains('fade-out')) {
+          intro.classList.add('fade-out');
+          intro.style.pointerEvents = 'none';
+          intro.style.visibility = 'hidden';
+        }
+        var brand = document.getElementById('login-brand');
+        var panel = document.getElementById('login-panel');
+        if (brand) brand.classList.add('intro-ready', 'compact');
+        if (panel) panel.classList.add('visible', 'compact-mode');
+      }
+      window.addEventListener('load', function () { setTimeout(recoverIntro, 11500); });
+      document.addEventListener('DOMContentLoaded', function () {
+        setTimeout(recoverIntro, 13000);
+      });
+      window.addEventListener('error', function (event) {
+        if (event.target && event.target.tagName === 'SCRIPT') recoverIntro();
+      }, true);
+    }());
+    </script>
+
     <!-- ربط ملف الـ JS -->
-    <script src="app.js?v=20261011-4"></script>
+    <script src="app.js?v=20261011-6"></script>
 </body>
 </html>
