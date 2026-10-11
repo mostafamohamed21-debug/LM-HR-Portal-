@@ -13,12 +13,30 @@ function excelDateToJSDate(serial) {
     return `${year}-${month}-${day}`;
 }
 
+function updatePasswordEyeIcon() {
+    const icon = document.getElementById('eye-icon');
+    const passInput = document.getElementById('login-password');
+    if (!icon || !passInput) return;
+
+    const isVisible = passInput.type === 'text';
+    icon.innerHTML = isVisible
+        ? `<svg viewBox="0 0 24 24" aria-hidden="true">
+             <path d="M3 3l18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+             <path d="M10.58 10.58a2 2 0 0 0 2.83 2.83" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+             <path d="M9.88 5.08A10.9 10.9 0 0 1 12 4.88c5.1 0 8.83 3.55 10 7.12-.43 1.3-1.27 2.57-2.44 3.72" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+             <path d="M6.23 6.24C4.2 7.55 2.82 9.37 2 12c1.17 3.57 4.9 7.12 10 7.12 1.16 0 2.25-.19 3.25-.54" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+           </svg>`
+        : `<svg viewBox="0 0 24 24" aria-hidden="true">
+             <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+             <circle cx="12" cy="12" r="2.7" fill="none" stroke="currentColor" stroke-width="1.8"/>
+           </svg>`;
+}
+
 function togglePasswordVisibility() {
     const passInput = document.getElementById('login-password');
-    const icon = document.getElementById('eye-icon');
     if (!passInput) return;
     passInput.type = passInput.type === 'password' ? 'text' : 'password';
-    if (icon) icon.innerText = passInput.type === 'password' ? '👁️' : '🙈';
+    updatePasswordEyeIcon();
 }
 
 const firebaseConfig = {
@@ -116,7 +134,9 @@ function getField(emp, ...keys) {
     }
     return '';
 }
-function getEmployeeCode(emp) { return String(getField(emp, 'الكود', 'code', 'employeeCode', 'empCode') || ''); }
+function getEmployeeCode(emp) {
+    return String(getField(emp, 'الكود', 'code', 'employeeCode', 'empCode', 'ID', 'id', 'EmployeeCode', 'employee_code') || '').trim();
+}
 function getEmployeeName(emp) { return getField(emp, 'اسم الموظف ', 'اسم الموظف', 'name', 'emp_name _en') || '--'; }
 function getEmployeeDept(emp) { return getField(emp, 'الإدارة ', 'الإدارة', 'department', 'dept') || '--'; }
 function getEmployeeJob(emp) { return getField(emp, 'الوظيفة', 'الوظيفة ', 'jobTitle', 'job title', 'job') || '--'; }
@@ -183,6 +203,7 @@ function setLanguage(lang) {
     if (activeEmployeeCode !== null) viewEmployee(activeEmployeeCode);
     if (document.getElementById('add-employee-modal') && !document.getElementById('add-employee-modal').classList.contains('hidden')) buildAddEmployeeForm();
     if (document.getElementById('dynamic-fields-container') && activeEmployeeCode !== null) renderDynamicFields();
+    updatePasswordEyeIcon();
 }
 
 function showLoginMessage(message, type='error') {
@@ -201,19 +222,103 @@ function hideLogin() {
 }
 
 async function handleLogin() {
-    const code = document.getElementById('login-emp-code')?.value.trim();
-    const pass = document.getElementById('login-password')?.value.trim();
-    const remember = document.getElementById('remember-me')?.checked;
-    if (!code || !pass) { showLoginMessage(tr('login_required')); return; }
-    showLoginMessage(currentLang==='ar'?'جاري التحقق...':'Checking...', 'success');
+    const codeInput = document.getElementById('login-emp-code');
+    const passInput = document.getElementById('login-password');
+    const rememberInput = document.getElementById('remember-me');
+
+    const code = String(codeInput?.value || '').trim();
+    const pass = String(passInput?.value || '').trim();
+    const remember = !!rememberInput?.checked;
+
+    if (!code || !pass) {
+        showLoginMessage(tr('login_required'));
+        return;
+    }
+
+    showLoginMessage(
+        currentLang === 'ar' ? 'جاري التحقق من بيانات الدخول...' : 'Checking login credentials...',
+        'success'
+    );
 
     try {
-        const snapshot = await db.ref('users/' + code).once('value');
-        if (!snapshot.exists()) { showLoginMessage(tr('login_not_found')); return; }
-        const user = snapshot.val() || {};
-        if (String(user.password ?? '') !== pass) { showLoginMessage(tr('login_wrong_pass')); return; }
+        // 1) Look for an authentication record under users/{code}.
+        // 2) Look for the employee under employees/{code}.
+        // 3) If employees use Firebase push keys, scan /employees and match the employee-code field.
+        const userSnap = await db.ref('users/' + code).once('value');
+        let userRecord = userSnap.exists() ? (userSnap.val() || {}) : null;
+        let userPath = userSnap.exists() ? ('users/' + code) : null;
 
-        currentUserData = user; currentUserData.code = code;
+        let employeeRecord = null;
+        let employeePath = null;
+
+        const directEmployeeSnap = await db.ref('employees/' + code).once('value');
+        if (directEmployeeSnap.exists()) {
+            employeeRecord = directEmployeeSnap.val() || {};
+            employeePath = 'employees/' + code;
+        } else {
+            const employeesSnap = await db.ref('employees').once('value');
+            if (employeesSnap.exists()) {
+                const raw = employeesSnap.val() || {};
+                Object.keys(raw).some(key => {
+                    const employee = raw[key];
+                    if (!employee || typeof employee !== 'object') return false;
+                    const employeeCode = getEmployeeCode(employee);
+                    if (employeeCode === code) {
+                        employeeRecord = employee;
+                        employeePath = 'employees/' + key;
+                        return true;
+                    }
+                    return false;
+                });
+            }
+        }
+
+        // The employee may be present in either users or employees.
+        if (!userRecord && !employeeRecord) {
+            showLoginMessage(
+                currentLang === 'ar'
+                    ? `كود الموظف ${code} غير موجود في قاعدة البيانات.`
+                    : `Employee code ${code} was not found in Firebase.`
+            );
+            return;
+        }
+
+        // Prefer password from users/{code}; if absent, accept password on the employee record.
+        const storedPassword =
+            getField(userRecord || {}, 'password', 'Password', 'PASSWORD', 'كلمة المرور', 'كلمه المرور', 'pass', 'userPassword') ??
+            getField(employeeRecord || {}, 'password', 'Password', 'PASSWORD', 'كلمة المرور', 'كلمه المرور', 'pass', 'userPassword');
+
+        if (storedPassword === '' || storedPassword === null || storedPassword === undefined) {
+            showLoginMessage(
+                currentLang === 'ar'
+                    ? 'الموظف موجود، ولكن لا توجد كلمة مرور مسجلة له.'
+                    : 'The employee exists, but no password is registered.'
+            );
+            console.warn('Employee found but password field is missing.', {
+                code,
+                userPath,
+                employeePath,
+                userRecord,
+                employeeRecord
+            });
+            return;
+        }
+
+        if (String(storedPassword).trim() !== pass) {
+            showLoginMessage(tr('login_wrong_pass'));
+            return;
+        }
+
+        // Merge authentication + employee data so the rest of the portal receives the employee profile.
+        currentUserData = {
+            ...(employeeRecord || {}),
+            ...(userRecord || {}),
+            code,
+            firebasePath: employeePath || userPath,
+            userFirebasePath: userPath,
+            employeeFirebasePath: employeePath
+        };
+
         if (remember) {
             localStorage.setItem('lacto_saved_code', code);
             localStorage.setItem('lacto_saved_pass', pass);
@@ -221,14 +326,29 @@ async function handleLogin() {
             localStorage.removeItem('lacto_saved_code');
             localStorage.removeItem('lacto_saved_pass');
         }
+
         sessionStorage.setItem('lacto_active_code', code);
-        document.getElementById('current-user-label')?.classList.remove('hidden');
-        if (document.getElementById('current-user-label')) document.getElementById('current-user-label').innerText = user.name || user['اسم الموظف'] || code;
+
+        const userLabel = document.getElementById('current-user-label');
+        if (userLabel) {
+            userLabel.classList.remove('hidden');
+            userLabel.innerText =
+                getEmployeeName(employeeRecord || userRecord || {}) ||
+                getField(employeeRecord || userRecord || {}, 'name', 'اسم الموظف', 'اسم الموظف ') ||
+                code;
+        }
+
         hideLogin();
         portalInitialized = true;
         await loadEmployeesFromFirebase();
+
+        showToast(
+            currentLang === 'ar'
+                ? 'تم تسجيل الدخول بنجاح'
+                : 'Signed in successfully'
+        );
     } catch (error) {
-        console.error(error);
+        console.error('LOGIN ERROR:', error);
         showLoginMessage(tr('login_error'));
     }
 }
@@ -253,7 +373,10 @@ async function loadEmployeesFromFirebase() {
         const snap = await db.ref('employees').once('value');
         if (snap.exists()) {
             const raw = snap.val() || {};
-            allEmployees = Object.keys(raw).map(key => ({ ...(raw[key] || {}), code: getField(raw[key]||{},'code','الكود') || key }));
+            allEmployees = Object.keys(raw).map(key => {
+                const employee = raw[key] || {};
+                return { ...employee, code: getEmployeeCode(employee) || key };
+            });
         } else {
             allEmployees = [];
         }
@@ -472,6 +595,7 @@ function revealLoginAfterIntro(){
 function prepareRememberedLogin(){
     const savedCode=localStorage.getItem('lacto_saved_code');const savedPass=localStorage.getItem('lacto_saved_pass');
     if(savedCode&&savedPass){document.getElementById('login-emp-code').value=savedCode;document.getElementById('login-password').value=savedPass;document.getElementById('remember-me').checked=true;}
+    updatePasswordEyeIcon();
 }
 
 window.addEventListener('click',(e)=>{
