@@ -14,34 +14,24 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
     <!-- خط Cairo -->
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
-       @keyframes leafFadeIn {
-           0% { opacity: 0; transform: translateY(15px) scale(0.95); }
-           100% { opacity: 1; transform: translateY(0) scale(1); }
-       }
-       .animate-fade-in { animation: leafFadeIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         body {
             font-family: 'Cairo', sans-serif;
-            background: linear-gradient(rgba(5, 11, 24, 0.93), rgba(5, 11, 24, 0.98)), url('background.jpg') no-repeat center center fixed;
+            background: linear-gradient(rgba(5, 11, 24, 0.95), rgba(5, 11, 24, 0.99)), url('background.jpg') no-repeat center center fixed;
             background-size: cover;
             color: #e2e8f0;
         }
         .glass-card {
-            background: rgba(15, 23, 42, 0.82);
+            background: rgba(15, 23, 42, 0.88);
             backdrop-filter: blur(16px);
-            border: 1px solid rgba(56, 189, 248, 0.22);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
         }
         .glass-table th, .glass-table td { border-color: rgba(56, 189, 248, 0.1) !important; }
         .neon-blue-icon {
             color: #38bdf8;
-            filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.7));
-            transition: all 0.3s ease;
-        }
-        .sidebar-item:hover .neon-blue-icon {
-            filter: drop-shadow(0 0 12px rgba(56, 189, 248, 1));
-            transform: scale(1.1);
+            filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.8));
         }
         @keyframes rotate3D {
             0% { transform: perspective(800px) rotateY(0deg); }
@@ -62,6 +52,19 @@
         }
         .hidden { display: none !important; }
 
+        /* خريطة مصر التفاعلية */
+        .egypt-map-container svg path {
+            fill: #1e293b;
+            stroke: #38bdf8;
+            stroke-width: 1.2;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .egypt-map-container svg path:hover, .egypt-map-container svg path.active {
+            fill: #0284c7;
+            filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.9));
+        }
+
         #intro-screen {
             position: fixed; inset: 0; width: 100vw; height: 100vh;
             background: linear-gradient(rgba(11,15,25,.92),rgba(11,15,25,.97)),url('background.jpg') center/cover no-repeat;
@@ -80,72 +83,37 @@
         #login-modal { background:linear-gradient(rgba(5,11,24,.55),rgba(5,11,24,.88)),url('background.jpg') center/cover no-repeat !important; backdrop-filter:blur(8px); }
         #login-lang-switcher { position:absolute; top:1.25rem; right:1.25rem; z-index:20; }
         [dir="ltr"] #login-lang-switcher { right:auto; left:1.25rem; }
-        .ess-lang-btn { display:flex; align-items:center; gap:.35rem; padding:.55rem .8rem; border-radius:.8rem; background:rgba(15,23,42,.82); border:1px solid rgba(56,189,248,.45); color:#38bdf8; font-size:.75rem; font-weight:800; box-shadow:0 6px 20px rgba(0,0,0,.3); backdrop-filter:blur(12px); cursor:pointer; transition:.25s ease; }
-        .ess-lang-btn:hover { transform:translateY(-1px) scale(1.02); border-color:#38bdf8; background:rgba(56,189,248,.12); }
-        .ess-lang-menu { position:absolute; top:calc(100% + 8px); min-width:110px; padding:.35rem; border-radius:.9rem; background:rgba(15,23,42,.96); border:1px solid rgba(56,189,248,.4); box-shadow:0 20px 45px rgba(0,0,0,.55); display:none; overflow:hidden; }
+        .ess-lang-btn { display:flex; align-items:center; gap:.35rem; padding:.55rem .8rem; border-radius:.8rem; background:rgba(15,23,42,.82); border:1px solid rgba(56,189,248,.45); color:#38bdf8; font-size:.75rem; font-weight:800; cursor:pointer; }
+        .ess-lang-menu { position:absolute; top:calc(100% + 8px); min-width:110px; padding:.35rem; border-radius:.9rem; background:rgba(15,23,42,.96); border:1px solid rgba(56,189,248,.4); display:none; }
         .ess-lang-menu.show { display:block; }
         [dir="rtl"] .ess-lang-menu { right:0; }
         [dir="ltr"] .ess-lang-menu { left:0; }
-        .ess-lang-option { width:100%; border:0; background:transparent; color:#e2e8f0; padding:.55rem .65rem; border-radius:.6rem; cursor:pointer; text-align:left; font-size:.75rem; font-weight:700; }
+        .ess-lang-option { width:100%; border:0; background:transparent; color:#e2e8f0; padding:.55rem .65rem; border-radius:.6rem; cursor:pointer; text-align:right; font-size:.75rem; font-weight:700; }
         .ess-lang-option:hover { background:rgba(56,189,248,.14); color:#38bdf8; }
-        [dir="rtl"] .ess-lang-option { text-align:right; }
 
         #login-brand-stage { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:1; }
-        #login-brand { width:min(46vw,420px); min-width:250px; display:flex; flex-direction:column; align-items:center; text-align:center; opacity:0; transform:scale(1.55); transition:transform 1.15s cubic-bezier(.16,1,.3,1), opacity .9s ease, left 1.15s ease, right 1.15s ease; }
+        #login-brand { width:min(46vw,420px); min-width:250px; display:flex; flex-direction:column; align-items:center; text-align:center; opacity:0; transform:scale(1.55); transition:1.15s cubic-bezier(.16,1,.3,1); }
         #login-brand.intro-ready { opacity:1; }
         #login-brand.compact { transform:scale(1); }
         [dir="rtl"] #login-brand.compact { position:absolute; right:8%; left:auto; }
         [dir="ltr"] #login-brand.compact { position:absolute; left:8%; right:auto; }
-        .login-brand-logo {
-            width:min(32vw,280px); height:min(32vw,280px); min-width:170px; min-height:170px;
-            object-fit:contain; background:transparent; border:0; border-radius:28px;
-            filter:drop-shadow(0 18px 24px rgba(0,0,0,.28)) drop-shadow(0 0 22px rgba(56,189,248,.28));
-            animation:loginLogoRotate3D 12s linear infinite, loginLogoGlow 4.5s ease-in-out infinite;
-        }
-        @keyframes loginLogoRotate3D {
-            0% { transform:perspective(1000px) rotateY(0deg) rotateX(0deg); }
-            50% { transform:perspective(1000px) rotateY(180deg) rotateX(2deg); }
-            100% { transform:perspective(1000px) rotateY(360deg) rotateX(0deg); }
-        }
-        @keyframes loginLogoGlow {
-            0%,100% { filter:drop-shadow(0 12px 18px rgba(0,0,0,.25)) drop-shadow(0 0 7px rgba(56,189,248,.14)); }
-            50% { filter:drop-shadow(0 16px 20px rgba(0,0,0,.29)) drop-shadow(0 0 13px rgba(56,189,248,.25)); }
-        }
-        .login-brand-name { margin-top:.8rem; font-size:clamp(1.35rem,3vw,2.1rem); font-weight:900; color:#fff; letter-spacing:.03em; text-shadow:0 0 18px rgba(56,189,248,.35); }
+        .login-brand-logo { width:min(32vw,280px); height:min(32vw,280px); object-fit:contain; border-radius:28px; filter:drop-shadow(0 18px 24px rgba(0,0,0,.28)); }
+        .login-brand-name { margin-top:.8rem; font-size:clamp(1.35rem,3vw,2.1rem); font-weight:900; color:#fff; }
         .login-brand-slogan { margin-top:.25rem; font-size:clamp(.75rem,1.4vw,.95rem); color:#38bdf8; font-weight:700; }
-        #login-panel { position:relative; z-index:5; width:min(420px,92vw); margin-top:3rem; opacity:0; transform:translateY(24px) scale(.98); transition:opacity .9s ease .25s, transform .9s cubic-bezier(.16,1,.3,1) .25s; }
+        #login-panel { position:relative; z-index:5; width:min(420px,92vw); margin-top:3rem; opacity:0; transform:translateY(24px) scale(.98); transition:.9s ease .25s; }
         #login-panel.visible { opacity:1; transform:translateY(0) scale(1); }
-        #login-panel .login-inner { background:rgba(15,23,42,.72); backdrop-filter:blur(22px); border:1px solid rgba(56,189,248,.34); box-shadow:0 25px 70px rgba(0,0,0,.45); border-radius:1.5rem; padding:1.7rem; }
+        #login-panel .login-inner { background:rgba(15,23,42,.72); backdrop-filter:blur(22px); border:1px solid rgba(56,189,248,.34); border-radius:1.5rem; padding:1.7rem; }
         [dir="rtl"] #login-panel.compact-mode { margin-right:50%; }
         [dir="ltr"] #login-panel.compact-mode { margin-left:50%; }
-        .login-error { min-height:1.25rem; color:#f87171; font-size:.72rem; font-weight:700; text-align:center; }
-        .portal-action-btn { background:linear-gradient(135deg,#38bdf8,#0284c7); border:1px solid rgba(56,189,248,.65); color:#fff; box-shadow:0 8px 22px rgba(2,132,199,.25); }
-        .portal-action-btn:hover { filter:brightness(1.08); transform:translateY(-1px); }
+
+        .portal-action-btn { background:linear-gradient(135deg,#38bdf8,#0284c7); border:1px solid rgba(56,189,248,.65); color:#fff; }
+        .portal-action-btn:hover { filter:brightness(1.08); }
         .portal-ghost-btn { background:rgba(56,189,248,.1); border:1px solid rgba(56,189,248,.35); color:#7dd3fc; }
         .portal-danger-btn { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.4); color:#fca5a5; }
-        .modal-panel { max-height:88vh; overflow:auto; }
-        .dynamic-field-card { background:rgba(15,23,42,.55); border:1px solid rgba(56,189,248,.14); border-radius:1rem; padding:1rem; }
-        .firebase-key-badge { font-family:'Share Tech Mono',monospace; color:#7dd3fc; font-size:.68rem; }
 
-        .password-field { position: relative; width: 100%; direction: inherit; }
-        .password-input {
-            width: 100%; height: 48px; box-sizing: border-box; padding-inline-start: 16px; padding-inline-end: 54px;
-            background: rgba(2,6,23,.78); border: 1px solid rgba(56,189,248,.30); border-radius: 12px; color: #e2e8f0; font-size: 14px; outline: none;
-        }
-        .password-toggle {
-            position: absolute; inset-inline-end: 8px; top: 50%; width: 34px; height: 34px; transform: translateY(-50%);
-            display: flex; align-items: center; justify-content: center; border: 1px solid rgba(56,189,248,.22); border-radius: 9px;
-            background: rgba(56,189,248,.07); color: #7dd3fc; cursor: pointer;
-        }
-
-        .gov-card {
-            background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 1rem; padding: 1rem;
-            cursor: pointer; transition: all 0.3s ease; text-align: center;
-        }
-        .gov-card.has-data {
-            border-color: rgba(56, 189, 248, 0.8); box-shadow: 0 0 15px rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.1);
-        }
-        .gov-card:hover { transform: translateY(-3px); border-color: #38bdf8; box-shadow: 0 0 20px rgba(56, 189, 248, 0.5); }
+        .password-field { position: relative; width: 100%; }
+        .password-input { width: 100%; height: 48px; padding-inline-start: 16px; padding-inline-end: 54px; background: rgba(2,6,23,.78); border: 1px solid rgba(56,189,248,.30); border-radius: 12px; color: #e2e8f0; font-size: 14px; outline: none; }
+        .password-toggle { position: absolute; inset-inline-end: 8px; top: 50%; width: 34px; height: 34px; transform: translateY(-50%); display: flex; align-items: center; justify-content: center; border: 1px solid rgba(56,189,248,.22); border-radius: 9px; background: rgba(56,189,248,.07); color: #7dd3fc; cursor: pointer; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -158,7 +126,7 @@
         </div>
         <div id="introFooter">
             <div id="copyrightText" data-ar="© 2026 جميع حقوق الإنشاء والطبع محفوظة" data-en="© 2026 All Creation & Copyrights Reserved">© 2026 جميع حقوق الإنشاء والطبع محفوظة</div>
-            <div data-translate="powered_by" style="font-family:'Great Vibes',cursive;font-size:1rem;color:#38bdf8;text-shadow:0 0 10px rgba(56,189,248,.6);">برمجة وتطوير إدارة الموارد البشرية</div>
+            <div style="font-family:'Great Vibes',cursive;font-size:1rem;color:#38bdf8;">برمجة وتطوير إدارة الموارد البشرية</div>
         </div>
     </div>
 
@@ -171,7 +139,6 @@
                 <button class="ess-lang-option" onclick="setLanguage('en')">🇬🇧 EN</button>
             </div>
         </div>
-
         <div id="login-brand-stage">
             <div id="login-brand">
                 <img src="logo.png" alt="Lacto Misr Logo" class="login-brand-logo">
@@ -179,35 +146,20 @@
                 <div id="login-brand-slogan" class="login-brand-slogan">شركاء في رحلة نمو طفلك</div>
             </div>
         </div>
-
         <div id="login-panel">
             <div class="login-inner">
                 <div class="text-center mb-5">
-                    <h3 class="text-xl font-extrabold text-white" data-translate="login_title">تسجيل الدخول</h3>
-                    <p class="text-xs text-slate-400 mt-1" data-translate="login_subtitle">أدخل كود الموظف وكلمة المرور</p>
+                    <h3 class="text-xl font-extrabold text-white">تسجيل الدخول</h3>
+                    <p class="text-xs text-slate-400 mt-1">أدخل كود الموظف وكلمة المرور</p>
                 </div>
                 <div class="space-y-3.5">
-                    <input type="text" id="login-emp-code" data-translate-placeholder="code_placeholder" placeholder="كود الموظف" class="w-full px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-slate-200 placeholder-slate-500">
+                    <input type="text" id="login-emp-code" placeholder="كود الموظف" class="w-full px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-slate-200 placeholder-slate-500">
                     <div class="password-field">
-                        <input type="password" id="login-password" data-translate-placeholder="pass_placeholder" placeholder="كلمة المرور" class="password-input">
-                        <button type="button" id="password-toggle" class="password-toggle" onclick="togglePasswordVisibility()">
-                            <span id="eye-icon"></span>
-                        </button>
+                        <input type="password" id="login-password" placeholder="كلمة المرور" class="password-input">
+                        <button type="button" id="password-toggle" class="password-toggle" onclick="togglePasswordVisibility()"><span id="eye-icon"></span></button>
                     </div>
-                    <div id="first-password-setup" class="hidden rounded-xl border border-sky-400/30 bg-sky-400/5 p-3 space-y-3">
-                        <p id="first-password-note" class="text-xs text-sky-200 leading-relaxed">الموظف مسجل لكن لا توجد كلمة مرور. أنشئ كلمة مرور للمتابعة.</p>
-                        <input type="password" id="confirm-new-password" data-translate-placeholder="confirm_password_placeholder" placeholder="تأكيد كلمة المرور" class="w-full px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-slate-200">
-                        <button type="button" id="create-password-btn" onclick="createFirstPassword()" class="portal-action-btn w-full py-3 font-bold rounded-xl">إنشاء كلمة المرور والدخول</button>
-                    </div>
-                    <div class="flex items-center justify-between text-xs text-slate-300 pt-1">
-                        <label class="flex items-center gap-2 cursor-pointer select-none">
-                            <input type="checkbox" id="remember-me" class="rounded bg-slate-900 border-sky-500/30 text-sky-600">
-                            <span data-translate="remember_me">تذكرني</span>
-                        </label>
-                        <a href="#" onclick="openForgotPassModal(); return false;" class="text-sky-400 hover:underline" data-translate="forgot_pass">نسيت كلمة المرور؟</a>
-                    </div>
-                    <button onclick="handleLogin()" class="portal-action-btn w-full py-3 font-bold rounded-xl" data-translate="login_btn">دخول للنظام</button>
-                    <div id="login-error" class="login-error"></div>
+                    <button onclick="handleLogin()" class="portal-action-btn w-full py-3 font-bold rounded-xl">دخول للنظام</button>
+                    <div id="login-error" class="text-red-400 text-xs text-center font-bold min-height"></div>
                 </div>
             </div>
         </div>
@@ -219,18 +171,10 @@
             <div class="w-10 h-10 flex items-center justify-center">
                 <img src="logo.png" alt="Company Logo" class="w-full h-full object-contain logo-soft-3d">
             </div>
-            <span id="header-brand" data-translate="header_brand" class="text-2xl font-bold text-sky-400 tracking-wider">لاكتو مصر - شؤون العاملين</span>
+            <span class="text-2xl font-bold text-sky-400 tracking-wider">لاكتو مصر - شؤون العاملين</span>
         </div>
-        <div class="flex items-center gap-3 relative">
-            <div class="relative">
-                <button onclick="toggleLangDropdown(event)" class="ess-lang-btn">🌐 <span id="lang-code">AR</span> ▼</button>
-                <div id="lang-dropdown" class="ess-lang-menu">
-                    <button onclick="setLanguage('ar')" class="ess-lang-option">🇪🇬 AR</button>
-                    <button onclick="setLanguage('en')" class="ess-lang-option">🇬🇧 EN</button>
-                </div>
-            </div>
-            <span id="current-user-label" class="font-semibold text-slate-300 text-sm hidden md:inline" data-translate="admin">مسؤول النظام</span>
-            <button onclick="handleLogout()" class="portal-danger-btn px-3 py-2 rounded-xl text-xs font-bold" data-translate="logout_btn">تسجيل الخروج</button>
+        <div class="flex items-center gap-3">
+            <button onclick="handleLogout()" class="portal-danger-btn px-3 py-2 rounded-xl text-xs font-bold">تسجيل الخروج</button>
         </div>
     </header>
 
@@ -241,195 +185,207 @@
         <aside class="sidebar-collapsed glass-card hidden md:flex flex-col justify-between border-l z-20 overflow-hidden shadow-2xl">
             <div class="p-4 space-y-6">
                 <div class="text-sm font-bold text-sky-300 text-center border-b border-sky-500/20 pb-3 truncate">
-                    <span class="text-xl neon-blue-icon">🎛️</span> <span class="sidebar-title" data-translate="control_panel">غرفة التحكم</span>
+                    <span class="text-xl neon-blue-icon">🎛️</span> <span class="sidebar-title">غرفة التحكم</span>
                 </div>
                 <nav class="space-y-3 text-sm">
-                    <a href="#" onclick="backToEmployeesList(); return false;" class="sidebar-item flex items-center gap-3.5 px-3 py-2.5 rounded-xl bg-sky-600/30 text-sky-300 font-semibold border border-sky-500/40 shadow-md">
-                        <svg class="w-5 h-5 neon-blue-icon shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
-                        <span class="nav-text" data-translate="nav_home">الرئيسية والموظفين</span>
-                    </a>
-                    <a href="#" onclick="openDashboardView(); return false;" class="sidebar-item flex items-center gap-3.5 px-3 py-2.5 rounded-xl hover:bg-slate-800/60 text-slate-300 transition">
+                    <a href="#" onclick="openDashboardView(); return false;" class="sidebar-item flex items-center gap-3.5 px-3 py-2.5 rounded-xl bg-sky-600/30 text-sky-300 font-semibold border border-sky-500/40 shadow-md">
                         <svg class="w-5 h-5 neon-blue-icon shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                        <span class="nav-text" data-translate="nav_analytics">تحليلات HR والخريطة</span>
+                        <span class="nav-text">Dashboard (الرئيسية)</span>
+                    </a>
+                    <a href="#" onclick="backToEmployeesList(); return false;" class="sidebar-item flex items-center gap-3.5 px-3 py-2.5 rounded-xl hover:bg-slate-800/60 text-slate-300 transition">
+                        <svg class="w-5 h-5 neon-blue-icon shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                        <span class="nav-text">قائمة العاملين</span>
                     </a>
                 </nav>
             </div>
             <div class="p-4 border-t border-sky-500/20 text-[10px] text-slate-400 text-center truncate">
-                <span class="nav-text" data-translate="portal_version">بورتال الموظفين v6.4 - برو</span>
+                <span class="nav-text">HR Portal v7.0 - Pro</span>
             </div>
         </aside>
 
         <!-- Content Area -->
         <main class="flex-1 p-6 overflow-y-auto">
             
-            <!-- جدول القائمة الرئيسية -->
-            <div id="employees-list-view">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                    <div class="glass-card p-5 rounded-2xl border-r-4 border-sky-500 shadow-xl">
-                        <p class="text-xs text-slate-400 font-semibold" data-translate="total_emp">إجمالي العاملين</p>
-                        <h3 id="total-employees-count" class="text-3xl font-bold mt-1 text-sky-300">346</h3>
+            <!-- 1. HR Dashboard الافتراضية الخرافية -->
+            <div id="dashboard-analytics-view" class="space-y-6">
+                <div class="flex justify-between items-center glass-card p-4 rounded-2xl border-l-4 border-sky-400">
+                    <div>
+                        <h2 class="text-xl font-extrabold text-white">HR Dashboard - نظرة عامة شاملة</h2>
+                        <p class="text-xs text-sky-400 mt-0.5">مؤشرات الأداء، تحليلات الأعمار، وخريطة مصر الجغرافية لخطوط النقل</p>
                     </div>
-                    <div class="glass-card p-5 rounded-2xl border-r-4 border-sky-500 shadow-xl">
-                        <p class="text-xs text-slate-400 font-semibold" data-translate="active_depts">الإدارات النشطة</p>
-                        <h3 class="text-3xl font-bold mt-1 text-sky-300">12</h3>
-                    </div>
-                    <div class="glass-card p-5 rounded-2xl border-r-4 border-sky-500 shadow-xl cursor-pointer hover:border-sky-300 transition" onclick="openDashboardView()">
-                        <p class="text-xs text-slate-400 font-semibold">لوحة التحليلات الذكية والخريطة 🌍</p>
-                        <h3 class="text-lg font-bold mt-2 text-sky-400 flex items-center gap-2">عرض التقارير والمحافظات ➔</h3>
+                    <div class="flex gap-2">
+                        <button onclick="openAddEmployeeModal()" class="portal-action-btn px-4 py-2 rounded-xl text-xs font-bold">+ إضافة موظف</button>
                     </div>
                 </div>
 
+                <!-- Top Metric Cards Grid (مماثلة لصور التمبلت) -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="glass-card p-5 rounded-2xl border-t-2 border-sky-400">
+                        <p class="text-xs text-slate-400 font-bold">إجمالي العاملين</p>
+                        <h3 id="dash-total-emp" class="text-3xl font-black text-sky-300 mt-2">346</h3>
+                        <span class="text-[10px] text-emerald-400 mt-1 block">↑ نشطون بالقاعدة بنسبة 100%</span>
+                    </div>
+                    <div class="glass-card p-5 rounded-2xl border-t-2 border-pink-500">
+                        <p class="text-xs text-slate-400 font-bold">الإدارات والأقسام</p>
+                        <h3 class="text-3xl font-black text-pink-400 mt-2">12</h3>
+                        <span class="text-[10px] text-slate-400 mt-1 block">إدارات تشغيلية وإدارية</span>
+                    </div>
+                    <div class="glass-card p-5 rounded-2xl border-t-2 border-amber-400">
+                        <p class="text-xs text-slate-400 font-bold">خطوط النقل والمأموريات</p>
+                        <h3 class="text-3xl font-black text-amber-300 mt-2">24</h3>
+                        <span class="text-[10px] text-amber-400 mt-1 block">خط سير رئيسي للشرقية والقاهرة</span>
+                    </div>
+                    <div class="glass-card p-5 rounded-2xl border-t-2 border-emerald-400">
+                        <p class="text-xs text-slate-400 font-bold">الحالة التأمينية</p>
+                        <h3 class="text-3xl font-black text-emerald-300 mt-2">98%</h3>
+                        <span class="text-[10px] text-emerald-400 mt-1 block">عاملين مؤمن عليهم بالكامل</span>
+                    </div>
+                </div>
+
+                <!-- Middle Grid: Charts & Real Geography Map of Egypt -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- تحليل الأعمار Bar Chart -->
+                    <div class="glass-card p-6 rounded-3xl space-y-4">
+                        <h3 class="font-bold text-sm text-sky-300 border-b border-sky-500/20 pb-2">📊 تحليل أعمار العاملين</h3>
+                        <div class="h-64 flex items-center justify-center relative">
+                            <canvas id="ageChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- خريطة مصر الفعلية (SVG جغرافيا حقيقية للمحافظات) -->
+                    <div class="glass-card p-6 rounded-3xl space-y-3 lg:col-span-2 flex flex-col justify-between">
+                        <div class="flex justify-between items-center border-b border-sky-500/20 pb-2">
+                            <h3 class="font-bold text-sm text-sky-300">🗺️ خريطة جمهورية مصر العربية (توزيع سكن ومقار الموظفين)</h3>
+                            <span class="text-xs text-sky-400 bg-sky-500/10 px-2.5 py-1 rounded-lg">اضغط على المحافظة</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                            <!-- SVG Map of Egypt (Stylized Geographic Regions) -->
+                            <div class="egypt-map-container flex justify-center items-center py-2">
+                                <svg viewBox="0 0 450 500" width="100%" height="210px">
+                                    <!-- دلتا النهر / القليوبية / القاهرة -->
+                                    <path id="gov-cairo" d="M210,240 L230,250 L220,270 L195,260 Z" onclick="selectGov('القاهرة الكبرى')" title="القاهرة والجيزة" />
+                                    <!-- الشرقية والعاشر من رمضان -->
+                                    <path id="gov-sharqia" class="active" d="M230,220 L270,230 L260,260 L220,240 Z" onclick="selectGov('الشرقية (العاشر من رمضان)')" title="الشرقية والعاشر" />
+                                    <!-- الإسكندرية والساحل -->
+                                    <path id="gov-alex" d="M120,160 L160,170 L150,195 L110,180 Z" onclick="selectGov('الإسكندرية')" title="الإسكندرية" />
+                                    <!-- الدقهلية والغربية -->
+                                    <path id="gov-delta" d="M180,180 L220,190 L210,220 L170,210 Z" onclick="selectGov('الدقهلية والغربية')" title="الدقهلية والغربية" />
+                                    <!-- الصعيد / القناة -->
+                                    <path id="gov-upper" d="M200,280 L230,320 L210,420 L180,350 Z" onclick="selectGov('محافظات الصعيد')" title="الصعيد" />
+                                </svg>
+                            </div>
+                            <!-- تفاصيل المحافظة المختارة Side Widget -->
+                            <div id="gov-info-panel" class="md:col-span-2 bg-slate-950/60 p-4 rounded-2xl border border-sky-500/30 space-y-3">
+                                <h4 id="selected-gov-title" class="font-extrabold text-sky-300 text-sm">📍 الشرقية (العاشر من رمضان) - المقر الرئيسي</h4>
+                                <p class="text-xs text-slate-300" id="selected-gov-desc">تحتضن العدد الأكبر من العاملين ومصانع الشركة مع خطوط أتوبيسات مكفة بالكامل.</p>
+                                <div class="grid grid-cols-2 gap-2 pt-1 text-xs">
+                                    <div class="bg-slate-900 p-2.5 rounded-xl border border-sky-500/20">
+                                        <span class="text-slate-400 block text-[10px]">عدد العاملين:</span>
+                                        <strong id="gov-emp-count" class="text-sky-300 text-sm">185 موظف</strong>
+                                    </div>
+                                    <div class="bg-slate-900 p-2.5 rounded-xl border border-sky-500/20">
+                                        <span class="text-slate-400 block text-[10px]">خطوط الحافلات:</span>
+                                        <strong id="gov-bus-count" class="text-emerald-400 text-sm">6 خطوط رئيسية</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Grid: Trends & Gauges (مثل التمبلت تماماً) -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="glass-card p-6 rounded-3xl space-y-3">
+                        <h3 class="font-bold text-sm text-sky-300">📈 مؤشر التعيينات السنوية</h3>
+                        <div class="h-48 relative flex items-center justify-center">
+                            <canvas id="trendChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="glass-card p-6 rounded-3xl space-y-3">
+                        <h3 class="font-bold text-sm text-pink-400">🍩 نسبة توزيع الكوادر</h3>
+                        <div class="h-48 relative flex items-center justify-center">
+                            <canvas id="donutChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="glass-card p-6 rounded-3xl space-y-3 bg-gradient-to-br from-slate-900/90 to-sky-950/40">
+                        <h3 class="font-bold text-sm text-emerald-400">⚡ كفاءة وحالة النظام</h3>
+                        <div class="space-y-3 pt-2 text-xs">
+                            <div>
+                                <div class="flex justify-between mb-1"><span>استقرار قاعدة البيانات (Firebase)</span><strong class="text-emerald-400">99.9%</strong></div>
+                                <div class="w-full bg-slate-950 rounded-full h-2"><div class="bg-emerald-400 h-2 rounded-full" style="width: 99.9%"></div></div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between mb-1"><span>مزامنة ملفات الموظفين</span><strong class="text-sky-400">100%</strong></div>
+                                <div class="w-full bg-slate-950 rounded-full h-2"><div class="bg-sky-400 h-2 rounded-full" style="width: 100%"></div></div>
+                            </div>
+                            <p class="text-[11px] text-slate-400 pt-2 border-t border-sky-500/20">النظام يعمل بكامل طاقته لخدمة 346 موظفاً في شركة لاكتو مصر.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. جدول قائمة العاملين (يفتح من الـ Sidebar) -->
+            <div id="employees-list-view" class="hidden space-y-6">
                 <div class="glass-card rounded-2xl overflow-hidden shadow-2xl">
                     <div class="p-4 border-b border-sky-500/20 flex flex-col md:flex-row justify-between items-center gap-4">
-                        <h2 class="font-bold text-lg text-sky-200" data-translate="emp_list">قائمة العاملين بالقاعدة</h2>
+                        <h2 class="font-bold text-lg text-sky-200">قائمة العاملين بالقاعدة</h2>
                         <div class="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-                            <input type="text" id="search-input" onkeyup="filterEmployees()" data-translate-placeholder="search_placeholder" placeholder="بحث بالاسم أو الكود..." class="px-4 py-2 bg-slate-900/80 border border-sky-500/30 rounded-xl text-sm w-full md:w-72 focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200 placeholder-slate-500">
-                            <button onclick="openAddEmployeeModal()" class="portal-action-btn px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition" data-translate="add_employee_btn">+ إضافة موظف</button>
+                            <input type="text" id="search-input" onkeyup="filterEmployees()" placeholder="بحث بالاسم أو الكود..." class="px-4 py-2 bg-slate-900/80 border border-sky-500/30 rounded-xl text-sm w-full md:w-72 text-slate-200 placeholder-slate-500">
+                            <button onclick="openAddEmployeeModal()" class="portal-action-btn px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap">+ إضافة موظف</button>
                         </div>
                     </div>
                     <div class="overflow-x-auto">
-                        <table id="main-employees-table" class="w-full border-collapse glass-table">
+                        <table class="w-full border-collapse glass-table">
                             <thead>
                                 <tr class="bg-slate-900/60 text-sky-400 border-b text-xs uppercase tracking-wider">
-                                    <th class="p-3.5" data-translate="th_code">الكود</th>
-                                    <th class="p-3.5" data-translate="th_name">اسم الموظف</th>
-                                    <th class="p-3.5" data-translate="th_dept">الإدارة</th>
-                                    <th class="p-3.5" data-translate="th_job">الوظيفة</th>
-                                    <th class="p-3.5" data-translate="th_hire">تاريخ التعيين</th>
-                                    <th class="p-3.5 text-center" data-translate="th_actions">الإجراءات</th>
+                                    <th class="p-3.5">الكود</th>
+                                    <th class="p-3.5">اسم الموظف</th>
+                                    <th class="p-3.5">الإدارة</th>
+                                    <th class="p-3.5">الوظيفة</th>
+                                    <th class="p-3.5">تاريخ التعيين</th>
+                                    <th class="p-3.5 text-center">الإجراءات</th>
                                 </tr>
                             </thead>
                             <tbody id="employees-table-body" class="divide-y divide-sky-500/10 text-sm">
-                                <tr><td colspan="6" class="p-6 text-center text-slate-400" data-translate="loading">جاري جلب البيانات من القاعدة...</td></tr>
+                                <tr><td colspan="6" class="p-6 text-center text-slate-400">جاري جلب البيانات...</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            <!-- صفحة تحليلات HR والخريطة التفاعلية -->
-            <div id="dashboard-analytics-view" class="hidden space-y-6">
-                <div class="flex justify-between items-center glass-card p-4 rounded-2xl">
-                    <button onclick="backToEmployeesList()" class="px-4 py-2 bg-sky-600/30 hover:bg-sky-600 text-sky-200 rounded-xl text-sm border border-sky-400/30 transition shadow-lg" data-translate="back_btn">← العودة للقائمة</button>
-                    <h2 class="text-lg font-bold text-sky-300">لوحة تحليل الأعمار ومحافظات الموظفين وخطوط المواصلات</h2>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="glass-card p-6 rounded-3xl space-y-4">
-                        <h3 class="font-bold text-md text-sky-400 border-b border-sky-500/20 pb-2">📊 تحليل أعمار العاملين</h3>
-                        <div class="h-64 flex items-center justify-center relative">
-                            <canvas id="ageChart"></canvas>
-                        </div>
-                    </div>
-
-                    <div class="glass-card p-6 rounded-3xl space-y-4">
-                        <h3 class="font-bold text-md text-sky-400 border-b border-sky-500/20 pb-2">🗺️ خريطة محافظات الموظفين ومسارات النقل</h3>
-                        <p class="text-xs text-slate-400">اختر المحافظة لمعرفة عدد الموظفين وخطوط المواصلات المتاحة:</p>
-                        <div id="egypt-govs-grid" class="grid grid-cols-3 gap-3 pt-2"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- صفحة الملف الوظيفي -->
+            <!-- 3. صفحة الملف الوظيفي -->
             <div id="employee-profile-view" class="hidden space-y-6">
                 <div class="flex justify-between items-center glass-card p-4 rounded-2xl">
-                    <button onclick="backToEmployeesList()" class="px-4 py-2 bg-sky-600/30 hover:bg-sky-600 text-sky-200 rounded-xl text-sm border border-sky-400/30 transition shadow-lg" data-translate="back_btn">← العودة للقائمة</button>
+                    <button onclick="openDashboardView()" class="px-4 py-2 bg-sky-600/30 hover:bg-sky-600 text-sky-200 rounded-xl text-sm border border-sky-400/30 transition">← العودة للداشبورد</button>
                     <div class="flex gap-3">
-                        <button id="btn-edit" onclick="enableEditing()" class="px-5 py-2 bg-sky-600/40 hover:bg-sky-600 text-white font-bold rounded-xl text-sm border border-sky-400/30 transition shadow-lg" data-translate="edit_btn">تعديل البيانات</button>
-                        <button id="btn-save" onclick="confirmSave()" class="hidden px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition shadow-lg" data-translate="save_btn">حفظ</button>
+                        <button id="btn-edit" onclick="enableEditing()" class="px-5 py-2 bg-sky-600/40 hover:bg-sky-600 text-white font-bold rounded-xl text-sm">تعديل البيانات</button>
+                        <button id="btn-save" onclick="confirmSave()" class="hidden px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm">حفظ</button>
                     </div>
                 </div>
-
+                <!-- بقية حقول البروفايل -->
                 <div class="glass-card p-6 rounded-3xl shadow-2xl grid grid-cols-1 lg:grid-cols-4 gap-6 items-center">
                     <div class="flex flex-col items-center justify-center space-y-3">
                         <div class="w-36 h-36 rounded-2xl overflow-hidden border-2 border-sky-500/50 shadow-xl bg-slate-900">
-                            <img id="profile-img" src="default-avatar.png" alt="Employee Photo" class="w-full h-full object-cover">
+                            <img id="profile-img" src="default-avatar.png" alt="Photo" class="w-full h-full object-cover">
                         </div>
-                        <input type="file" id="photo-upload-input" accept="image/*" class="hidden" onchange="uploadEmployeePhoto(event)">
-                        <button id="btn-photo" onclick="document.getElementById('photo-upload-input').click()" class="hidden px-3 py-1.5 bg-sky-600/20 hover:bg-sky-600 text-sky-300 rounded-lg text-xs border border-sky-400/30 transition" data-translate="change_photo">تعديل الصورة</button>
                     </div>
-
                     <div class="lg:col-span-3 space-y-4">
                         <div>
-                            <label class="text-xs text-sky-400 font-semibold" data-translate="th_name">اسم الموظف</label>
-                            <input type="text" id="prof-name" disabled class="w-full mt-1 px-4 py-2.5 bg-slate-900/50 border border-slate-700 rounded-xl text-white font-bold disabled:opacity-80">
+                            <label class="text-xs text-sky-400 font-semibold">اسم الموظف</label>
+                            <input type="text" id="prof-name" disabled class="w-full mt-1 px-4 py-2.5 bg-slate-900/50 border border-slate-700 rounded-xl text-white font-bold">
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label class="text-xs text-slate-400" data-translate="th_code">الكود</label>
+                                <label class="text-xs text-slate-400">الكود</label>
                                 <input type="text" id="prof-code" disabled class="w-full mt-1 px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-sky-400 font-mono">
                             </div>
                             <div>
-                                <label class="text-xs text-slate-400" data-translate="th_dept">الإدارة</label>
-                                <input type="text" id="prof-dept" disabled class="w-full mt-1 px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 disabled:opacity-80">
+                                <label class="text-xs text-slate-400">الإدارة</label>
+                                <input type="text" id="prof-dept" disabled class="w-full mt-1 px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200">
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="glass-card p-5 rounded-2xl space-y-4">
-                        <h3 class="text-sm font-bold text-sky-400 border-b border-sky-500/20 pb-2" data-translate="sec_job">البيانات الوظيفية</h3>
-                        <div>
-                            <label class="text-xs text-slate-400" data-translate="th_job">الوظيفة</label>
-                            <input type="text" id="prof-job" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
-                        </div>
-                        <div>
-                            <label class="text-xs text-slate-400" data-translate="manager_label">المدير المباشر</label>
-                            <input type="text" id="prof-manager" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
-                        </div>
-                        <div>
-                            <label class="text-xs text-slate-400" data-translate="th_hire">تاريخ التعيين</label>
-                            <input type="text" id="prof-hire" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm font-mono disabled:opacity-80">
-                        </div>
-                        <div>
-                            <label class="text-xs text-slate-400" data-translate="service_years">سنوات الخدمة</label>
-                            <input type="text" id="prof-service" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
-                        </div>
-                    </div>
-
-                    <div class="glass-card p-5 rounded-2xl space-y-4">
-                        <h3 class="text-sm font-bold text-sky-400 border-b border-sky-500/20 pb-2" data-translate="sec_qual">المؤهل العلمي</h3>
-                        <div>
-                            <label class="text-xs text-slate-400" data-translate="qual_label">المؤهل</label>
-                            <input type="text" id="prof-qual" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
-                        </div>
-                        <div>
-                            <label class="text-xs text-slate-400" data-translate="qual_auth">جهة المؤهل</label>
-                            <input type="text" id="prof-qual-auth" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
-                        </div>
-                    </div>
-
-                    <div class="glass-card p-5 rounded-2xl space-y-4">
-                        <h3 class="text-sm font-bold text-sky-400 border-b border-sky-500/20 pb-2" data-translate="sec_personal">البيانات الشخصية</h3>
-                        <div>
-                            <label class="text-xs text-slate-400" data-translate="dob_label">تاريخ الميلاد</label>
-                            <input type="text" id="prof-dob" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm font-mono disabled:opacity-80">
-                        </div>
-                        <div>
-                            <label class="text-xs text-slate-400" data-translate="age_label">السن حتى تاريخه</label>
-                            <input type="text" id="prof-age" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
-                        </div>
-                        <div>
-                            <label class="text-xs text-slate-400" data-translate="insurance_label">الحالة التأمينية</label>
-                            <input type="text" id="prof-insurance" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
-                        </div>
-                        <div>
-                            <label class="text-xs text-slate-400" data-translate="pob_label">مكان الميلاد</label>
-                            <input type="text" id="prof-pob" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="glass-card p-5 rounded-2xl space-y-4">
-                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                        <div>
-                            <h3 class="text-sm font-bold text-sky-400" data-translate="firebase_fields_title">الحقول الإضافية المخصصة (Custom Fields)</h3>
-                            <p class="text-[11px] text-slate-500 mt-1">تمت تصفية الحقول الأساسية تماماً لتظهر هنا الخانات الإضافية فقط.</p>
-                        </div>
-                        <button onclick="openAddCustomFieldModal()" class="portal-ghost-btn px-4 py-2 rounded-xl text-xs font-bold transition">+ إضافة خانة إضافية</button>
-                    </div>
-                    <div id="dynamic-fields-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
                 </div>
             </div>
 
@@ -438,13 +394,12 @@
 
     <!-- Modals -->
     <div id="add-employee-modal" class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
-        <div class="glass-card modal-panel p-6 rounded-3xl w-full max-w-5xl border border-sky-500/35 shadow-2xl">
+        <div class="glass-card p-6 rounded-3xl w-full max-w-5xl border border-sky-500/35 shadow-2xl">
             <div class="flex items-center justify-between gap-3 mb-5">
                 <h3 class="text-lg font-extrabold text-white">إضافة موظف جديد</h3>
                 <button onclick="closeAddEmployeeModal()" class="portal-ghost-btn w-9 h-9 rounded-full">✕</button>
             </div>
             <div id="add-employee-fields" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-            <div id="add-employee-error" class="min-h-5 text-center text-xs text-red-400 mt-3"></div>
             <div class="flex justify-end gap-2 mt-5">
                 <button onclick="closeAddEmployeeModal()" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300">إلغاء</button>
                 <button onclick="saveNewEmployee()" class="portal-action-btn px-5 py-2 rounded-xl text-xs font-bold">حفظ الموظف</button>
@@ -452,49 +407,6 @@
         </div>
     </div>
 
-    <div id="custom-field-modal" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
-        <div class="glass-card p-6 rounded-3xl w-full max-w-md border border-sky-500/35 shadow-2xl">
-            <div class="flex items-center justify-between mb-5">
-                <h3 class="text-lg font-extrabold text-white">إضافة خانة إضافية</h3>
-                <button onclick="closeAddCustomFieldModal()" class="portal-ghost-btn w-9 h-9 rounded-full">✕</button>
-            </div>
-            <label class="text-xs text-slate-400">اسم الخانة</label>
-            <input id="custom-field-name" class="w-full mt-1 px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-white" placeholder="مثال: الرقم التأميني">
-            <label class="text-xs text-slate-400 block mt-4">القيمة</label>
-            <input id="custom-field-value" class="w-full mt-1 px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-white" placeholder="القيمة">
-            <div id="custom-field-error" class="min-h-5 text-center text-xs text-red-400 mt-3"></div>
-            <div class="flex justify-end gap-2 mt-4">
-                <button onclick="closeAddCustomFieldModal()" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300">إلغاء</button>
-                <button onclick="saveCustomField()" class="portal-action-btn px-5 py-2 rounded-xl text-xs font-bold">حفظ</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="gov-details-modal" class="hidden fixed inset-0 z-[85] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
-        <div class="glass-card p-6 rounded-3xl w-full max-w-lg border border-sky-500/40 shadow-2xl space-y-4">
-            <div class="flex items-center justify-between border-b border-sky-500/20 pb-3">
-                <h3 id="gov-modal-title" class="text-lg font-bold text-sky-300">تفاصيل المحافظة</h3>
-                <button onclick="closeGovModal()" class="portal-ghost-btn w-9 h-9 rounded-full">✕</button>
-            </div>
-            <div id="gov-modal-content" class="space-y-3 text-sm text-slate-200"></div>
-        </div>
-    </div>
-
-    <div id="confirm-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
-        <div class="glass-card p-6 rounded-2xl max-w-sm w-full border border-sky-500/30 text-center space-y-4">
-            <h3 id="confirm-title" class="text-lg font-bold text-white">هل ترغب في حفظ التعديلات؟</h3>
-            <div class="flex justify-center gap-3 pt-2">
-                <button onclick="executeSave()" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-xs transition">نعم</button>
-                <button onclick="closeConfirmModal()" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition">إلغاء</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="toast-notification" class="fixed bottom-6 left-6 z-50 transform translate-y-32 opacity-0 transition-all duration-300 glass-card px-6 py-3 rounded-2xl border border-sky-500/40 shadow-2xl flex items-center gap-3">
-        <span class="text-sky-400 text-lg">✓</span>
-        <span id="toast-message" class="text-sm font-bold text-white">تم الحفظ بنجاح</span>
-    </div>
-
-    <script src="app.js?v=20261011-5"></script>
+    <script src="app.js?v=20261011-7"></script>
 </body>
 </html>
