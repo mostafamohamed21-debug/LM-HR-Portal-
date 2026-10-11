@@ -1,161 +1,132 @@
 // ==========================================
-// LM-HR-Portal - app.js (Optimized & Safe)
+// LM-HR-Portal - app.js (Fixed Connection & Login)
 // ==========================================
 
-// التأكد من تهيئة الـ Firebase بشكل آمن لمنع أخطاء الاتصال
+// إعدادات اتصال Firebase الخاصة بمشروعك (استبدل القيم أدناه بإعداداتك الأصلية)
+const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    databaseURL: "YOUR_DATABASE_URL",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID"
+};
+
+// تهيئة الـ Firebase بشكل آمن
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+
 document.addEventListener("DOMContentLoaded", function () {
-    initApp();
+    initPortal();
 });
 
-function initApp() {
-    try {
-        // التحقق من أن مكتبة الـ Firebase مُحمّلة
-        if (typeof firebase === 'undefined') {
-            console.error("Firebase SDK is not loaded!");
-            showConnectionErrorUI();
-            return;
+function initPortal() {
+    // مراقبة حالة الاتصال بقاعدة البيانات في الوقت الفعلي
+    const connectedRef = firebase.database().ref(".info/connected");
+    connectedRef.on("value", function(snap) {
+        if (snap.val() === true) {
+            console.log("Connected to Firebase successfully.");
+            hideConnectionError();
+        } else {
+            console.warn("Disconnected from Firebase.");
+            showConnectionError();
         }
+    });
 
-        // مراقبة حالة الاتصال بقاعدة البيانات في الوقت الفعلي
-        const connectedRef = firebase.database().ref(".info/connected");
-        connectedRef.on("value", function(snap) {
-            if (snap.val() === true) {
-                console.log("Connected to Firebase successfully.");
-                hideConnectionErrorUI();
-            } else {
-                console.warn("Disconnected from Firebase database.");
-                showConnectionErrorUI();
-            }
+    setupLoginForm();
+}
+
+function setupLoginForm() {
+    // ربط عملية تسجيل الدخول بنموذج أو زر الدخول الموجود في الصفحة الحالية
+    const loginForm = document.querySelector('form') || document.getElementById('login-form');
+    const signInBtn = document.querySelector('button[type="submit"]') || document.getElementById('signin-btn');
+
+    if (loginForm) {
+        loginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleLogin();
         });
-
-        // تشغيل الوظائف الأساسية للبورتال
-        loadEmployeesData();
-        setupEventListeners();
-
-    } catch (error) {
-        console.error("Initialization Error:", error);
-        showConnectionErrorUI();
+    } else if (signInBtn) {
+        signInBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            handleLogin();
+        });
     }
 }
 
-// دالة مساعدة لتنظيف وجلب بيانات الموظف بغض النظر عن المسافات في المفاتيح
-function getEmpField(emp, fieldName, lang) {
-    if (!emp) return '';
-    let key = '';
-    
-    if (fieldName === 'name') {
-        key = (lang === 'ar') ? 'اسم الموظف ' : 'emp_name _en';
-    } else if (fieldName === 'job') {
-        key = (lang === 'ar') ? 'الوظيفة' : 'job title ';
-    } else if (fieldName === 'department') {
-        key = (lang === 'ar') ? 'الإدارة ' : 'department ';
-    } else if (fieldName === 'manager') {
-        key = (lang === 'ar') ? 'المدير المباشر ' : 'direct manager ';
-    } else if (fieldName === 'qualification') {
-        key = (lang === 'ar') ? 'المؤهل' : 'qualification';
-    } else if (fieldName === 'insurance') {
-        key = (lang === 'ar') ? 'الحالة التأمينية ' : 'insurance status ';
-    }
-    
-    // محاولة الجلب بالمفتاح المباشر أو مع تنظيف المسافات الاحتياطي
-    if (emp[key] !== undefined) return emp[key];
-    const trimmedKey = key.trim();
-    if (emp[trimmedKey] !== undefined) return emp[trimmedKey];
-    
-    // بحث مرن في مفاتيح الكائن إذا لم يتم العثور بالمطابقة التامة
-    for (let k in emp) {
-        if (k.trim() === trimmedKey) {
-            return emp[k];
+function handleLogin() {
+    // قراءة كود الموظف وكلمة المرور من الحقول الحالية في الصفحة
+    const inputs = document.querySelectorAll('input');
+    let empCode = '';
+    let password = '';
+
+    inputs.forEach(input => {
+        if (input.type === 'text' || input.type === 'number' || input.id?.includes('code') || input.name?.includes('code')) {
+            empCode = input.value.trim();
+        } else if (input.type === 'password') {
+            password = input.value.trim();
         }
-    }
-    return '';
-}
+    });
 
-// تحميل بيانات الموظفين مع معالجة آمنة للأخطاء
-function loadEmployeesData() {
-    const dbRef = firebase.database().ref('employees'); // أو المسار المستخدم في مشروعك
-    
+    if (!empCode && inputs.length > 0) empCode = inputs[0].value.trim();
+    if (!password && inputs.length > 1) password = inputs[1].value.trim();
+
+    if (!empCode) {
+        alert("يرجى إدخال كود الموظف");
+        return;
+    }
+
+    // جلب البيانات والتحقق من قاعدة بيانات الموظفين
+    const dbRef = firebase.database().ref('employees');
     dbRef.once('value')
         .then((snapshot) => {
             const data = snapshot.val();
-            if (data) {
-                // حفظ البيانات في متغير عام أو معالجتها بالعرض الحالي
-                window.allEmployeesData = data;
-                renderEmployeesTable(data);
+            if (!data) {
+                showConnectionError("لا توجد بيانات موظفين مسجلة");
+                return;
+            }
+
+            let foundEmp = null;
+            Object.keys(data).forEach(key => {
+                const emp = data[key];
+                if (emp && (emp.الكود == empCode || emp.code == empCode || key === empCode)) {
+                    foundEmp = emp;
+                }
+            });
+
+            if (foundEmp) {
+                console.log("Employee verified successfully.");
+                hideConnectionError();
+                localStorage.setItem('currentEmployee', JSON.stringify(foundEmp));
+                // التوجيه للوحة التحكم أو الصفحة التالية حسب هيكل مشروعك
+                window.location.href = "dashboard.html"; 
             } else {
-                console.log("No employee data found in database.");
+                alert("كود الموظف غير صحيح");
             }
         })
         .catch((error) => {
-            console.error("Error loading data from Firebase:", error);
-            showConnectionErrorUI();
+            console.error("Database Error:", error);
+            showConnectionError();
         });
 }
 
-// دالة الحفظ والتحديث الآمنة المرتبطة بكود الموظف أو مفتاح الـ Firebase
-function saveEmployeeChanges(empIdentifier, updatedData, callback) {
-    const dbRef = firebase.database().ref('employees');
-    
-    dbRef.once('value')
-        .then((snapshot) => {
-            let targetKey = null;
-            
-            snapshot.forEach((childSnapshot) => {
-                const emp = childSnapshot.val();
-                // مطابقة الكود الوظيفي أو المفتاح
-                if (childSnapshot.key === empIdentifier || emp.الكود == empIdentifier || emp.code == empIdentifier) {
-                    targetKey = childSnapshot.key;
-                }
-            });
-            
-            if (targetKey !== null) {
-                dbRef.child(targetKey).update(updatedData)
-                    .then(() => {
-                        console.log("Data updated successfully.");
-                        if (typeof callback === 'function') callback(true);
-                    })
-                    .catch((err) => {
-                        console.error("Update failed:", err);
-                        if (typeof callback === 'function') callback(false, err);
-                    });
-            } else {
-                console.error("Employee not found for update.");
-                if (typeof callback === 'function') callback(false, "Employee not found");
-            }
-        })
-        .catch((err) => {
-            console.error("Database connection error during save:", err);
-            if (typeof callback === 'function') callback(false, err);
-        });
+function showConnectionError(msg) {
+    const allElements = document.querySelectorAll('*');
+    allElements.forEach(el => {
+        if (el.childNodes.length === 1 && el.childNodes[0].nodeType === 3 && el.childNodes[0].nodeValue.includes('Connection error')) {
+            el.style.display = 'block';
+            if (msg) el.childNodes[0].nodeValue = msg;
+        }
+    });
 }
 
-// دوال واجهة المستخدم للرسائل (لا تؤثر على التصميم الأساسي إن وجدت عناصرها أو تتخطاها بأمان)
-function showConnectionErrorUI() {
-    const errorBanner = document.getElementById('connection-error-banner');
-    if (errorBanner) {
-        errorBanner.style.display = 'block';
-    }
-}
-
-function hideConnectionErrorUI() {
-    const errorBanner = document.getElementById('connection-error-banner');
-    if (errorBanner) {
-        errorBanner.style.display = 'none';
-    }
-}
-
-// ربط الأحداث الافتراضية للعناصر الموجودة مسبقاً في الصفحة
-function setupEventListeners() {
-    // أي مستمعات أحداث خاصة بالبحث أو التنقل مطابقة للـ IDs الأصلية
-    const searchInput = document.getElementById('search-input');
-    if (searchInput) {
-        searchInput.addEventListener('input', function(e) {
-            // تنفيذ البحث بنفس الطريقة القديمة
-        });
-    }
-}
-
-// دالة العرض الافتراضية (تستخدم نفس أسماء الفئات والعناصر القديمة لضمان عدم تغير الشكل)
-function renderEmployeesTable(data) {
-    // الكود المسؤول عن رسم الجداول أو الكروت بناءً على العناصر الموجودة في الـ HTML الأصلي
+function hideConnectionError() {
+    const allElements = document.querySelectorAll('*');
+    allElements.forEach(el => {
+        if (el.childNodes.length === 1 && el.childNodes[0].nodeType === 3 && el.childNodes[0].nodeValue.includes('Connection error')) {
+            el.style.display = 'none';
+        }
+    });
 }
