@@ -1,4 +1,4 @@
-// Lacto Misr HR Portal v6.4 - Final Fix for Intro Screen & Analytics
+// Lacto Misr HR Portal v6.4 - Full Unified Production Code
 
 function excelDateToJSDate(serial) {
     if (!serial || typeof serial !== 'number') return serial || '--';
@@ -471,11 +471,69 @@ async function handleLogin() {
     }
 }
 
-// هنا كانت المشكلة: تم إعادة استدعاء runPortalIntro وتشغيل جلب البيانات بانتظام
+function prepareRememberedLogin(){
+    const savedCode = localStorage.getItem('lacto_saved_code');
+    const savedPass = localStorage.getItem('lacto_saved_pass');
+    if(savedCode && savedPass){
+        const codeInput = document.getElementById('login-emp-code');
+        const passInput = document.getElementById('login-password');
+        const rememberCheck = document.getElementById('remember-me');
+        if(codeInput) codeInput.value = savedCode;
+        if(passInput) passInput.value = savedPass;
+        if(rememberCheck) rememberCheck.checked = true;
+    }
+}
+
+function runPortalIntro(){
+    const intro = document.getElementById('intro-screen');
+    const container = document.getElementById('introTitle');
+    const subtitle = document.getElementById('introSubtitle');
+    if(!intro || !container || !window.gsap){
+        const modal = document.getElementById('login-modal');
+        if(modal) modal.style.display = 'flex';
+        return;
+    }
+    container.innerHTML = '';
+    const chars = [];
+    const text = 'LACTO MISR S.A.E';
+    for(const ch of text){
+        if(ch === ' '){
+            const sp = document.createElement('span');
+            sp.className = 'intro-space';
+            container.appendChild(sp);
+        } else {
+            const el = document.createElement('span');
+            el.className = 'intro-char';
+            el.innerText = ch;
+            container.appendChild(el);
+            chars.push(el);
+        }
+    }
+    chars.forEach(el => gsap.set(el, { y: -250, x: (Math.random() - .5) * 400, rotation: (Math.random() - .5) * 720, opacity: 0, scale: .8 }));
+    gsap.set(subtitle, { opacity: 0, y: 20 });
+    gsap.set('#introFooter', { opacity: 0, bottom: '-20vh' });
+
+    const tl = gsap.timeline({
+        onComplete: () => {
+            intro.classList.add('fade-out');
+            setTimeout(() => {
+                const brand = document.getElementById('login-brand');
+                const panel = document.getElementById('login-panel');
+                if(brand){ brand.classList.add('intro-ready'); setTimeout(() => brand.classList.add('compact'), 350); }
+                if(panel){ setTimeout(() => panel.classList.add('visible', 'compact-mode'), 650); }
+            }, 500);
+        }
+    });
+    tl.to(chars, { duration: 2.5, x: 0, y: 0, rotation: 360, opacity: 1, scale: 1, stagger: .1, ease: 'power2.out' }, 'start');
+    tl.to(subtitle, { duration: 1.5, opacity: 1, y: 0, ease: 'power2.out' }, 'start+=1');
+    tl.to('#introFooter', { duration: 1.5, bottom: '12%', opacity: 1, ease: 'power2.out' }, 'start+=1.5');
+    tl.to([subtitle, '#introFooter'], { duration: 1.2, opacity: 0, y: 20, ease: 'power1.in' }, 'start+=6');
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
     setLanguage(currentLang);
     prepareRememberedLogin();
-    runPortalIntro(); // تشغيل الأنترو وسحب الشاشة السوداء تلقائياً
+    runPortalIntro(); 
     portalInitialized = true;
     await loadEmployeesFromFirebase();
 });
