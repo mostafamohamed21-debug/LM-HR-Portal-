@@ -427,6 +427,7 @@ async function loadEmployeesFromFirebase() {
         allEmployees = await readEmployeeSources();
         renderTable(allEmployees);
         updateDashboardStats();
+        if(hrActivePage==='dashboard') renderHRWorkspace();
         if (typeof renderHRWorkspace === 'function') renderHRWorkspace();
         const status = document.getElementById('connection-status');
         if (status) status.textContent = currentLang === 'ar'
@@ -626,7 +627,7 @@ function closeForgotPassModal(){document.getElementById('forgot-pass-modal')?.cl
 
 function runPortalIntro(){
     const intro=document.getElementById('intro-screen');const container=document.getElementById('introTitle');const subtitle=document.getElementById('introSubtitle');
-    if(!intro||!container||!window.gsap){ revealLoginAfterIntro(); return; }
+    if(!intro||!container||!window.gsap){ intro?.classList.add("fade-out"); revealLoginAfterIntro(); return; }
     container.innerHTML='';const chars=[];const text='LACTO MISR S.A.E';
     for(const ch of text){if(ch===' '){const sp=document.createElement('span');sp.className='intro-space';container.appendChild(sp);}else{const el=document.createElement('span');el.className='intro-char';el.innerText=ch;container.appendChild(el);chars.push(el);}}
     chars.forEach(el=>gsap.set(el,{y:-250,x:(Math.random()-.5)*400,rotation:(Math.random()-.5)*720,opacity:0,scale:.8}));
@@ -658,7 +659,7 @@ window.addEventListener('click',(e)=>{
 window.addEventListener('DOMContentLoaded',async()=>{
     setLanguage(currentLang);
     prepareRememberedLogin();
-    runPortalIntro();
+    try { runPortalIntro(); } catch (err) { console.error("Intro error", err); document.getElementById("intro-screen")?.classList.add("fade-out"); revealLoginAfterIntro(); }
 });
 
 
@@ -678,18 +679,7 @@ function showHRPage(page){
 function hrCard(label,value,foot=''){return `<div class="hr-kpi"><p class="text-xs text-slate-400">${escapeHtml(label)}</p><div class="text-3xl text-sky-300 font-bold mt-2">${escapeHtml(value)}</div><p class="text-xs text-slate-500 mt-2">${escapeHtml(foot)}</p></div>`}
 function renderHRWorkspace(){
     document.querySelectorAll('.hr-nav [data-ar]').forEach(el=>{el.textContent=el.dataset[currentLang]});
-    if(hrActivePage==='dashboard'){
-        const d=document.getElementById('hr-dashboard-view');if(!d)return;
-        const groups={};allEmployees.forEach(e=>{const k=String(getEmployeeDept(e)||'--').trim();groups[k]=(groups[k]||0)+1});
-        const entries=Object.entries(groups).sort((a,b)=>b[1]-a[1]).slice(0,10),max=Math.max(1,...entries.map(x=>x[1]));
-        const years={};allEmployees.forEach(e=>{const raw=getHireDate(e),year=String(raw).match(/(?:19|20)\d{2}/)?.[0];if(year)years[year]=(years[year]||0)+1});
-        const yearEntries=Object.entries(years).sort((a,b)=>a[0].localeCompare(b[0])).slice(-10),ym=Math.max(1,...yearEntries.map(x=>x[1]));
-        d.innerHTML=`<div class="flex flex-wrap justify-between gap-3 mb-6"><div><h1 class="text-2xl font-extrabold text-white">${hrText('لوحة تحليلات الموارد البشرية','HR Analytics Dashboard')}</h1><p class="text-xs text-slate-400">${hrText('إحصائيات مبنية على سجلات الموظفين الموجودة','Statistics based on existing employee records')}</p></div><span class="text-xs text-sky-300">Firebase · ${hrText('بيانات الموظفين','Employee data')}</span></div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">${hrCard(hrText('إجمالي الموظفين','Total employees'),String(allEmployees.length))}${hrCard(hrText('الإدارات المسجلة','Departments'),String(Object.keys(groups).length))}${hrCard(hrText('ملفات بها تاريخ تعيين','Records with hire date'),String(allEmployees.filter(e=>getHireDate(e)!=='--').length))}${hrCard(hrText('طلبات ESS','ESS requests'),hrText('غير مربوط','Not connected'),hrText('لا توجد بيانات طلبات متصلة بعد','Requests source not connected'))}</div>
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-5"><div class="glass-card rounded-2xl p-5"><h2 class="font-bold text-sky-200 mb-5">${hrText('توزيع الموظفين حسب الإدارة','Employees by department')}</h2><div class="space-y-4">${entries.map(([name,count])=>`<div><div class="flex justify-between text-xs mb-1 gap-2"><span class="truncate">${escapeHtml(name)}</span><span>${count}</span></div><div class="h-2 bg-slate-800 rounded-full overflow-hidden"><div class="h-full bg-sky-500 rounded-full" style="width:${count/max*100}%"></div></div></div>`).join('')||hrText('لا توجد بيانات','No data')}</div></div>
-        <div class="glass-card rounded-2xl p-5"><h2 class="font-bold text-sky-200 mb-5">${hrText('سنوات التعيين المسجلة','Hiring years')}</h2><div class="h-56 flex items-end gap-3 border-b border-slate-700 pb-1">${yearEntries.map(([year,count])=>`<div class="flex-1 min-w-0 flex flex-col items-center justify-end h-full gap-2"><span class="text-xs text-sky-300">${count}</span><div class="hr-chart-bar w-full" style="height:${count/ym*80}%"></div><span class="text-[10px] text-slate-400">${year}</span></div>`).join('')||hrText('لا توجد بيانات تواريخ تعيين','No hiring date data')}</div></div></div>
-        <div class="glass-card rounded-2xl p-5 mt-5 text-sm text-slate-400">${hrText('الحضور والانصراف والرواتب وخرائط GPS ستظهر بتحليلات فعلية بعد ربط مصدر ESS وجهاز البصمة. لا يتم اختلاق أرقام حضور أو غياب.','Attendance, payroll and GPS analytics will appear once ESS and biometric sources are connected. No attendance figures are fabricated.')}</div>`;
-    }
+    if(hrActivePage==='dashboard'){renderRichDashboard();}
     if(hrActivePage==='payroll'){
         const d=document.getElementById('hr-payroll-view');if(!d)return;
         const demo=allEmployees.slice(0,30).map((e,i)=>{const base=5500+(i%9)*850,allowance=500+(i%4)*250,deduction=(i%3)*175;return {e,base,allowance,deduction,net:base+allowance-deduction}});
@@ -701,3 +691,45 @@ function renderHRWorkspace(){
     }
 }
 document.addEventListener('DOMContentLoaded',()=>showHRPage('employees'));
+
+
+// Dashboard uses employee records only. Geographic dots are schematic, not official boundaries.
+const hrGovernorates=[
+ ['Cairo','القاهرة',30.044,31.236],['Giza','الجيزة',30.01,31.12],['Alexandria','الإسكندرية',31.20,29.92],['Qalyubia','القليوبية',30.33,31.22],['Sharqia','الشرقية',30.59,31.50],['Dakahlia','الدقهلية',31.05,31.38],['Gharbia','الغربية',30.87,31.03],['Monufia','المنوفية',30.60,30.98],['Beheira','البحيرة',30.85,30.34],['Kafr El Sheikh','كفر الشيخ',31.11,30.94],['Damietta','دمياط',31.42,31.81],['Port Said','بورسعيد',31.26,32.29],['Ismailia','الإسماعيلية',30.60,32.27],['Suez','السويس',29.97,32.55],['North Sinai','شمال سيناء',30.56,33.80],['South Sinai','جنوب سيناء',28.25,33.80],['Fayoum','الفيوم',29.31,30.84],['Beni Suef','بني سويف',29.07,31.10],['Minya','المنيا',28.10,30.75],['Assiut','أسيوط',27.18,31.18],['Sohag','سوهاج',26.56,31.69],['Qena','قنا',26.16,32.72],['Luxor','الأقصر',25.69,32.64],['Aswan','أسوان',24.09,32.90],['Red Sea','البحر الأحمر',26.75,33.94],['New Valley','الوادي الجديد',25.44,30.55],['Matrouh','مطروح',31.35,27.23]
+];
+function hrNormalize(s){return String(s||'').trim().toLowerCase().replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[\u064b-\u065f]/g,'').replace(/[_-]/g,' ').replace(/\s+/g,' ')}
+function hrGovIndex(value){const s=hrNormalize(value);if(!s)return -1;return hrGovernorates.findIndex(([en,ar])=>s===hrNormalize(en)||s===hrNormalize(ar)||s.includes(hrNormalize(ar))||s.includes(hrNormalize(en)))}
+function hrGeoField(emp){return getField(emp,'المحافظة','محافظة','محافظة السكن','محافظة الإقامة','محل الإقامة','العنوان','governorate','Governorate','governorate_name','province','city','residence','address')}
+function hrPercent(a,b){return b?Math.round(a/b*100):0}
+function hrStat(label,value,foot){return `<div class="hr-panel"><div class="hr-stat-label">${escapeHtml(label)}</div><div class="hr-stat-value">${escapeHtml(String(value))}</div><div class="text-xs text-slate-500 mt-2">${escapeHtml(foot||'')}</div></div>`}
+function hrPanel(title,content){return `<section class="hr-panel"><h2 class="font-bold text-sky-200 mb-5">${escapeHtml(title)}</h2>${content}</section>`}
+function hrBars(rows,total,maxItems=9){const top=rows.slice(0,maxItems);return top.map(([name,count])=>`<div class="mb-3"><div class="flex justify-between gap-3 text-xs mb-1"><span class="truncate">${escapeHtml(name)}</span><span class="text-sky-300">${count} · ${hrPercent(count,total)}%</span></div><div class="hr-mini-track"><div class="hr-mini-fill" style="width:${hrPercent(count,total)}%"></div></div></div>`).join('')||`<p class="text-slate-400 text-sm">${hrText('لا توجد بيانات متاحة','No available data')}</p>`}
+function renderRichDashboard(){
+ const d=document.getElementById('hr-dashboard-view');if(!d)return;
+ const total=allEmployees.length;
+ const aggregate=(fn)=>{const m=new Map();allEmployees.forEach(e=>{const v=String(fn(e)||'').trim();if(v&&v!=='--')m.set(v,(m.get(v)||0)+1)});return [...m].sort((a,b)=>b[1]-a[1])};
+ const depts=aggregate(getEmployeeDept),jobs=aggregate(getEmployeeJob);
+ const insured=allEmployees.filter(e=>/insured|مؤمن|مومن/i.test(String(getField(e,'insurance status ','insurance status','insuranceStatus','الحالة التأمينية','الحاله التامينيه')||''))).length;
+ const insuredKnown=allEmployees.filter(e=>String(getField(e,'insurance status ','insurance status','insuranceStatus','الحالة التأمينية','الحاله التامينيه')||'').trim()).length;
+ const qualification=aggregate(e=>getField(e,'qualification ','qualification','المؤهل','المؤهل العلمي'));
+ const hireYears=aggregate(e=>{const date=String(getHireDate(e)||'');return date.match(/(?:19|20)\d{2}/)?.[0]||''}).sort((a,b)=>a[0].localeCompare(b[0]));
+ const recentYear=new Date().getFullYear();const recentHires=hireYears.filter(([y])=>Number(y)>=recentYear-4).reduce((s,[,v])=>s+v,0);
+ const yearsService=allEmployees.map(e=>{const raw=getField(e,'years of service','years of service ','yearsService','سنوات الخدمة');const n=Number(raw);return raw!==''&&Number.isFinite(n)&&n>=0&&n<90?n:null}).filter(n=>n!==null);
+ const avgService=yearsService.length?(yearsService.reduce((a,b)=>a+b,0)/yearsService.length).toFixed(1):'—';
+ const counts=hrGovernorates.map(()=>0);let geoKnown=0,unmatched=0;
+ allEmployees.forEach(e=>{const v=hrGeoField(e);if(!v)return;geoKnown++;const idx=hrGovIndex(v);if(idx>=0)counts[idx]++;else unmatched++});
+ const mapped=counts.reduce((a,b)=>a+b,0),maxCount=Math.max(1,...counts);
+ // Stylized Egypt geographic schematic; not a cadastral or official governorate boundary map.
+ const coords=([, ,lat,lon])=>({x:55+(lon-25.5)*24,y:24+(32-lat)*30});
+ const outline='M 55 24 L 216 24 L 216 72 L 247 101 L 268 164 L 242 215 L 228 245 L 232 328 L 211 351 L 215 388 L 200 422 L 195 465 L 175 465 L 165 440 L 135 440 L 105 456 L 63 452 L 55 24 Z';
+ const dots=hrGovernorates.map((g,i)=>{const {x,y}=coords(g),count=counts[i];const label=currentLang==='ar'?g[1]:g[0];return `<g class="hr-map-dot" tabindex="0" role="img" aria-label="${escapeHtml(label+': '+count)}" data-geo-name="${escapeHtml(label)}" data-geo-count="${count}"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${count?7+7*count/maxCount:4}" fill="${count?'#38bdf8':'#334155'}" stroke="${count?'#bae6fd':'#475569'}" stroke-width="1.3" opacity="${count?'.95':'.8'}"/><title>${escapeHtml(label)}: ${count}</title></g>`}).join('');
+ const geoList=hrGovernorates.map((g,i)=>[currentLang==='ar'?g[1]:g[0],counts[i]]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
+ const yearMax=Math.max(1,...hireYears.map(x=>x[1]));
+ const yearsHtml=`<div class="flex items-end gap-2 h-48 border-b border-slate-700 pb-2">${hireYears.slice(-12).map(([y,c])=>`<div class="flex-1 min-w-0 flex flex-col justify-end items-center h-full gap-1"><span class="text-[10px] text-sky-200">${c}</span><div class="w-full rounded-t-md bg-gradient-to-t from-sky-800 to-cyan-300" style="height:${Math.max(5,c/yearMax*80)}%"></div><span class="text-[9px] text-slate-400">${escapeHtml(y.slice(2))}</span></div>`).join('')}</div>`;
+ d.innerHTML=`<div class="flex flex-wrap items-center justify-between gap-4 mb-6"><div><h1 class="text-3xl font-extrabold text-white">${hrText('مركز تحليلات الموارد البشرية','HR Intelligence Center')}</h1><p class="text-sm text-slate-400 mt-2">${hrText('مؤشرات فعلية من سجلات الموظفين المتاحة على Firebase','Live indicators from available Firebase employee records')}</p></div><span class="rounded-full border border-sky-400/30 px-4 py-2 text-xs text-sky-200">● Firebase · ${total} ${hrText('سجل','records')}</span></div>
+ <div class="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-4 mb-5">${hrStat(hrText('إجمالي الموظفين','Employees'),total,hrText('السجلات المحملة','Loaded records'))}${hrStat(hrText('الإدارات','Departments'),depts.length,hrText('إدارات مسجلة','Recorded departments'))}${hrStat(hrText('المسميات الوظيفية','Job titles'),jobs.length,hrText('وظائف مختلفة','Distinct roles'))}${hrStat(hrText('متوسط سنوات الخدمة','Average tenure'),avgService,hrText('حسب الحقول المتاحة','From available fields'))}${hrStat(hrText('تعيينات آخر 5 سنوات','Last 5 years hires'),recentHires,hrText('حسب تاريخ التعيين','By hire date'))}${hrStat(hrText('تغطية المحافظة','Location coverage'),hrPercent(mapped,total)+'%',hrText('محافظات أمكن تحديدها','Recognized governorates'))}</div>
+ <div class="grid grid-cols-1 xl:grid-cols-5 gap-5 mb-5"><div class="xl:col-span-3">${hrPanel(hrText('خريطة توزيع الموظفين على محافظات مصر','Egypt employee distribution'),`<div class="grid grid-cols-1 md:grid-cols-5 gap-4"><div class="md:col-span-3"><p class="text-xs text-slate-400 mb-2">${hrText('خريطة تخطيطية بنقاط تقريبية وليست حدودًا إدارية رسمية. مرر الماوس فوق النقاط.','Schematic map with approximate dots, not official boundaries. Hover over dots.')}</p><div class="relative max-w-[350px] mx-auto"><svg viewBox="0 0 325 485" class="w-full" aria-label="Egypt governorate markers"><path d="${outline}" fill="#102f4b" stroke="#38bdf8" stroke-width="2"/><path d="M 206 24 L 230 80 L 246 110 L 232 155 L 212 175 L 218 245" fill="none" stroke="#155e75" stroke-width="2"/>${dots}</svg><div id="hr-geo-tooltip" class="absolute bottom-2 inset-x-4 text-center bg-slate-950/90 border border-sky-400/40 rounded-lg p-2 text-sm text-sky-200">${hrText('مرر على المحافظة لمعرفة العدد','Hover a governorate to see its count')}</div></div></div><div class="md:col-span-2 text-sm"><p class="text-sky-300 mb-3">${hrText('المحافظات المسجلة','Recorded governorates')}: ${geoList.length}</p><div class="max-h-80 overflow-y-auto">${hrBars(geoList,mapped,27)}</div></div></div><p class="text-xs text-slate-400 mt-4">${hrText('البيانات الجغرافية المعروفة','Location values present')}: ${geoKnown} · ${hrText('المحددة على الخريطة','Mapped')}: ${mapped} · ${hrText('غير المطابقة','Unrecognized')}: ${unmatched} · ${hrText('بلا محافظة','No location')}: ${total-geoKnown}</p>`)}</div><div class="xl:col-span-2 flex flex-col gap-5">${hrPanel(hrText('توزيع الإدارات','Department distribution'),hrBars(depts,total,9))}${hrPanel(hrText('المؤهلات المسجلة','Recorded qualifications'),hrBars(qualification,total,6))}</div></div>
+ <div class="grid grid-cols-1 xl:grid-cols-3 gap-5 mb-5">${hrPanel(hrText('اتجاه التعيينات السنوية','Annual hiring trend'),yearsHtml)}${hrPanel(hrText('المسميات الوظيفية','Job titles'),hrBars(jobs,total,8))}${hrPanel(hrText('جودة بيانات الموظفين','Employee data coverage'),hrBars([[hrText('محافظة معروفة','Known governorate'),mapped],[hrText('سنوات خدمة','Years of service'),yearsService.length],[hrText('حالة تأمينية مسجلة','Insurance status recorded'),insuredKnown],[hrText('مؤهل مسجل','Qualification recorded'),qualification.reduce((s,x)=>s+x[1],0)]],total,5)+`<p class="text-xs text-slate-400 mt-3">${hrText('حالات مؤمن عليه ضمن السجلات المعروفة','Insured among known records')}: ${insured} / ${insuredKnown}</p>`)}</div>
+ <div class="hr-panel text-sm text-slate-400">${hrText('تنبيه: الخريطة تستخدم محافظة الإقامة إن وُجدت، ولا تستنتجها من مكان الميلاد. الحضور والمرتبات وطلبات ESS غير متصلة هنا بعد.','Note: Location is based on residence fields where available, never inferred from birthplace. ESS attendance, payroll and requests are not connected yet.')}</div>`;
+ d.querySelectorAll('.hr-map-dot').forEach(node=>{const update=()=>{const el=d.querySelector('#hr-geo-tooltip');if(el)el.textContent=node.dataset.geoName+' — '+node.dataset.geoCount+' '+hrText('موظف','employees')};node.addEventListener('mouseenter',update);node.addEventListener('focus',update)});
+}
