@@ -1,4 +1,4 @@
-// Lacto Misr HR Portal v6.3 - Analytics & Governorates & Clean Fields
+// Lacto Misr HR Portal v6.4 - Final Fix for Intro Screen & Analytics
 
 function excelDateToJSDate(serial) {
     if (!serial || typeof serial !== 'number') return serial || '--';
@@ -67,7 +67,7 @@ const translations = {
         login_title: "تسجيل الدخول", login_subtitle: "أدخل كود الموظف وكلمة المرور", code_placeholder: "كود الموظف", pass_placeholder: "كلمة المرور",
         remember_me: "تذكرني", forgot_pass: "نسيت كلمة المرور؟", login_btn: "دخول للنظام", logout_btn: "تسجيل الخروج",
         login_required: "يرجى إدخال كود الموظف وكلمة المرور", login_not_found: "كود الموظف غير مسجل!", login_wrong_pass: "كلمة المرور غير صحيحة!",
-        header_brand: "لاكتو مصر - شؤون العاملين", powered_by: "برمجة وتطوير إدارة الموارد البشرية", portal_version: "بورتال الموظفين v6.3 - برو"
+        header_brand: "لاكتو مصر - شؤون العاملين", powered_by: "برمجة وتطوير إدارة الموارد البشرية", portal_version: "بورتال الموظفين v6.4 - برو"
     },
     en: {
         admin: "System Admin", control_panel: "Control Room", nav_home: "Home & Employees", nav_analytics: "HR Analytics & Map",
@@ -82,7 +82,7 @@ const translations = {
         login_title: "Sign in", login_subtitle: "Enter employee code and password", code_placeholder: "Employee Code", pass_placeholder: "Password",
         remember_me: "Remember Me", forgot_pass: "Forgot password?", login_btn: "Sign in", logout_btn: "Sign out",
         login_required: "Please enter employee code and password", login_not_found: "Employee code not found!", login_wrong_pass: "Incorrect password!",
-        header_brand: "Lacto Misr HR", powered_by: "Powered by HR Department", portal_version: "Portal v6.3 - Pro Edition"
+        header_brand: "Lacto Misr HR", powered_by: "Powered by HR Department", portal_version: "Portal v6.4 - Pro Edition"
     }
 };
 
@@ -264,7 +264,6 @@ function backToEmployeesList() {
     document.getElementById('employees-list-view').classList.remove('hidden');
 }
 
-// دالة عرض الحقول الإضافية فقط (مع تصفية الحقول الأساسية تماماً لعدم إزعاج المستخدم)
 function renderDynamicFields() {
     const container = document.getElementById('dynamic-fields-container'); if (!container || activeEmployeeCode === null) return;
     const emp = allEmployees.find(e => String(getEmployeeCode(e)) === String(activeEmployeeCode)); if (!emp) return;
@@ -287,7 +286,6 @@ function renderDynamicFields() {
     }
 }
 
-// فتح دشبورد التحليلات والخريطة
 function openDashboardView() {
     document.getElementById('employees-list-view').classList.add('hidden');
     document.getElementById('employee-profile-view').classList.add('hidden');
@@ -296,12 +294,10 @@ function openDashboardView() {
     renderEgyptMap();
 }
 
-// رسم تحليل الأعمار
 function renderAgeChart() {
     const ctx = document.getElementById('ageChart')?.getContext('2d');
     if (!ctx) return;
     
-    // حساب الفئات العمرية من البيانات
     let brackets = { '< 30': 0, '30 - 40': 0, '41 - 50': 0, '50+': 0, 'غير محدد': 0 };
     allEmployees.forEach(emp => {
         const age = Number(getField(emp, 'السن حتى تاريخه ', 'السن حتى تاريخه', 'age'));
@@ -339,7 +335,6 @@ function renderAgeChart() {
     });
 }
 
-// خريطة محافظات مصر التفاعلية مع بيانات النقل الافتراضية
 function renderEgyptMap() {
     const container = document.getElementById('egypt-govs-grid');
     if (!container) return;
@@ -358,7 +353,6 @@ function renderEgyptMap() {
     ];
 
     governorates.forEach(gov => {
-        // حساب عدد الموظفين في المحافظة دي بناء على مكان الميلاد (pob)
         const count = allEmployees.filter(emp => {
             const pob = String(getField(emp, 'مكان الميلاد', 'pob')).toLowerCase();
             return pob.includes(gov.name.split(' ')[0].toLowerCase());
@@ -397,7 +391,6 @@ function showGovDetails(gov, empCount) {
 
 function closeGovModal() { document.getElementById('gov-details-modal')?.classList.add('hidden'); }
 
-// بقية الدوال الأساسية
 function updateDashboardStats() { const el = document.getElementById('total-employees-count'); if (el) el.innerText = allEmployees.length; }
 function confirmSave() { document.getElementById('confirm-modal')?.classList.remove('hidden'); }
 function closeConfirmModal() { document.getElementById('confirm-modal')?.classList.add('hidden'); }
@@ -478,9 +471,11 @@ async function handleLogin() {
     }
 }
 
+// هنا كانت المشكلة: تم إعادة استدعاء runPortalIntro وتشغيل جلب البيانات بانتظام
 window.addEventListener('DOMContentLoaded', async () => {
     setLanguage(currentLang);
-    // تسجيل دخول مباشر تجريبي أو بانتظار الباسورد
+    prepareRememberedLogin();
+    runPortalIntro(); // تشغيل الأنترو وسحب الشاشة السوداء تلقائياً
     portalInitialized = true;
     await loadEmployeesFromFirebase();
 });
