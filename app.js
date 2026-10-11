@@ -54,6 +54,7 @@ const db = firebase.database();
 let allEmployees = [];
 let currentLang = localStorage.getItem('lacto_lang') || 'ar';
 let activeEmployeeCode = null;
+let isProfileEditing = false;
 let currentUserData = null;
 let portalInitialized = false;
 
@@ -130,38 +131,11 @@ function getField(emp, ...keys) {
     return '';
 }
 function getEmployeeCode(emp) { return String(getField(emp, 'الكود', 'code', 'employeeCode', 'empCode', 'EmployeeCode', 'employee_code', 'ID', 'id') || '').trim(); }
-function normalizedKey(value) { return String(value ?? '').toLowerCase().replace(/[\s_\-:：]+/g, ''); }
-function getFieldFlexible(emp, keys) {
-    const direct = getField(emp, ...keys);
-    if (direct !== '') return direct;
-    if (!emp || typeof emp !== 'object') return '';
-    const wanted = new Set(keys.map(normalizedKey));
-    for (const [key, value] of Object.entries(emp)) {
-        if (wanted.has(normalizedKey(key)) && value !== undefined && value !== null && String(value).trim() !== '') return value;
-    }
-    return '';
-}
-function getEmployeeName(emp) {
-    const ar = getFieldFlexible(emp, ['اسم الموظف ', 'اسم الموظف', 'name_ar', 'name']);
-    const en = getFieldFlexible(emp, ['emp_name_en', 'emp_name _en', 'name_en', 'employee_name_en', 'employee name']);
-    return (currentLang === 'en' ? (en || ar) : (ar || en)) || '--';
-}
-function getEmployeeDept(emp) {
-    const ar = getFieldFlexible(emp, ['الإدارة ', 'الإدارة', 'department_ar', 'اسم الإدارة']);
-    const en = getFieldFlexible(emp, ['department', 'department_en', 'dept_en', 'department_name_en', 'dept', 'department name']);
-    return (currentLang === 'en' ? (en || ar) : (ar || en)) || '--';
-}
-function getEmployeeJob(emp) {
-    const ar = getFieldFlexible(emp, ['الوظيفة', 'الوظيفة ', 'المسمى الوظيفي', 'job_title_ar']);
-    const en = getFieldFlexible(emp, ['job_title', 'job title', 'job_title_en', 'jobTitle', 'job']);
-    return (currentLang === 'en' ? (en || ar) : (ar || en)) || '--';
-}
-function getHireDate(emp) { const v=getFieldFlexible(emp,['تاريخ التعيين ','تاريخ التعيين','hireDate','date_of_hiring','date of hiring']); return typeof v==='number'?excelDateToJSDate(v):v||'--'; }
-function localizedValue(emp, arKeys, enKeys) {
-    const ar = getFieldFlexible(emp, arKeys);
-    const en = getFieldFlexible(emp, enKeys);
-    return currentLang === 'en' ? (en || ar) : (ar || en);
-}
+function getEmployeeName(emp) { return getField(emp, 'اسم الموظف ', 'اسم الموظف', 'name', 'emp_name _en') || '--'; }
+function getEmployeeDept(emp) { return getField(emp, 'الإدارة ', 'الإدارة', 'department', 'dept') || '--'; }
+function getEmployeeJob(emp) { return getField(emp, 'الوظيفة', 'الوظيفة ', 'jobTitle', 'job title', 'job') || '--'; }
+function getHireDate(emp) { const v=getField(emp,'تاريخ التعيين ','تاريخ التعيين','hireDate','date_of_hiring '); return typeof v==='number'?excelDateToJSDate(v):v||'--'; }
+function localizedValue(emp, arKeys, enKeys) { return currentLang==='ar' ? getField(emp,...arKeys) : (getField(emp,...enKeys) || getField(emp,...arKeys)); }
 
 function existingKey(obj, keys, fallback) {
     for (const key of keys) if (Object.prototype.hasOwnProperty.call(obj || {}, key)) return key;
@@ -263,7 +237,7 @@ async function readEmployeeSources() {
     const addRecord = (key, data, path) => {
         if (!data || typeof data !== 'object' || Array.isArray(data)) return;
         const code = String(getField(data, 'الكود', 'code', 'employeeCode', 'empCode', 'EmployeeCode', 'employee_code', 'ID', 'id') || key || '').trim();
-        const name = getEmployeeName(data) || getField(data, 'اسم الموظف ', 'اسم الموظف', 'name', 'emp_name_en', 'emp_name _en', 'employeeName');
+        const name = getField(data, 'اسم الموظف ', 'اسم الموظف', 'name', 'emp_name _en', 'employeeName');
         // A real employee record should have a code or a recognizable employee name.
         if (!code || (!name && !getField(data, 'الإدارة', 'الإدارة ', 'department', 'الوظيفة', 'jobTitle', 'job title'))) return;
         const unique = code;
@@ -389,7 +363,7 @@ async function createFirstPassword() {
         updates[`users/${code}/password`] = pass;
         if (!userSnap.exists()) {
             updates[`users/${code}/code`] = code;
-            const name = getEmployeeName(employeeData) || getField(employeeData, 'اسم الموظف', 'اسم الموظف ', 'name', 'emp_name_en', 'emp_name _en');
+            const name = getField(employeeData, 'اسم الموظف', 'اسم الموظف ', 'name', 'emp_name _en');
             if (name) updates[`users/${code}/name`] = name;
             const email = getField(employeeData, 'email', 'Email', 'البريد الإلكتروني', 'البريد الالكتروني');
             if (email) updates[`users/${code}/email`] = email;
@@ -445,29 +419,17 @@ async function loadEmployeesFromFirebase() {
     const tableBody = document.getElementById('employees-table-body');
     if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">${tr('loading')}</td></tr>`;
     try {
-        const [employeesSnap, rootSnap] = await Promise.all([db.ref('employees').once('value'), db.ref('/').once('value')]);
-        const byCode = new Map();
-        const isEmployee = r => r && typeof r === 'object' && !Array.isArray(r) &&
-          !!getField(r,'الكود','code','employeeCode','employee_code','empCode','ID','id') &&
-          !!getField(r,'emp_name_en','emp_name _en','اسم الموظف','اسم الموظف ','name','department','الإدارة','job_title','job title','الوظيفة');
-        if (employeesSnap.exists()) Object.entries(employeesSnap.val() || {}).forEach(([key, r]) => {
-            if (!isEmployee(r)) return;
-            const code=String(getEmployeeCode(r)||key); byCode.set(code,{...r,code:getEmployeeCode(r)||code});
-        });
-        if (rootSnap.exists()) {
-            const root=rootSnap.val()||{};
-            const entries=Array.isArray(root)?root.map((r,i)=>[String(i),r]):Object.entries(root);
-            entries.forEach(([key,r])=>{
-                if(!isEmployee(r)) return;
-                const code=String(getEmployeeCode(r)||key), old=byCode.get(code)||{};
-                byCode.set(code,{...old,...r,code:getEmployeeCode(r)||old.code||code});
-            });
-        }
-        allEmployees=Array.from(byCode.values()); renderTable(allEmployees); updateDashboardStats();
-    } catch(error) {
-        console.error('Firebase employees load failed:',error);
-        const message=currentLang==='ar'?'تعذر تحميل بيانات الموظفين من Firebase. راجع قواعد قاعدة البيانات.':'Could not load employees from Firebase. Check Realtime Database rules.';
-        if(tableBody) tableBody.innerHTML=`<tr><td colspan="6" class="p-6 text-center text-red-300">${escapeHtml(message)}</td></tr>`;
+        allEmployees = await readEmployeeSources();
+        renderTable(allEmployees);
+        updateDashboardStats();
+        const status = document.getElementById('connection-status');
+        if (status) status.textContent = currentLang === 'ar'
+            ? `متصل بـ Firebase — ${allEmployees.length} موظف`
+            : `Connected to Firebase — ${allEmployees.length} employees`;
+    } catch (error) {
+        console.error('Firebase employee load failed:', error);
+        if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-300">${currentLang === 'ar' ? 'تعذر تحميل بيانات الموظفين. راجع Console وصلاحيات Firebase.' : 'Could not load employees. Check Console and Firebase rules.'}</td></tr>`;
+        showToast(currentLang === 'ar' ? 'تعذر تحميل بيانات الموظفين من Firebase' : 'Could not load employees from Firebase', true);
     }
 }
 
@@ -483,9 +445,9 @@ function renderTable(dataList) {
     if(!dataList.length){ tableBody.innerHTML=`<tr><td colspan="6" class="p-6 text-center text-slate-400">${tr('no_results')}</td></tr>`; return; }
     dataList.forEach(emp=>{
         const code=getEmployeeCode(emp)||'--';
-        const name=getEmployeeName(emp)||'--';
-        const dept=getEmployeeDept(emp)||'--';
-        const job=getEmployeeJob(emp)||'--';
+        const name=localizedValue(emp,['اسم الموظف ','اسم الموظف','name'],['emp_name _en','name'])||'--';
+        const dept=localizedValue(emp,['الإدارة ','الإدارة','department'],['department','dept'])||'--';
+        const job=localizedValue(emp,['الوظيفة','الوظيفة ','jobTitle'],['job title','jobTitle','job'])||'--';
         const hire=getHireDate(emp);
         const row=document.createElement('tr'); row.className='hover:bg-slate-800/40 transition text-slate-300';
         row.innerHTML=`<td class="p-3.5 font-mono text-sky-400">${escapeHtml(code)}</td><td class="p-3.5 font-semibold text-white">${escapeHtml(String(name).trim())}</td><td class="p-3.5">${escapeHtml(String(dept).trim())}</td><td class="p-3.5">${escapeHtml(String(job).trim())}</td><td class="p-3.5 font-mono text-xs">${escapeHtml(String(hire))}</td><td class="p-3.5 text-center"><button onclick="viewEmployee('${escapeAttr(code)}')" class="px-3.5 py-1.5 bg-sky-600/30 hover:bg-sky-600 text-sky-200 rounded-lg text-xs border border-sky-400/30 transition shadow-lg">${tr('action_btn')}</button></td>`;
@@ -504,25 +466,26 @@ function viewEmployee(code) {
     if (listView) { listView.classList.add('hidden'); listView.style.display='none'; }
     if (profileView) { profileView.classList.remove('hidden'); profileView.style.display='block'; }
     setFieldVal('prof-code',code);
-    setFieldVal('prof-name',getEmployeeName(emp)==='--'?'':getEmployeeName(emp));
-    setFieldVal('prof-dept',getEmployeeDept(emp)==='--'?'':getEmployeeDept(emp));
-    setFieldVal('prof-job',getEmployeeJob(emp)==='--'?'':getEmployeeJob(emp));
-    setFieldVal('prof-manager',localizedValue(emp,['المدير المباشر ','المدير المباشر','direct_manager_ar'],['direct manager','direct_manager','directManager','direct_manager_en']));
+    setFieldVal('prof-name',localizedValue(emp,['اسم الموظف ','اسم الموظف','name'],['emp_name _en','name']));
+    setFieldVal('prof-dept',localizedValue(emp,['الإدارة ','الإدارة','department'],['department','dept']));
+    setFieldVal('prof-job',localizedValue(emp,['الوظيفة','الوظيفة ','jobTitle'],['job title','jobTitle','job']));
+    setFieldVal('prof-manager',localizedValue(emp,['المدير المباشر ','المدير المباشر','directManager'],['direct manager','directManager']));
     setFieldVal('prof-hire',getHireDate(emp));
-    setFieldVal('prof-service',localizedValue(emp,['سنوات الخدمة ','سنوات الخدمة','years_service_ar'],['years of service','years_of_service','yearsService']));
-    setFieldVal('prof-qual',localizedValue(emp,['المؤهل','المؤهل '],['qualification','qualification_en']));
-    setFieldVal('prof-qual-auth',localizedValue(emp,['جهة المؤهل ','جهة المؤهل','جهة إصدار المؤهل'],['qualification issuing authority','qualification_issuing_authority','qulification issuing authority','qualAuth','issuer']));
-    { const dob=localizedValue(emp,['تاريخ الميلاد','تاريخ الميلاد '],['dob','date_of_birth']); setFieldVal('prof-dob',typeof dob==='number'?excelDateToJSDate(dob):dob); }
-    setFieldVal('prof-age',localizedValue(emp,['السن حتى تاريخه ','السن حتى تاريخه'],['age to date','age_to_date','age']));
-    setFieldVal('prof-insurance',localizedValue(emp,['الحالة التأمينية ','الحالة التأمينية'],['insurance status','insurance_status','insuranceStatus']));
-    setFieldVal('prof-pob',localizedValue(emp,['مكان الميلاد','مكان الميلاد ','محل الميلاد','محل الميلاد '],['place of birth','place_of_birth','pob','pob_en']));
+    setFieldVal('prof-service',getField(emp,'سنوات الخدمة ','سنوات الخدمة','yearsService','years service'));
+    setFieldVal('prof-qual',localizedValue(emp,['المؤهل','qualification'],['qualification']));
+    setFieldVal('prof-qual-auth',localizedValue(emp,['جهة المؤهل ','جهة المؤهل','qualAuth'],['qulification issuing authority','qualAuth','issuer']));
+    setFieldVal('prof-dob',excelDateToJSDate(getField(emp,'تاريخ الميلاد','dob')));
+    setFieldVal('prof-age',getField(emp,'السن حتى تاريخه ','السن حتى تاريخه','age','age to date'));
+    setFieldVal('prof-insurance',localizedValue(emp,['الحالة التأمينية ','الحالة التأمينية','insuranceStatus'],['insurance status','insuranceStatus']));
+    setFieldVal('prof-pob',localizedValue(emp,['مكان الميلاد','pob'],['pob']));
     document.getElementById('profile-img').src=getField(emp,'photoUrl','photo','رابط الصورة') || 'default-avatar.png';
+    isProfileEditing = false;
     document.getElementById('btn-save')?.classList.add('hidden'); document.getElementById('btn-edit')?.classList.remove('hidden'); document.getElementById('btn-photo')?.classList.add('hidden');
     setFieldsEditable(true); renderDynamicFields();
 }
 function setFieldVal(id,val){const el=document.getElementById(id);if(el)el.value=val??'';}
-function enableEditing(){setFieldsEditable(false);document.getElementById('btn-edit')?.classList.add('hidden');document.getElementById('btn-save')?.classList.remove('hidden');document.getElementById('btn-photo')?.classList.remove('hidden');}
-function setFieldsEditable(isDisabled){['prof-name','prof-dept','prof-job','prof-manager','prof-hire','prof-service','prof-qual','prof-qual-auth','prof-dob','prof-age','prof-insurance','prof-pob'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.disabled=isDisabled;el.classList.toggle('bg-slate-900/50',isDisabled);el.classList.toggle('border-slate-700',isDisabled);el.classList.toggle('bg-slate-900/90',!isDisabled);el.classList.toggle('border-sky-500/50',!isDisabled);});}
+function enableEditing(){isProfileEditing=true;setFieldsEditable(false);document.getElementById('btn-edit')?.classList.add('hidden');document.getElementById('btn-save')?.classList.remove('hidden');document.getElementById('btn-photo')?.classList.remove('hidden');}
+function setFieldsEditable(isDisabled){isProfileEditing=!isDisabled;['prof-name','prof-dept','prof-job','prof-manager','prof-hire','prof-service','prof-qual','prof-qual-auth','prof-dob','prof-age','prof-insurance','prof-pob'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.disabled=isDisabled;el.classList.toggle('bg-slate-900/50',isDisabled);el.classList.toggle('border-slate-700',isDisabled);el.classList.toggle('bg-slate-900/90',!isDisabled);el.classList.toggle('border-sky-500/50',!isDisabled);});document.querySelectorAll('#dynamic-fields-container [data-firebase-key]').forEach(input=>{input.disabled=isDisabled;input.classList.toggle('border-sky-500/50',!isDisabled);});}
 function backToEmployeesList(){activeEmployeeCode=null;const profile=document.getElementById('employee-profile-view');const list=document.getElementById('employees-list-view');if(profile){profile.classList.add('hidden');profile.style.display='none';}if(list){list.classList.remove('hidden');list.style.display='block';}}
 
 function renderDynamicFields(){
@@ -531,13 +494,11 @@ function renderDynamicFields(){
     container.innerHTML='';
     Object.keys(emp).sort().forEach(key=>{
         if(['code','_firebasePath','_firebaseKey'].includes(key) || ['الكود'].includes(key)) return;
-        if (isOppositeLanguageKey(key)) return;
         const value=emp[key];
         if(value && typeof value==='object') return;
         const card=document.createElement('div'); card.className='dynamic-field-card';
         const inputType=/date|dob|تاريخ/i.test(key)?'date':'text';
-        const displayValue = typeof value === 'number' && /date|dob|تاريخ/i.test(key) ? excelDateToJSDate(value) : value;
-        card.innerHTML=`<div class="flex items-center justify-between gap-2 mb-1"><label class="text-xs text-slate-400">${escapeHtml(displayKey(key))}</label><span class="firebase-key-badge">${escapeHtml(key)}</span></div><input data-firebase-key="${escapeAttr(key)}" type="${inputType}" value="${escapeHtml(displayValue??'')}" ${key==='password'?'autocomplete="new-password"':''} class="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm" disabled>`;
+        card.innerHTML=`<div class="flex items-center justify-between gap-2 mb-1"><label class="text-xs text-slate-400">${escapeHtml(displayKey(key))}</label><span class="firebase-key-badge">${escapeHtml(key)}</span></div><input data-firebase-key="${escapeAttr(key)}" type="${inputType}" value="${escapeHtml(value??'')}" ${key==='password'?'autocomplete="new-password"':''} class="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm" ${isProfileEditing?'':'disabled'}>`;
         container.appendChild(card);
     });
 }
@@ -546,33 +507,102 @@ function confirmSave(){const modal=document.getElementById('confirm-modal');if(m
 function closeConfirmModal(){document.getElementById('confirm-modal')?.classList.add('hidden');}
 
 async function executeSave(){
-    closeConfirmModal(); if(activeEmployeeCode===null)return;
-    const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(activeEmployeeCode)); if(!emp)return;
-    const updatedData={};
-    putMapped(updatedData, emp, ['الكود','code','employeeCode','empCode'], activeEmployeeCode, 'code');
-    setLocalizedMapped(updatedData, emp, ['اسم الموظف ','اسم الموظف','name_ar'], ['emp_name_en','emp_name _en','name_en'], document.getElementById('prof-name').value, currentLang==='ar'?'اسم الموظف':'emp_name_en');
-    setLocalizedMapped(updatedData, emp, ['الإدارة ','الإدارة','department_ar'], ['department','department_en','dept_en'], document.getElementById('prof-dept').value, currentLang==='ar'?'الإدارة':'department');
-    setLocalizedMapped(updatedData, emp, ['الوظيفة','الوظيفة ','job_title_ar'], ['job_title','job title','jobTitle','job_en'], document.getElementById('prof-job').value, currentLang==='ar'?'الوظيفة':'job_title');
-    setLocalizedMapped(updatedData, emp, ['المدير المباشر ','المدير المباشر','direct_manager_ar'], ['direct manager','direct_manager','directManager','direct_manager_en'], document.getElementById('prof-manager').value, currentLang==='ar'?'المدير المباشر':'direct manager');
-    setLocalizedMapped(updatedData, emp, ['تاريخ التعيين ','تاريخ التعيين','hire_date_ar'], ['date_of_hiring','date_of_hiring ','hireDate','hire_date'], document.getElementById('prof-hire').value, currentLang==='ar'?'تاريخ التعيين':'date_of_hiring');
-    setLocalizedMapped(updatedData, emp, ['سنوات الخدمة ','سنوات الخدمة','years_service_ar'], ['years of service','years_of_service','yearsService'], document.getElementById('prof-service').value, currentLang==='ar'?'سنوات الخدمة':'years of service');
-    setLocalizedMapped(updatedData, emp, ['المؤهل','المؤهل '], ['qualification','qualification_en'], document.getElementById('prof-qual').value, currentLang==='ar'?'المؤهل':'qualification');
-    setLocalizedMapped(updatedData, emp, ['جهة المؤهل ','جهة المؤهل','جهة إصدار المؤهل'], ['qualification issuing authority','qualification_issuing_authority','qulification issuing authority','qualAuth','issuer'], document.getElementById('prof-qual-auth').value, currentLang==='ar'?'جهة المؤهل':'qualification issuing authority');
-    setLocalizedMapped(updatedData, emp, ['تاريخ الميلاد','تاريخ الميلاد '], ['dob','date_of_birth'], document.getElementById('prof-dob').value, currentLang==='ar'?'تاريخ الميلاد':'dob');
-    setLocalizedMapped(updatedData, emp, ['السن حتى تاريخه ','السن حتى تاريخه'], ['age to date','age_to_date','age'], document.getElementById('prof-age').value, currentLang==='ar'?'السن حتى تاريخه':'age');
-    setLocalizedMapped(updatedData, emp, ['الحالة التأمينية ','الحالة التأمينية'], ['insurance status','insurance_status','insuranceStatus'], document.getElementById('prof-insurance').value, currentLang==='ar'?'الحالة التأمينية':'insurance status');
-    setLocalizedMapped(updatedData, emp, ['مكان الميلاد','مكان الميلاد ','محل الميلاد','محل الميلاد '], ['place of birth','place_of_birth','pob','pob_en'], document.getElementById('prof-pob').value, currentLang==='ar'?'مكان الميلاد':'place of birth');
-    putMapped(updatedData, emp, ['photoUrl','photo','رابط الصورة'], document.getElementById('profile-img').src, 'photoUrl');
-    document.querySelectorAll('#dynamic-fields-container [data-firebase-key]').forEach(input=>{
-        const key=input.getAttribute('data-firebase-key'); if(isValidFirebaseKey(key)) updatedData[key]=input.value;
-    });
-    try{
-        const savePath = emp._firebasePath || `employees/${activeEmployeeCode}`;
-        await db.ref(savePath).update(updatedData);
-        Object.assign(emp,updatedData); showToast(); setFieldsEditable(true); document.getElementById('btn-save')?.classList.add('hidden'); document.getElementById('btn-edit')?.classList.remove('hidden'); document.getElementById('btn-photo')?.classList.add('hidden'); renderTable(allEmployees); renderDynamicFields();
-    }catch(error){console.error(error);showToast(currentLang==='ar'?'حدث خطأ أثناء الحفظ':'Save error',true);}
-}
+    const yesButton = document.querySelector('#confirm-modal button[onclick="executeSave()"]');
+    const originalButtonText = yesButton?.innerText || '';
+    if (yesButton) { yesButton.disabled = true; yesButton.innerText = currentLang === 'ar' ? 'جاري الحفظ...' : 'Saving...'; }
+    try {
+        if (activeEmployeeCode === null || activeEmployeeCode === undefined || String(activeEmployeeCode).trim() === '') {
+            showToast(currentLang === 'ar' ? 'تعذر الحفظ: لم يتم تحديد كود الموظف.' : 'Save failed: no employee code is selected.', true);
+            return;
+        }
 
+        // Re-read Firebase immediately before saving so we use the real current database path,
+        // including root-level numeric records such as /0, /1, etc.
+        const freshRecord = await findEmployeeRecord(activeEmployeeCode);
+        const emp = allEmployees.find(e => String(getEmployeeCode(e)).trim() === String(activeEmployeeCode).trim());
+        if (!freshRecord || !freshRecord.path) {
+            showToast(currentLang === 'ar' ? `تعذر الحفظ: لم يتم العثور على سجل الموظف ${activeEmployeeCode} داخل Firebase.` : `Save failed: employee ${activeEmployeeCode} was not found in Firebase.`, true);
+            return;
+        }
+
+        const source = freshRecord.data || emp || {};
+        const updatedData = {};
+        const mappedGroups = [
+            { ids:['prof-name'], ar:['اسم الموظف ','اسم الموظف'], en:['emp_name _en','emp_name_en','employeeName','name'], fallback:'name' },
+            { ids:['prof-dept'], ar:['الإدارة ','الإدارة'], en:['department','dept'], fallback:'department' },
+            { ids:['prof-job'], ar:['الوظيفة','الوظيفة '], en:['job title','jobTitle','job'], fallback:'jobTitle' },
+            { ids:['prof-manager'], ar:['المدير المباشر ','المدير المباشر'], en:['direct manager','directManager'], fallback:'directManager' },
+            { ids:['prof-hire'], ar:['تاريخ التعيين ','تاريخ التعيين'], en:['date_of_hiring ','date_of_hiring','hireDate'], fallback:'hireDate' },
+            { ids:['prof-service'], ar:['سنوات الخدمة ','سنوات الخدمة'], en:['years of service','yearsService','years service'], fallback:'yearsService' },
+            { ids:['prof-qual'], ar:['المؤهل'], en:['qualification'], fallback:'qualification' },
+            { ids:['prof-qual-auth'], ar:['جهة المؤهل ','جهة المؤهل'], en:['qualification issuing authority','qulification issuing authority','qualAuth','issuer'], fallback:'qualAuth' },
+            { ids:['prof-dob'], ar:['تاريخ الميلاد'], en:['dob','date of birth'], fallback:'dob' },
+            { ids:['prof-age'], ar:['السن حتى تاريخه ','السن حتى تاريخه'], en:['age to date','age'], fallback:'age' },
+            { ids:['prof-insurance'], ar:['الحالة التأمينية ','الحالة التأمينية'], en:['insurance status','insuranceStatus'], fallback:'insuranceStatus' },
+            { ids:['prof-pob'], ar:['مكان الميلاد'], en:['pob','place of birth'], fallback:'pob' }
+        ];
+        const mappedKeys = new Set();
+        for (const group of mappedGroups) {
+            const input = document.getElementById(group.ids[0]);
+            if (!input) continue;
+            const preferredKeys = currentLang === 'ar' ? [...group.ar, ...group.en] : [...group.en, ...group.ar];
+            const targetKey = existingKey(source, preferredKeys, currentLang === 'ar' ? (group.ar[0] || group.fallback) : (group.en[0] || group.fallback));
+            updatedData[targetKey] = input.value;
+            [...group.ar, ...group.en].forEach(k => mappedKeys.add(k));
+        }
+        // Preserve the existing employee code field and never rewrite the record's key.
+        const codeField = ['الكود','code','employeeCode','empCode','EmployeeCode','employee_code','ID','id'].find(k => Object.prototype.hasOwnProperty.call(source,k));
+        if (codeField) updatedData[codeField] = source[codeField];
+
+        const photo = document.getElementById('profile-img');
+        if (photo && photo.src && !photo.src.endsWith('/default-avatar.png')) {
+            const photoKey = existingKey(source, ['photoUrl','photo','رابط الصورة'], 'photoUrl');
+            updatedData[photoKey] = photo.src;
+        }
+
+        // IMPORTANT: do not let hidden/old duplicate fields overwrite values from the profile form.
+        document.querySelectorAll('#dynamic-fields-container [data-firebase-key]').forEach(input => {
+            const key = input.getAttribute('data-firebase-key');
+            if (!isValidFirebaseKey(key) || mappedKeys.has(key) || ['code','_firebasePath','_firebaseKey','الكود'].includes(key)) return;
+            if (!input.disabled) updatedData[key] = input.value;
+        });
+
+        const saveRef = db.ref(freshRecord.path);
+        await saveRef.update(updatedData);
+        // Confirm the write actually reached Firebase before reporting success.
+        const verifySnap = await saveRef.once('value');
+        if (!verifySnap.exists()) throw new Error(`Firebase verification failed: record missing at ${freshRecord.path}`);
+        const savedRecord = verifySnap.val() || {};
+        for (const [key, value] of Object.entries(updatedData)) {
+            if (String(savedRecord[key] ?? '') !== String(value ?? '')) {
+                throw new Error(`Firebase verification mismatch for field "${key}" at ${freshRecord.path}`);
+            }
+        }
+
+        // Update local cache using the same database path, then refresh the list/profile.
+        if (emp) Object.assign(emp, savedRecord, { _firebasePath: freshRecord.path, _firebaseKey: freshRecord.key });
+        else {
+            const refreshed = await readEmployeeSources();
+            allEmployees = refreshed;
+        }
+        closeConfirmModal();
+        showToast(tr('toast_success'));
+        setFieldsEditable(true);
+        document.getElementById('btn-save')?.classList.add('hidden');
+        document.getElementById('btn-edit')?.classList.remove('hidden');
+        document.getElementById('btn-photo')?.classList.add('hidden');
+        renderTable(allEmployees);
+        renderDynamicFields();
+    } catch (error) {
+        console.error('Employee profile save failed:', error);
+        const detail = error?.code === 'PERMISSION_DENIED'
+            ? (currentLang === 'ar' ? 'صلاحيات الكتابة مرفوضة في Firebase Realtime Database.' : 'Firebase Realtime Database denied write permission.')
+            : (error?.message || (currentLang === 'ar' ? 'خطأ غير معروف.' : 'Unknown error.'));
+        showToast((currentLang === 'ar' ? 'فشل الحفظ: ' : 'Save failed: ') + detail, true);
+    } finally {
+        if (yesButton) { yesButton.disabled = false; yesButton.innerText = originalButtonText; }
+    }
+}
 function uploadEmployeePhoto(event){const file=event.target.files?.[0];if(!file||activeEmployeeCode===null)return;const reader=new FileReader();reader.onload=async e=>{const base64=e.target.result;document.getElementById('profile-img').src=base64;try{const emp=allEmployees.find(x=>String(getEmployeeCode(x))===String(activeEmployeeCode));const savePath=emp?emp._firebasePath:`employees/${activeEmployeeCode}`;await db.ref(savePath).update({photoUrl:base64});if(emp)emp.photoUrl=base64;showToast();}catch(err){console.error(err);}};reader.readAsDataURL(file);}
 
 function showToast(message=null,isError=false){const toast=document.getElementById('toast-notification');const msg=document.getElementById('toast-message');if(!toast||!msg)return;msg.innerText=message||tr('toast_success');msg.classList.toggle('text-red-300',isError);msg.classList.toggle('text-white',!isError);toast.classList.remove('translate-y-32','opacity-0');setTimeout(()=>toast.classList.add('translate-y-32','opacity-0'),3200);}
