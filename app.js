@@ -130,42 +130,37 @@ function getField(emp, ...keys) {
     return '';
 }
 function getEmployeeCode(emp) { return String(getField(emp, 'الكود', 'code', 'employeeCode', 'empCode', 'EmployeeCode', 'employee_code', 'ID', 'id') || '').trim(); }
-function getEmployeeName(emp) { return localizedValue(emp, ['اسم الموظف ', 'اسم الموظف', 'name_ar'], ['emp_name_en', 'emp_name _en', 'name_en', 'employee_name_en']) || '--'; }
-function getEmployeeDept(emp) { return localizedValue(emp, ['الإدارة ', 'الإدارة', 'department_ar'], ['department', 'department_en', 'dept_en']) || '--'; }
-function getEmployeeJob(emp) { return localizedValue(emp, ['الوظيفة', 'الوظيفة ', 'job_title_ar'], ['job_title', 'job title', 'jobTitle', 'job_en']) || '--'; }
-function getHireDate(emp) { const v=localizedValue(emp,['تاريخ التعيين ','تاريخ التعيين','hire_date_ar'],['date_of_hiring','date_of_hiring ','hireDate','hire_date']); return typeof v==='number'?excelDateToJSDate(v):v||'--'; }
-// Prefer the selected language's Firebase field. Do not silently display Arabic values in English mode.
+function normalizedKey(value) { return String(value ?? '').toLowerCase().replace(/[\s_\-:：]+/g, ''); }
+function getFieldFlexible(emp, keys) {
+    const direct = getField(emp, ...keys);
+    if (direct !== '') return direct;
+    if (!emp || typeof emp !== 'object') return '';
+    const wanted = new Set(keys.map(normalizedKey));
+    for (const [key, value] of Object.entries(emp)) {
+        if (wanted.has(normalizedKey(key)) && value !== undefined && value !== null && String(value).trim() !== '') return value;
+    }
+    return '';
+}
+function getEmployeeName(emp) {
+    const ar = getFieldFlexible(emp, ['اسم الموظف ', 'اسم الموظف', 'name_ar', 'name']);
+    const en = getFieldFlexible(emp, ['emp_name_en', 'emp_name _en', 'name_en', 'employee_name_en', 'employee name']);
+    return (currentLang === 'en' ? (en || ar) : (ar || en)) || '--';
+}
+function getEmployeeDept(emp) {
+    const ar = getFieldFlexible(emp, ['الإدارة ', 'الإدارة', 'department_ar', 'اسم الإدارة']);
+    const en = getFieldFlexible(emp, ['department', 'department_en', 'dept_en', 'department_name_en', 'dept', 'department name']);
+    return (currentLang === 'en' ? (en || ar) : (ar || en)) || '--';
+}
+function getEmployeeJob(emp) {
+    const ar = getFieldFlexible(emp, ['الوظيفة', 'الوظيفة ', 'المسمى الوظيفي', 'job_title_ar']);
+    const en = getFieldFlexible(emp, ['job_title', 'job title', 'job_title_en', 'jobTitle', 'job']);
+    return (currentLang === 'en' ? (en || ar) : (ar || en)) || '--';
+}
+function getHireDate(emp) { const v=getFieldFlexible(emp,['تاريخ التعيين ','تاريخ التعيين','hireDate','date_of_hiring','date of hiring']); return typeof v==='number'?excelDateToJSDate(v):v||'--'; }
 function localizedValue(emp, arKeys, enKeys) {
-    if (currentLang === 'ar') return getField(emp, ...arKeys) || getField(emp, ...enKeys);
-    return getField(emp, ...enKeys) || '';
-}
-
-const bilingualFieldGroups = [
-    { ar:['اسم الموظف ','اسم الموظف','name_ar'], en:['emp_name_en','emp_name _en','name_en','employee_name_en'] },
-    { ar:['الإدارة ','الإدارة','department_ar'], en:['department','department_en','dept_en'] },
-    { ar:['الوظيفة','الوظيفة ','job_title_ar'], en:['job_title','job title','jobTitle','job_en'] },
-    { ar:['المدير المباشر ','المدير المباشر','direct_manager_ar'], en:['direct manager','direct_manager','directManager','direct_manager_en'] },
-    { ar:['تاريخ التعيين ','تاريخ التعيين','hire_date_ar'], en:['date_of_hiring','date_of_hiring ','hireDate','hire_date'] },
-    { ar:['سنوات الخدمة ','سنوات الخدمة','years_service_ar'], en:['years of service','years_of_service','yearsService'] },
-    { ar:['المؤهل','المؤهل '], en:['qualification','qualification_en'] },
-    { ar:['جهة المؤهل ','جهة المؤهل','جهة إصدار المؤهل'], en:['qualification issuing authority','qualification_issuing_authority','qulification issuing authority','qualAuth','issuer'] },
-    { ar:['تاريخ الميلاد','تاريخ الميلاد '], en:['dob','date_of_birth'] },
-    { ar:['السن حتى تاريخه ','السن حتى تاريخه'], en:['age to date','age_to_date','age'] },
-    { ar:['الحالة التأمينية ','الحالة التأمينية'], en:['insurance status','insurance_status','insuranceStatus'] },
-    { ar:['مكان الميلاد','مكان الميلاد ','محل الميلاد','محل الميلاد '], en:['place of birth','place_of_birth','pob','pob_en'] }
-];
-function isOppositeLanguageKey(key) {
-    const list = currentLang === 'en' ? bilingualFieldGroups.flatMap(g => g.ar) : bilingualFieldGroups.flatMap(g => g.en);
-    return list.includes(key);
-}
-function localizedGroupForKey(key) {
-    return bilingualFieldGroups.find(g => g.ar.includes(key) || g.en.includes(key));
-}
-function setLocalizedMapped(target, source, arKeys, enKeys, value, fallback) {
-    // Update only the selected language's field; never overwrite the other language's value.
-    const preferred = currentLang === 'ar' ? arKeys : enKeys;
-    const key = existingKey(source, preferred, fallback || preferred[0]);
-    target[key] = value;
+    const ar = getFieldFlexible(emp, arKeys);
+    const en = getFieldFlexible(emp, enKeys);
+    return currentLang === 'en' ? (en || ar) : (ar || en);
 }
 
 function existingKey(obj, keys, fallback) {
@@ -450,17 +445,29 @@ async function loadEmployeesFromFirebase() {
     const tableBody = document.getElementById('employees-table-body');
     if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">${tr('loading')}</td></tr>`;
     try {
-        allEmployees = await readEmployeeSources();
-        renderTable(allEmployees);
-        updateDashboardStats();
-        const status = document.getElementById('connection-status');
-        if (status) status.textContent = currentLang === 'ar'
-            ? `متصل بـ Firebase — ${allEmployees.length} موظف`
-            : `Connected to Firebase — ${allEmployees.length} employees`;
-    } catch (error) {
-        console.error('Firebase employee load failed:', error);
-        if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-300">${currentLang === 'ar' ? 'تعذر تحميل بيانات الموظفين. راجع Console وصلاحيات Firebase.' : 'Could not load employees. Check Console and Firebase rules.'}</td></tr>`;
-        showToast(currentLang === 'ar' ? 'تعذر تحميل بيانات الموظفين من Firebase' : 'Could not load employees from Firebase', true);
+        const [employeesSnap, rootSnap] = await Promise.all([db.ref('employees').once('value'), db.ref('/').once('value')]);
+        const byCode = new Map();
+        const isEmployee = r => r && typeof r === 'object' && !Array.isArray(r) &&
+          !!getField(r,'الكود','code','employeeCode','employee_code','empCode','ID','id') &&
+          !!getField(r,'emp_name_en','emp_name _en','اسم الموظف','اسم الموظف ','name','department','الإدارة','job_title','job title','الوظيفة');
+        if (employeesSnap.exists()) Object.entries(employeesSnap.val() || {}).forEach(([key, r]) => {
+            if (!isEmployee(r)) return;
+            const code=String(getEmployeeCode(r)||key); byCode.set(code,{...r,code:getEmployeeCode(r)||code});
+        });
+        if (rootSnap.exists()) {
+            const root=rootSnap.val()||{};
+            const entries=Array.isArray(root)?root.map((r,i)=>[String(i),r]):Object.entries(root);
+            entries.forEach(([key,r])=>{
+                if(!isEmployee(r)) return;
+                const code=String(getEmployeeCode(r)||key), old=byCode.get(code)||{};
+                byCode.set(code,{...old,...r,code:getEmployeeCode(r)||old.code||code});
+            });
+        }
+        allEmployees=Array.from(byCode.values()); renderTable(allEmployees); updateDashboardStats();
+    } catch(error) {
+        console.error('Firebase employees load failed:',error);
+        const message=currentLang==='ar'?'تعذر تحميل بيانات الموظفين من Firebase. راجع قواعد قاعدة البيانات.':'Could not load employees from Firebase. Check Realtime Database rules.';
+        if(tableBody) tableBody.innerHTML=`<tr><td colspan="6" class="p-6 text-center text-red-300">${escapeHtml(message)}</td></tr>`;
     }
 }
 
