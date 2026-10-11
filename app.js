@@ -226,7 +226,7 @@ function setLanguage(lang) {
     renderTable(allEmployees);
     if (activeEmployeeCode !== null) viewEmployee(activeEmployeeCode);
     if (document.getElementById('add-employee-modal') && !document.getElementById('add-employee-modal').classList.contains('hidden')) buildAddEmployeeForm();
-    if (document.getElementById('dynamic-fields-container') && activeEmployeeCode !== null) renderDynamicFields();
+
 }
 
 function showLoginMessage(message, type='error') {
@@ -485,7 +485,7 @@ function viewEmployee(code) {
     setFieldVal('prof-pob', currentLang === 'ar' ? (getField(emp, 'مكان الميلاد', 'pob') || '--') : (getField(emp, 'pob') || '--'));
     document.getElementById('profile-img').src=getField(emp,'photoUrl','photo','رابط الصورة') || 'default-avatar.png';
     document.getElementById('btn-save')?.classList.add('hidden'); document.getElementById('btn-edit')?.classList.remove('hidden'); document.getElementById('btn-photo')?.classList.add('hidden');
-    setFieldsEditable(true); renderDynamicFields();
+    setFieldsEditable(true);
 }
 function setFieldVal(id,val){const el=document.getElementById(id);if(el)el.value=val??'';}
 function enableEditing(){setFieldsEditable(false);document.getElementById('btn-edit')?.classList.add('hidden');document.getElementById('btn-save')?.classList.remove('hidden');document.getElementById('btn-photo')?.classList.remove('hidden');}
@@ -534,7 +534,7 @@ async function executeSave(){
     try{
         const savePath = emp._firebasePath || `employees/${activeEmployeeCode}`;
         await db.ref(savePath).update(updatedData);
-        Object.assign(emp,updatedData); showToast(); setFieldsEditable(true); document.getElementById('btn-save')?.classList.add('hidden'); document.getElementById('btn-edit')?.classList.remove('hidden'); document.getElementById('btn-photo')?.classList.add('hidden'); renderTable(allEmployees); renderDynamicFields();
+        Object.assign(emp,updatedData); showToast(); setFieldsEditable(true); document.getElementById('btn-save')?.classList.add('hidden'); document.getElementById('btn-edit')?.classList.remove('hidden'); document.getElementById('btn-photo')?.classList.add('hidden'); renderTable(allEmployees);
     }catch(error){showToast(tr('login_error'),true);}
 }
 
@@ -657,3 +657,52 @@ window.addEventListener('DOMContentLoaded',async()=>{
     prepareRememberedLogin();
     runPortalIntro();
 });
+
+
+// HR workspace: presentation-only demo data until ESS integration is configured.
+let hrActivePage='employees';
+const hrText=(ar,en)=>currentLang==='ar'?ar:en;
+function showHRPage(page){
+    if(!['dashboard','employees','payroll','notifications'].includes(page))return;
+    hrActivePage=page;
+    ['dashboard','payroll','notifications'].forEach(p=>document.getElementById('hr-'+p+'-view')?.classList.toggle('hidden',p!==page));
+    const list=document.getElementById('employees-list-view'),profile=document.getElementById('employee-profile-view');
+    if(page==='employees'){if(activeEmployeeCode!==null){if(profile){profile.classList.remove('hidden');profile.style.display='block';}if(list){list.classList.add('hidden');list.style.display='none';}}else{if(list){list.classList.remove('hidden');list.style.display='block';}if(profile){profile.classList.add('hidden');profile.style.display='none';}}}
+    else {if(list){list.classList.add('hidden');list.style.display='none';}if(profile){profile.classList.add('hidden');profile.style.display='none';}}
+    document.querySelectorAll('.hr-nav').forEach(el=>el.classList.toggle('active',el.dataset.page===page));
+    renderHRWorkspace();
+}
+function hrCard(label,value,foot=''){return `<div class="hr-kpi"><p class="text-xs text-slate-400">${escapeHtml(label)}</p><div class="text-3xl text-sky-300 font-bold mt-2">${escapeHtml(value)}</div><p class="text-xs text-slate-500 mt-2">${escapeHtml(foot)}</p></div>`}
+function renderHRWorkspace(){
+    document.querySelectorAll('.hr-nav [data-ar]').forEach(el=>{el.textContent=el.dataset[currentLang]});
+    if(hrActivePage==='dashboard'){
+        const d=document.getElementById('hr-dashboard-view');if(!d)return;
+        const groups={};allEmployees.forEach(e=>{const k=String(getEmployeeDept(e)||'--').trim();groups[k]=(groups[k]||0)+1});
+        const entries=Object.entries(groups).sort((a,b)=>b[1]-a[1]).slice(0,10),max=Math.max(1,...entries.map(x=>x[1]));
+        const years={};allEmployees.forEach(e=>{const raw=getHireDate(e),year=String(raw).match(/(?:19|20)\d{2}/)?.[0];if(year)years[year]=(years[year]||0)+1});
+        const yearEntries=Object.entries(years).sort((a,b)=>a[0].localeCompare(b[0])).slice(-10),ym=Math.max(1,...yearEntries.map(x=>x[1]));
+        d.innerHTML=`<div class="flex flex-wrap justify-between gap-3 mb-6"><div><h1 class="text-2xl font-extrabold text-white">${hrText('لوحة تحليلات الموارد البشرية','HR Analytics Dashboard')}</h1><p class="text-xs text-slate-400">${hrText('إحصائيات مبنية على سجلات الموظفين الموجودة','Statistics based on existing employee records')}</p></div><span class="text-xs text-sky-300">Firebase · ${hrText('بيانات الموظفين','Employee data')}</span></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">${hrCard(hrText('إجمالي الموظفين','Total employees'),String(allEmployees.length))}${hrCard(hrText('الإدارات المسجلة','Departments'),String(Object.keys(groups).length))}${hrCard(hrText('ملفات بها تاريخ تعيين','Records with hire date'),String(allEmployees.filter(e=>getHireDate(e)!=='--').length))}${hrCard(hrText('طلبات ESS','ESS requests'),hrText('غير مربوط','Not connected'),hrText('لا توجد بيانات طلبات متصلة بعد','Requests source not connected'))}</div>
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-5"><div class="glass-card rounded-2xl p-5"><h2 class="font-bold text-sky-200 mb-5">${hrText('توزيع الموظفين حسب الإدارة','Employees by department')}</h2><div class="space-y-4">${entries.map(([name,count])=>`<div><div class="flex justify-between text-xs mb-1 gap-2"><span class="truncate">${escapeHtml(name)}</span><span>${count}</span></div><div class="h-2 bg-slate-800 rounded-full overflow-hidden"><div class="h-full bg-sky-500 rounded-full" style="width:${count/max*100}%"></div></div></div>`).join('')||hrText('لا توجد بيانات','No data')}</div></div>
+        <div class="glass-card rounded-2xl p-5"><h2 class="font-bold text-sky-200 mb-5">${hrText('سنوات التعيين المسجلة','Hiring years')}</h2><div class="h-56 flex items-end gap-3 border-b border-slate-700 pb-1">${yearEntries.map(([year,count])=>`<div class="flex-1 min-w-0 flex flex-col items-center justify-end h-full gap-2"><span class="text-xs text-sky-300">${count}</span><div class="hr-chart-bar w-full" style="height:${count/ym*80}%"></div><span class="text-[10px] text-slate-400">${year}</span></div>`).join('')||hrText('لا توجد بيانات تواريخ تعيين','No hiring date data')}</div></div></div>
+        <div class="glass-card rounded-2xl p-5 mt-5 text-sm text-slate-400">${hrText('الحضور والانصراف والرواتب وخرائط GPS ستظهر بتحليلات فعلية بعد ربط مصدر ESS وجهاز البصمة. لا يتم اختلاق أرقام حضور أو غياب.','Attendance, payroll and GPS analytics will appear once ESS and biometric sources are connected. No attendance figures are fabricated.')}</div>`;
+    }
+    if(hrActivePage==='payroll'){
+        const d=document.getElementById('hr-payroll-view');if(!d)return;
+        const demo=allEmployees.slice(0,30).map((e,i)=>{const base=5500+(i%9)*850,allowance=500+(i%4)*250,deduction=(i%3)*175;return {e,base,allowance,deduction,net:base+allowance-deduction}});
+        d.innerHTML=`<h1 class="text-2xl font-extrabold mb-2">${hrText('المرتبات','Payroll')}</h1><p class="text-amber-300 text-sm mb-5">${hrText('بيانات تجريبية فقط — غير مرتبطة برواتب الموظفين الفعلية','DEMO ONLY — not actual employee salaries')}</p><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">${hrCard(hrText('عدد السجلات التجريبية','Demo records'),String(demo.length))}${hrCard(hrText('إجمالي الأساسي التجريبي','Demo basic total'),demo.reduce((s,r)=>s+r.base,0).toLocaleString()+' EGP')}${hrCard(hrText('إجمالي الصافي التجريبي','Demo net total'),demo.reduce((s,r)=>s+r.net,0).toLocaleString()+' EGP')}</div><div class="glass-card rounded-2xl overflow-x-auto"><table class="w-full text-sm text-start"><thead class="bg-slate-900/70 text-sky-300"><tr>${[hrText('الموظف','Employee'),hrText('الأساسي','Basic'),hrText('البدلات','Allowances'),hrText('الخصومات','Deductions'),hrText('الصافي','Net')].map(x=>`<th class="p-4 text-start">${x}</th>`).join('')}</tr></thead><tbody>${demo.map(r=>`<tr class="border-t border-slate-700/50"><td class="p-3">${escapeHtml(getEmployeeName(r.e))}</td><td class="p-3">${r.base.toLocaleString()}</td><td class="p-3">${r.allowance.toLocaleString()}</td><td class="p-3">${r.deduction.toLocaleString()}</td><td class="p-3 text-sky-300">${r.net.toLocaleString()}</td></tr>`).join('')}</tbody></table></div>`;
+    }
+    if(hrActivePage==='notifications'){
+        const d=document.getElementById('hr-notifications-view');if(!d)return;
+        d.innerHTML=`<h1 class="text-2xl font-extrabold mb-5">${hrText('الإشعارات والطلبات','Notifications & Requests')}</h1><div class="glass-card rounded-2xl p-6 mb-5"><h2 class="font-bold text-sky-300 mb-3">${hrText('طلبات ESS المعلقة','Pending ESS requests')}</h2><p class="text-slate-400 text-sm">${hrText('لم يتم ربط مصدر طلبات ESS بعد. لا يمكن عرض طلبات حقيقية قبل معرفة مسارها وصلاحيات الوصول.','ESS requests source is not connected. Real requests require the database path and access permissions.')}</p></div><div class="glass-card rounded-2xl p-6"><h2 class="font-bold text-sky-300 mb-3">${hrText('إرسال إشعار للموبايل','Send mobile notification')}</h2><input id="hr-notify-title" maxlength="100" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-3" placeholder="${hrText('عنوان الإشعار','Notification title')}"><textarea id="hr-notify-body" maxlength="500" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-3" placeholder="${hrText('نص الرسالة','Message body')}"></textarea><button type="button" onclick="showToast(hrText('الإرسال غير مفعل: يلزم ربط FCM والتحقق من صلاحيات المرسل','Sending unavailable: FCM and sender permissions must be configured'),true)" class="portal-ghost-btn px-5 py-3 rounded-xl">${hrText('إرسال (يتطلب الربط)','Send (integration required)')}</button><p class="text-xs text-slate-500 mt-3">${hrText('لن يتم إرسال أي إشعار حقيقي قبل تفعيل الربط الآمن.','No real notification will be sent before secure integration.')}</p></div>`;
+    }
+}
+const hrOldBack=backToEmployeesList;
+backToEmployeesList=function(){hrOldBack();showHRPage('employees')};
+const hrOldView=viewEmployee;
+viewEmployee=function(code){showHRPage('employees');hrOldView(code)};
+const hrOldStats=updateDashboardStats;
+updateDashboardStats=function(){hrOldStats();renderHRWorkspace()};
+const hrOldLanguage=setLanguage;
+setLanguage=function(lang){hrOldLanguage(lang);renderHRWorkspace()};
+document.addEventListener('DOMContentLoaded',()=>showHRPage('employees'));
