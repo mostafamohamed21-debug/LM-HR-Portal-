@@ -124,11 +124,26 @@ const fieldLabels = {
 };
 
 function tr(key) { return translations[currentLang][key] || key; }
-function getField(emp, ...keys) {
-    for (const key of keys) {
-        if (emp && emp[key] !== undefined && emp[key] !== null && String(emp[key]).trim() !== '') return emp[key];
+function getEmpField(emp, fieldName, lang) {
+    if (!emp) return '';
+    
+    let key = '';
+    if (fieldName === 'name') {
+        key = (lang === 'ar') ? 'اسم الموظف ' : 'emp_name _en';
+    } else if (fieldName === 'job') {
+        key = (lang === 'ar') ? 'الوظيفة' : 'job title ';
+    } else if (fieldName === 'department') {
+        key = (lang === 'ar') ? 'الإدارة ' : 'department ';
+    } else if (fieldName === 'manager') {
+        key = (lang === 'ar') ? 'المدير المباشر ' : 'direct manager ';
+    } else if (fieldName === 'qualification') {
+        key = (lang === 'ar') ? 'المؤهل' : 'qualification';
+    } else if (fieldName === 'insurance') {
+        key = (lang === 'ar') ? 'الحالة التأمينية ' : 'insurance status ';
     }
-    return '';
+    
+    // إرجاع القيمة مع إزالة المسافات الزائدة إن وجدت
+    return emp[key] !== undefined ? emp[key] : (emp[key.trim()] || '');
 }
 function getEmployeeCode(emp) { return String(getField(emp, 'الكود', 'code', 'employeeCode', 'empCode', 'EmployeeCode', 'employee_code', 'ID', 'id') || '').trim(); }
 function getEmployeeName(emp) { return getField(emp, 'اسم الموظف ', 'اسم الموظف', 'name', 'emp_name _en') || '--'; }
@@ -628,18 +643,36 @@ function buildAddEmployeeForm(){
     });
     const err=document.getElementById('add-employee-error');if(err)err.innerText='';
 }
-async function saveNewEmployee(){
-    const data={};document.querySelectorAll('#add-employee-fields [data-add-key]').forEach(input=>{const key=input.getAttribute('data-add-key');data[key]=input.value.trim();});
-    const codeKey=Object.keys(data).find(k=>['الكود','code','employeeCode','empCode'].includes(k)) || 'code';
-    const code=data[codeKey];const err=document.getElementById('add-employee-error');
-    if(!code){if(err)err.innerText=tr('required_code');return;}
-    if(!isValidFirebaseKey(code)){if(err)err.innerText=tr('custom_field_invalid');return;}
-    try{
-        const ref=db.ref('employees/'+code);const exists=await ref.once('value');if(exists.exists()){if(err)err.innerText=tr('employee_exists');return;}
-        data[codeKey]=code;await ref.set(data);allEmployees.push(data);closeAddEmployeeModal();renderTable(allEmployees);updateDashboardStats();showToast(tr('employee_saved'));
-    }catch(error){console.error(error);if(err)err.innerText=currentLang==='ar'?'حدث خطأ أثناء الإضافة.':'Error while adding employee.';}
+async function saveEmployeeChanges(empCode, updatedData) {
+    // البحث عن المفتاح (Key) الخاص بالموظف في قاعدة البيانات بناءً على الـ code
+    const dbRef = firebase.database().ref(); // أو المسار المحدد للقاعدة
+    
+    dbRef.child('employees').once('snapshot', (snapshot) => {
+        let targetKey = null;
+        
+        snapshot.forEach((childSnapshot) => {
+            const emp = childSnapshot.val();
+            // التأكد من مطابقة الكود
+            if (emp.الكود == empCode || emp.code == empCode) {
+                targetKey = childSnapshot.key; // هذا هو المفتاح الفعلي في الـ Firebase مثل "0" أو "1"
+            }
+        });
+        
+        if (targetKey !== null) {
+            // تحديث البيانات في المسار الصحيح بدقة
+            dbRef.child('employees/' + targetKey).update(updatedData)
+                .then(() => {
+                    console.log("تم حفظ التعديلات بنجاح!");
+                    alert("تم حفظ التعديلات بنجاح");
+                })
+                .catch((error) => {
+                    console.error("خطأ أثناء الحفظ:", error);
+                });
+        } else {
+            console.error("لم يتم العثور على الموظف في قاعدة البيانات");
+        }
+    });
 }
-
 function openAddCustomFieldModal(){if(activeEmployeeCode===null){showToast(currentLang==='ar'?'افتح ملف موظف أولاً':'Open an employee profile first',true);return;}document.getElementById('custom-field-modal')?.classList.remove('hidden');document.getElementById('custom-field-name').value='';document.getElementById('custom-field-value').value='';document.getElementById('custom-field-error').innerText='';}
 function closeAddCustomFieldModal(){document.getElementById('custom-field-modal')?.classList.add('hidden');}
 async function saveCustomField(){
