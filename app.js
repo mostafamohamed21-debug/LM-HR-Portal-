@@ -13,12 +13,25 @@ function excelDateToJSDate(serial) {
     return `${year}-${month}-${day}`;
 }
 
-function togglePasswordVisibility() {
-    const passInput = document.getElementById('login-password');
+function updatePasswordEyeIcon() {
+    const input = document.getElementById('login-password');
     const icon = document.getElementById('eye-icon');
-    if (!passInput) return;
-    passInput.type = passInput.type === 'password' ? 'text' : 'password';
-    if (icon) icon.innerText = passInput.type === 'password' ? '👁️' : '🙈';
+    const button = document.getElementById('password-toggle');
+    if (!input || !icon) return;
+    const visible = input.type === 'text';
+    icon.innerHTML = visible
+        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.1A10.9 10.9 0 0 1 12 4.9c5.1 0 8.8 3.6 10 7.1-.4 1.3-1.3 2.6-2.4 3.7M6.2 6.2C4.2 7.6 2.8 9.4 2 12c1.2 3.6 4.9 7.1 10 7.1 1.2 0 2.3-.2 3.3-.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.7" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
+    if (button) {
+        button.setAttribute('aria-label', visible ? (currentLang === 'ar' ? 'إخفاء كلمة المرور' : 'Hide password') : (currentLang === 'ar' ? 'إظهار كلمة المرور' : 'Show password'));
+        button.title = button.getAttribute('aria-label');
+    }
+}
+function togglePasswordVisibility() {
+    const input = document.getElementById('login-password');
+    if (!input) return;
+    input.type = input.type === 'password' ? 'text' : 'password';
+    updatePasswordEyeIcon();
 }
 
 const firebaseConfig = {
@@ -58,7 +71,7 @@ const translations = {
         toast_success: "تم حفظ التعديلات بنجاح وتحديث Firebase", login_title: "تسجيل الدخول", login_subtitle: "أدخل كود الموظف وكلمة المرور",
         code_placeholder: "كود الموظف", pass_placeholder: "كلمة المرور", remember_me: "تذكرني", forgot_pass: "نسيت كلمة المرور؟", login_btn: "دخول للنظام",
         logout_btn: "تسجيل الخروج", login_required: "يرجى إدخال كود الموظف وكلمة المرور", login_not_found: "كود الموظف غير مسجل!",
-        login_wrong_pass: "كلمة المرور غير صحيحة!", login_error: "حدث خطأ أثناء الاتصال، حاول مرة أخرى.", logged_out: "تم تسجيل الخروج بنجاح",
+        login_wrong_pass: "كلمة المرور غير صحيحة!", setup_password_title: "الموظف مسجل لكن لا توجد كلمة مرور. أنشئ كلمة مرور للمتابعة.", confirm_password_placeholder: "تأكيد كلمة المرور", create_password_btn: "إنشاء كلمة المرور والدخول", password_mismatch: "كلمتا المرور غير متطابقتين.", password_too_short: "كلمة المرور يجب أن تكون 6 أحرف على الأقل.", password_saved: "تم إنشاء كلمة المرور وحفظها. جاري تسجيل الدخول...", login_error: "حدث خطأ أثناء الاتصال، حاول مرة أخرى.", logged_out: "تم تسجيل الخروج بنجاح",
         add_employee_btn: "+ إضافة موظف", add_employee_title: "إضافة موظف جديد", add_employee_hint: "سيتم إنشاء السجل مباشرة داخل Firebase.", save_employee_btn: "حفظ الموظف",
         employee_exists: "هذا الكود موجود بالفعل.", employee_saved: "تمت إضافة الموظف بنجاح إلى Firebase.", required_code: "كود الموظف مطلوب.",
         firebase_fields_title: "حقول Firebase", firebase_fields_hint: "كل الحقول الموجودة فعلياً على سجل الموظف تظهر هنا ويمكن تعديلها.",
@@ -85,7 +98,7 @@ const translations = {
         toast_success: "Changes saved successfully & synced with Firebase", login_title: "Sign in", login_subtitle: "Enter employee code and password",
         code_placeholder: "Employee Code", pass_placeholder: "Password", remember_me: "Remember Me", forgot_pass: "Forgot password?", login_btn: "Sign in",
         logout_btn: "Sign out", login_required: "Please enter employee code and password", login_not_found: "Employee code not found!",
-        login_wrong_pass: "Incorrect password!", login_error: "Connection error. Please try again.", logged_out: "Signed out successfully",
+        login_wrong_pass: "Incorrect password!", setup_password_title: "Your employee record exists but has no password. Create one to continue.", confirm_password_placeholder: "Confirm password", create_password_btn: "Create Password & Sign In", password_mismatch: "The passwords do not match.", password_too_short: "Password must be at least 6 characters.", password_saved: "Password created and saved. Signing in...", login_error: "Connection error. Please try again.", logged_out: "Signed out successfully",
         add_employee_btn: "+ Add Employee", add_employee_title: "Add New Employee", add_employee_hint: "The record will be created directly in Firebase.", save_employee_btn: "Save Employee",
         employee_exists: "This employee code already exists.", employee_saved: "Employee added successfully to Firebase.", required_code: "Employee code is required.",
         firebase_fields_title: "Firebase Fields", firebase_fields_hint: "All fields currently stored on the employee record appear here and can be edited.",
@@ -116,7 +129,7 @@ function getField(emp, ...keys) {
     }
     return '';
 }
-function getEmployeeCode(emp) { return String(getField(emp, 'الكود', 'code', 'employeeCode', 'empCode') || ''); }
+function getEmployeeCode(emp) { return String(getField(emp, 'الكود', 'code', 'employeeCode', 'empCode', 'EmployeeCode', 'employee_code', 'ID', 'id') || '').trim(); }
 function getEmployeeName(emp) { return getField(emp, 'اسم الموظف ', 'اسم الموظف', 'name', 'emp_name _en') || '--'; }
 function getEmployeeDept(emp) { return getField(emp, 'الإدارة ', 'الإدارة', 'department', 'dept') || '--'; }
 function getEmployeeJob(emp) { return getField(emp, 'الوظيفة', 'الوظيفة ', 'jobTitle', 'job title', 'job') || '--'; }
@@ -179,6 +192,13 @@ function setLanguage(lang) {
 
     document.getElementById('login-lang-menu')?.classList.remove('show');
     document.getElementById('lang-dropdown')?.classList.remove('show');
+    updatePasswordEyeIcon();
+    const confirmPass = document.getElementById('confirm-new-password');
+    if (confirmPass) confirmPass.placeholder = tr('confirm_password_placeholder');
+    const setupNote = document.getElementById('first-password-note');
+    if (setupNote) setupNote.innerText = tr('setup_password_title');
+    const createBtn = document.getElementById('create-password-btn');
+    if (createBtn) createBtn.innerText = tr('create_password_btn');
     renderTable(allEmployees);
     if (activeEmployeeCode !== null) viewEmployee(activeEmployeeCode);
     if (document.getElementById('add-employee-modal') && !document.getElementById('add-employee-modal').classList.contains('hidden')) buildAddEmployeeForm();
@@ -200,39 +220,138 @@ function hideLogin() {
     setTimeout(() => modal.style.display='none', 350);
 }
 
+async function findEmployeeRecord(code) {
+    const snap = await db.ref('employees').once('value');
+    if (!snap.exists()) return null;
+    const records = snap.val() || {};
+    for (const key of Object.keys(records)) {
+        const record = records[key];
+        if (!record || typeof record !== 'object') continue;
+        const recordCode = String(getField(record, 'الكود', 'code', 'employeeCode', 'empCode', 'EmployeeCode', 'employee_code', 'ID', 'id') || key).trim();
+        if (recordCode === String(code).trim()) return { key, data: record, path: `employees/${key}` };
+    }
+    return null;
+}
+
+function showFirstPasswordSetup(code, employeeRecord) {
+    const panel = document.getElementById('first-password-setup');
+    if (!panel) {
+        showLoginMessage(currentLang === 'ar' ? 'الموظف موجود لكن تعذر فتح نموذج إنشاء كلمة المرور. حدّث index.html.' : 'Employee found, but the password setup form is missing. Update index.html.');
+        return;
+    }
+    panel.dataset.employeeCode = code;
+    panel.dataset.employeePath = employeeRecord ? employeeRecord.path : '';
+    panel.classList.remove('hidden');
+    const note = document.getElementById('first-password-note');
+    if (note) note.innerText = tr('setup_password_title');
+    const confirm = document.getElementById('confirm-new-password');
+    if (confirm) { confirm.value = ''; confirm.focus(); }
+    const create = document.getElementById('create-password-btn');
+    if (create) create.innerText = tr('create_password_btn');
+    showLoginMessage('', 'success');
+}
+
 async function handleLogin() {
-    const code = document.getElementById('login-emp-code')?.value.trim();
-    const pass = document.getElementById('login-password')?.value.trim();
-    const remember = document.getElementById('remember-me')?.checked;
+    const code = String(document.getElementById('login-emp-code')?.value || '').trim();
+    const pass = String(document.getElementById('login-password')?.value || '');
+    const remember = !!document.getElementById('remember-me')?.checked;
     if (!code || !pass) { showLoginMessage(tr('login_required')); return; }
-    showLoginMessage(currentLang==='ar'?'جاري التحقق...':'Checking...', 'success');
-
+    showLoginMessage(currentLang === 'ar' ? 'جاري التحقق...' : 'Checking...', 'success');
     try {
-        const snapshot = await db.ref('users/' + code).once('value');
-        if (!snapshot.exists()) { showLoginMessage(tr('login_not_found')); return; }
-        const user = snapshot.val() || {};
-        if (String(user.password ?? '') !== pass) { showLoginMessage(tr('login_wrong_pass')); return; }
+        const [userSnap, employeeRecord] = await Promise.all([
+            db.ref('users/' + code).once('value'),
+            findEmployeeRecord(code)
+        ]);
+        const user = userSnap.exists() ? (userSnap.val() || {}) : null;
+        const employee = employeeRecord ? employeeRecord.data : null;
+        if (!user && !employee) { showLoginMessage(tr('login_not_found')); return; }
 
-        currentUserData = user; currentUserData.code = code;
-        if (remember) {
-            localStorage.setItem('lacto_saved_code', code);
-            localStorage.setItem('lacto_saved_pass', pass);
-        } else {
-            localStorage.removeItem('lacto_saved_code');
-            localStorage.removeItem('lacto_saved_pass');
+        // Existing user credentials take priority; employee-record password is supported too.
+        const storedPassword = getField(user, 'password', 'Password', 'PASSWORD', 'كلمة المرور', 'كلمه المرور', 'pass', 'userPassword') ||
+            getField(employee, 'password', 'Password', 'PASSWORD', 'كلمة المرور', 'كلمه المرور', 'pass', 'userPassword');
+
+        if (!storedPassword) {
+            showFirstPasswordSetup(code, employeeRecord);
+            return;
         }
-        sessionStorage.setItem('lacto_active_code', code);
-        document.getElementById('current-user-label')?.classList.remove('hidden');
-        if (document.getElementById('current-user-label')) document.getElementById('current-user-label').innerText = user.name || user['اسم الموظف'] || code;
-        hideLogin();
-        portalInitialized = true;
-        await loadEmployeesFromFirebase();
+        if (String(storedPassword) !== pass) {
+            showLoginMessage(tr('login_wrong_pass'));
+            return;
+        }
+        await completeLogin(code, pass, remember, user || employee || {});
     } catch (error) {
-        console.error(error);
+        console.error('LOGIN LOOKUP ERROR:', error);
         showLoginMessage(tr('login_error'));
     }
 }
 
+async function createFirstPassword() {
+    const panel = document.getElementById('first-password-setup');
+    const code = String(panel?.dataset.employeeCode || document.getElementById('login-emp-code')?.value || '').trim();
+    const pass = String(document.getElementById('login-password')?.value || '');
+    const confirm = String(document.getElementById('confirm-new-password')?.value || '');
+    const remember = !!document.getElementById('remember-me')?.checked;
+    if (!code || !pass || !confirm) { showLoginMessage(tr('login_required')); return; }
+    if (pass.length < 6) { showLoginMessage(tr('password_too_short')); return; }
+    if (pass !== confirm) { showLoginMessage(tr('password_mismatch')); return; }
+
+    const button = document.getElementById('create-password-btn');
+    if (button) { button.disabled = true; button.style.opacity = '.65'; }
+    showLoginMessage(currentLang === 'ar' ? 'جاري حفظ كلمة المرور...' : 'Saving password...', 'success');
+    try {
+        const employeeRecord = await findEmployeeRecord(code);
+        const userSnap = await db.ref('users/' + code).once('value');
+        const existingUser = userSnap.exists() ? (userSnap.val() || {}) : {};
+        const employeeData = employeeRecord ? employeeRecord.data : {};
+        // Re-check immediately before writing to avoid replacing a password created in another tab.
+        const latestPassword = getField(existingUser, 'password', 'Password', 'PASSWORD', 'كلمة المرور', 'كلمه المرور', 'pass', 'userPassword') ||
+            getField(employeeData, 'password', 'Password', 'PASSWORD', 'كلمة المرور', 'كلمه المرور', 'pass', 'userPassword');
+        if (latestPassword) {
+            showLoginMessage(currentLang === 'ar' ? 'تم إنشاء كلمة مرور بالفعل لهذا الموظف. سجّل الدخول بها.' : 'A password has already been created for this employee. Please sign in with it.');
+            panel?.classList.add('hidden');
+            return;
+        }
+        const updates = {};
+        updates[`users/${code}/password`] = pass;
+        if (!userSnap.exists()) {
+            updates[`users/${code}/code`] = code;
+            const name = getField(employeeData, 'اسم الموظف', 'اسم الموظف ', 'name', 'emp_name _en');
+            if (name) updates[`users/${code}/name`] = name;
+            const email = getField(employeeData, 'email', 'Email', 'البريد الإلكتروني', 'البريد الالكتروني');
+            if (email) updates[`users/${code}/email`] = email;
+        }
+        if (employeeRecord) updates[`${employeeRecord.path}/password`] = pass;
+        await db.ref().update(updates);
+        panel?.classList.add('hidden');
+        showLoginMessage(tr('password_saved'), 'success');
+        await completeLogin(code, pass, remember, { ...(employeeData || {}), ...(existingUser || {}), code, password: pass });
+    } catch (error) {
+        console.error('PASSWORD SETUP ERROR:', error);
+        showLoginMessage(currentLang === 'ar' ? 'تعذر حفظ كلمة المرور. راجع صلاحيات الكتابة في Firebase Realtime Database.' : 'Could not save the password. Check Firebase Realtime Database write permissions.');
+    } finally {
+        if (button) { button.disabled = false; button.style.opacity = ''; }
+    }
+}
+
+async function completeLogin(code, pass, remember, user) {
+    currentUserData = { ...(user || {}), code };
+    if (remember) {
+        localStorage.setItem('lacto_saved_code', code);
+        localStorage.setItem('lacto_saved_pass', pass);
+    } else {
+        localStorage.removeItem('lacto_saved_code');
+        localStorage.removeItem('lacto_saved_pass');
+    }
+    sessionStorage.setItem('lacto_active_code', code);
+    const label = document.getElementById('current-user-label');
+    if (label) {
+        label.classList.remove('hidden');
+        label.innerText = getEmployeeName(user || {}) || getField(user || {}, 'name', 'اسم الموظف', 'اسم الموظف ') || code;
+    }
+    hideLogin();
+    portalInitialized = true;
+    await loadEmployeesFromFirebase();
+}
 function handleLogout() {
     localStorage.removeItem('lacto_saved_code');
     localStorage.removeItem('lacto_saved_pass');
