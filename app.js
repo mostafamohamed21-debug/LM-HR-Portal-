@@ -1,5 +1,4 @@
-// Lacto Misr HR Portal v6
-// Enhanced version based on the supplied portal + ESS styling/behavior.
+// Lacto Misr HR Portal v6.2 - Strict Language Isolation & Full Stability
 
 function excelDateToJSDate(serial) {
     if (!serial || typeof serial !== 'number') return serial || '--';
@@ -83,7 +82,8 @@ const translations = {
         email_required: "أدخل البريد الإلكتروني.", code_sent: "تم إنشاء رمز التحقق وتجهيزه للإرسال إلى البريد.", code_sent_no_email: "تم تجهيز الرمز، لكن خدمة البريد غير مفعلة في Firebase بعد.",
         invalid_code: "رمز التحقق غير صحيح أو منتهي.", password_changed: "تم تغيير كلمة المرور بنجاح.", new_password_required: "أدخل كلمة المرور الجديدة.",
         code_expired: "انتهت صلاحية رمز التحقق، اطلب رمزاً جديداً.", employee_email_found: "تم العثور على البريد المسجل.", employee_email_missing: "لا يوجد بريد مسجل، أدخل بريد الموظف.",
-        schema_loading: "جاري تجهيز حقول Firebase..."
+        schema_loading: "جاري تجهيز حقول Firebase...",
+        header_brand: "لاكتو مصر - شؤون العاملين", powered_by: "برمجة وتطوير إدارة الموارد البشرية", portal_version: "بورتال الموظفين v5.2 - النسخة الاحترافية"
     },
     en: {
         admin: "System Admin", control_panel: "Control Room", nav_home: "Home & Employees", nav_depts: "Departments",
@@ -110,9 +110,38 @@ const translations = {
         email_required: "Enter an email address.", code_sent: "Verification code created and queued for email delivery.", code_sent_no_email: "Code prepared, but Firebase email delivery is not enabled yet.",
         invalid_code: "Invalid or expired verification code.", password_changed: "Password changed successfully.", new_password_required: "Enter the new password.",
         code_expired: "The verification code has expired. Request a new one.", employee_email_found: "Registered email found.", employee_email_missing: "No registered email found. Enter the employee email.",
-        schema_loading: "Preparing Firebase fields..."
+        schema_loading: "Preparing Firebase fields...",
+        header_brand: "Lacto Misr HR", powered_by: "Powered by HR Department", portal_version: "Portal v5.2 - Pro Edition"
     }
 };
+
+// دوال جلب البيانات الصارمة للفصل بين اللغات (بدون أي تداخل عربي مع إنجليزي)
+function getEmployeeName(emp) {
+    if (!emp) return '--';
+    if (currentLang === 'ar') {
+        return getField(emp, 'اسم الموظف ', 'اسم الموظف', 'name') || '--';
+    } else {
+        return getField(emp, 'emp_name _en', 'name', 'employee_name_en') || '--';
+    }
+}
+
+function getEmployeeDept(emp) {
+    if (!emp) return '--';
+    if (currentLang === 'ar') {
+        return getField(emp, 'الإدارة ', 'الإدارة', 'department') || '--';
+    } else {
+        return getField(emp, 'department ', 'department', 'dept') || '--';
+    }
+}
+
+function getEmployeeJob(emp) {
+    if (!emp) return '--';
+    if (currentLang === 'ar') {
+        return getField(emp, 'الوظيفة', 'الوظيفة ', 'jobTitle', 'job') || '--';
+    } else {
+        return getField(emp, 'job title ', 'jobTitle', 'job title', 'job') || '--';
+    }
+}
 
 const fieldLabels = {
     code: ['الكود', 'CODE'], name: ['اسم الموظف', 'EMPLOYEE NAME'], department: ['الإدارة', 'DEPARTMENT'], jobTitle: ['الوظيفة', 'JOB TITLE'],
@@ -130,11 +159,6 @@ function getField(emp, ...keys) {
     return '';
 }
 function getEmployeeCode(emp) { return String(getField(emp, 'الكود', 'code', 'employeeCode', 'empCode', 'EmployeeCode', 'employee_code', 'ID', 'id') || '').trim(); }
-function getEmployeeName(emp) { return getField(emp, 'اسم الموظف ', 'اسم الموظف', 'name', 'emp_name _en') || '--'; }
-function getEmployeeDept(emp) { return getField(emp, 'الإدارة ', 'الإدارة', 'department', 'dept') || '--'; }
-function getEmployeeJob(emp) { return getField(emp, 'الوظيفة', 'الوظيفة ', 'jobTitle', 'job title', 'job') || '--'; }
-function getHireDate(emp) { const v=getField(emp,'تاريخ التعيين ','تاريخ التعيين','hireDate','date_of_hiring '); return typeof v==='number'?excelDateToJSDate(v):v||'--'; }
-function localizedValue(emp, arKeys, enKeys) { return currentLang==='ar' ? getField(emp,...arKeys) : (getField(emp,...enKeys) || getField(emp,...arKeys)); }
 
 function existingKey(obj, keys, fallback) {
     for (const key of keys) if (Object.prototype.hasOwnProperty.call(obj || {}, key)) return key;
@@ -221,15 +245,12 @@ function hideLogin() {
 }
 
 async function readEmployeeSources() {
-    // The ESS app stores employee records at the database root in some deployments,
-    // while the portal may also use /employees. Read both without treating users/mail
-    // metadata as employee records.
     let root = {};
     let employeesOnly = {};
     try { const rootSnap = await db.ref('/').once('value'); root = rootSnap.exists() ? (rootSnap.val() || {}) : {}; }
-    catch (rootError) { console.warn('Root read denied; trying /employees directly.', rootError); }
+    catch (rootError) {}
     try { const employeesSnap = await db.ref('employees').once('value'); employeesOnly = employeesSnap.exists() ? (employeesSnap.val() || {}) : {}; }
-    catch (employeesError) { console.warn('Could not read /employees directly.', employeesError); }
+    catch (employeesError) {}
     const records = [];
     const seen = new Set();
 
@@ -237,11 +258,9 @@ async function readEmployeeSources() {
         if (!data || typeof data !== 'object' || Array.isArray(data)) return;
         const code = String(getField(data, 'الكود', 'code', 'employeeCode', 'empCode', 'EmployeeCode', 'employee_code', 'ID', 'id') || key || '').trim();
         const name = getField(data, 'اسم الموظف ', 'اسم الموظف', 'name', 'emp_name _en', 'employeeName');
-        // A real employee record should have a code or a recognizable employee name.
         if (!code || (!name && !getField(data, 'الإدارة', 'الإدارة ', 'department', 'الوظيفة', 'jobTitle', 'job title'))) return;
         const unique = code;
         if (seen.has(unique)) {
-            // Prefer the explicit /employees record when duplicates exist.
             const existingIndex = records.findIndex(item => item.code === unique);
             if (existingIndex >= 0 && path.startsWith('employees/')) {
                 records[existingIndex] = { ...data, code, _firebasePath: path, _firebaseKey: key };
@@ -278,21 +297,16 @@ async function findEmployeeRecord(code) {
 
 function showFirstPasswordSetup(code, employeeRecord) {
     const panel = document.getElementById('first-password-setup');
-    if (!panel) {
-        showLoginMessage(currentLang === 'ar' ? 'الموظف موجود لكن تعذر فتح نموذج إنشاء كلمة المرور. حدّث index.html.' : 'Employee found, but the password setup form is missing. Update index.html.');
-        return;
-    }
+    if (!panel) return;
     panel.dataset.employeeCode = code;
     panel.dataset.employeePath = employeeRecord ? employeeRecord.path : '';
     panel.classList.remove('hidden');
     const note = document.getElementById('first-password-note');
-    if (note) note.innerText = currentLang === 'ar'
-        ? 'أول مرة تدخل؟ اكتب كلمة مرور جديدة في الخانة الأولى، ثم أكدها في الخانة التالية. لن يتم تسجيل الدخول أو الحفظ قبل التأكيد.'
-        : 'First sign-in: enter a new password in the first field, then confirm it below. Nothing is saved and you are not signed in until you confirm.';
+    if (note) note.innerText = tr('setup_password_title');
     const password = document.getElementById('login-password');
     if (password) { password.value = ''; password.placeholder = currentLang === 'ar' ? 'أنشئ كلمة مرور جديدة' : 'Create a new password'; password.setAttribute('autocomplete', 'new-password'); }
     const confirm = document.getElementById('confirm-new-password');
-    if (confirm) { confirm.value = ''; confirm.placeholder = currentLang === 'ar' ? 'أعد كتابة كلمة المرور للتأكيد' : 'Re-enter password to confirm'; confirm.focus(); }
+    if (confirm) { confirm.value = ''; confirm.placeholder = tr('confirm_password_placeholder'); confirm.focus(); }
     const create = document.getElementById('create-password-btn');
     if (create) create.innerText = tr('create_password_btn');
     showLoginMessage('', 'success');
@@ -313,7 +327,6 @@ async function handleLogin() {
         const employee = employeeRecord ? employeeRecord.data : null;
         if (!user && !employee) { showLoginMessage(tr('login_not_found')); return; }
 
-        // Existing user credentials take priority; employee-record password is supported too.
         const storedPassword = getField(user, 'password', 'Password', 'PASSWORD', 'كلمة المرور', 'كلمه المرور', 'pass', 'userPassword') ||
             getField(employee, 'password', 'Password', 'PASSWORD', 'كلمة المرور', 'كلمه المرور', 'pass', 'userPassword');
 
@@ -327,7 +340,6 @@ async function handleLogin() {
         }
         await completeLogin(code, pass, remember, user || employee || {});
     } catch (error) {
-        console.error('LOGIN LOOKUP ERROR:', error);
         showLoginMessage(tr('login_error'));
     }
 }
@@ -350,11 +362,10 @@ async function createFirstPassword() {
         const userSnap = await db.ref('users/' + code).once('value');
         const existingUser = userSnap.exists() ? (userSnap.val() || {}) : {};
         const employeeData = employeeRecord ? employeeRecord.data : {};
-        // Re-check immediately before writing to avoid replacing a password created in another tab.
         const latestPassword = getField(existingUser, 'password', 'Password', 'PASSWORD', 'كلمة المرور', 'كلمه المرور', 'pass', 'userPassword') ||
             getField(employeeData, 'password', 'Password', 'PASSWORD', 'كلمة المرور', 'كلمه المرور', 'pass', 'userPassword');
         if (latestPassword) {
-            showLoginMessage(currentLang === 'ar' ? 'تم إنشاء كلمة مرور بالفعل لهذا الموظف. سجّل الدخول بها.' : 'A password has already been created for this employee. Please sign in with it.');
+            showLoginMessage(currentLang === 'ar' ? 'تم إنشاء كلمة مرور بالفعل لهذا الموظف.' : 'A password has already been created.');
             panel?.classList.add('hidden');
             return;
         }
@@ -364,7 +375,7 @@ async function createFirstPassword() {
             updates[`users/${code}/code`] = code;
             const name = getField(employeeData, 'اسم الموظف', 'اسم الموظف ', 'name', 'emp_name _en');
             if (name) updates[`users/${code}/name`] = name;
-            const email = getField(employeeData, 'email', 'Email', 'البريد الإلكتروني', 'البريد الالكتروني');
+            const email = getField(employeeData, 'email', 'Email', 'البريد الإلكتروني');
             if (email) updates[`users/${code}/email`] = email;
         }
         if (employeeRecord) updates[`${employeeRecord.path}/password`] = pass;
@@ -373,8 +384,7 @@ async function createFirstPassword() {
         showLoginMessage(tr('password_saved'), 'success');
         await completeLogin(code, pass, remember, { ...(employeeData || {}), ...(existingUser || {}), code, password: pass });
     } catch (error) {
-        console.error('PASSWORD SETUP ERROR:', error);
-        showLoginMessage(currentLang === 'ar' ? 'تعذر حفظ كلمة المرور. راجع صلاحيات الكتابة في Firebase Realtime Database.' : 'Could not save the password. Check Firebase Realtime Database write permissions.');
+        showLoginMessage(tr('login_error'));
     } finally {
         if (button) { button.disabled = false; button.style.opacity = ''; }
     }
@@ -395,22 +405,17 @@ async function completeLogin(code, pass, remember, user) {
     const label = document.getElementById('current-user-label');
     if (label) {
         label.classList.remove('hidden');
-        label.innerText = getEmployeeName(user || {}) || getField(user || {}, 'name', 'اسم الموظف', 'اسم الموظف ') || code;
+        label.innerText = getField(user || {}, 'name', 'اسم الموظف', 'اسم الموظف ') || code;
     }
     hideLogin();
     portalInitialized = true;
     await loadEmployeesFromFirebase();
 }
+
 function handleLogout() {
     localStorage.removeItem('lacto_saved_code');
     localStorage.removeItem('lacto_saved_pass');
     sessionStorage.removeItem('lacto_active_code');
-    currentUserData = null;
-    activeEmployeeCode = null;
-    const code = document.getElementById('login-emp-code');
-    const pass = document.getElementById('login-password');
-    const remember = document.getElementById('remember-me');
-    if (code) code.value=''; if (pass) pass.value=''; if (remember) remember.checked=false;
     window.location.reload();
 }
 
@@ -426,9 +431,8 @@ async function loadEmployeesFromFirebase() {
             ? `متصل بـ Firebase — ${allEmployees.length} موظف`
             : `Connected to Firebase — ${allEmployees.length} employees`;
     } catch (error) {
-        console.error('Firebase employee load failed:', error);
-        if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-300">${currentLang === 'ar' ? 'تعذر تحميل بيانات الموظفين. راجع Console وصلاحيات Firebase.' : 'Could not load employees. Check Console and Firebase rules.'}</td></tr>`;
-        showToast(currentLang === 'ar' ? 'تعذر تحميل بيانات الموظفين من Firebase' : 'Could not load employees from Firebase', true);
+        if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-300">${tr('login_error')}</td></tr>`;
+        showToast(tr('login_error'), true);
     }
 }
 
@@ -444,15 +448,17 @@ function renderTable(dataList) {
     if(!dataList.length){ tableBody.innerHTML=`<tr><td colspan="6" class="p-6 text-center text-slate-400">${tr('no_results')}</td></tr>`; return; }
     dataList.forEach(emp=>{
         const code=getEmployeeCode(emp)||'--';
-        const name=localizedValue(emp,['اسم الموظف ','اسم الموظف','name'],['emp_name _en','name'])||'--';
-        const dept=localizedValue(emp,['الإدارة ','الإدارة','department'],['department','dept'])||'--';
-        const job=localizedValue(emp,['الوظيفة','الوظيفة ','jobTitle'],['job title','jobTitle','job'])||'--';
+        const name=getEmployeeName(emp);
+        const dept=getEmployeeDept(emp);
+        const job=getEmployeeJob(emp);
         const hire=getHireDate(emp);
         const row=document.createElement('tr'); row.className='hover:bg-slate-800/40 transition text-slate-300';
         row.innerHTML=`<td class="p-3.5 font-mono text-sky-400">${escapeHtml(code)}</td><td class="p-3.5 font-semibold text-white">${escapeHtml(String(name).trim())}</td><td class="p-3.5">${escapeHtml(String(dept).trim())}</td><td class="p-3.5">${escapeHtml(String(job).trim())}</td><td class="p-3.5 font-mono text-xs">${escapeHtml(String(hire))}</td><td class="p-3.5 text-center"><button onclick="viewEmployee('${escapeAttr(code)}')" class="px-3.5 py-1.5 bg-sky-600/30 hover:bg-sky-600 text-sky-200 rounded-lg text-xs border border-sky-400/30 transition shadow-lg">${tr('action_btn')}</button></td>`;
         tableBody.appendChild(row);
     });
 }
+
+function getHireDate(emp) { const v=getField(emp,'تاريخ التعيين ','تاريخ التعيين','hireDate','date_of_hiring '); return typeof v==='number'?excelDateToJSDate(v):v||'--'; }
 
 function escapeHtml(value){return String(value).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
 function escapeAttr(value){return String(value).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
@@ -465,18 +471,18 @@ function viewEmployee(code) {
     if (listView) { listView.classList.add('hidden'); listView.style.display='none'; }
     if (profileView) { profileView.classList.remove('hidden'); profileView.style.display='block'; }
     setFieldVal('prof-code',code);
-    setFieldVal('prof-name',localizedValue(emp,['اسم الموظف ','اسم الموظف','name'],['emp_name _en','name']));
-    setFieldVal('prof-dept',localizedValue(emp,['الإدارة ','الإدارة','department'],['department','dept']));
-    setFieldVal('prof-job',localizedValue(emp,['الوظيفة','الوظيفة ','jobTitle'],['job title','jobTitle','job']));
-    setFieldVal('prof-manager',localizedValue(emp,['المدير المباشر ','المدير المباشر','directManager'],['direct manager','directManager']));
+    setFieldVal('prof-name', getEmployeeName(emp));
+    setFieldVal('prof-dept', getEmployeeDept(emp));
+    setFieldVal('prof-job', getEmployeeJob(emp));
+    setFieldVal('prof-manager', currentLang === 'ar' ? (getField(emp, 'المدير المباشر ', 'المدير المباشر', 'directManager') || '--') : (getField(emp, 'direct manager ', 'directManager') || '--'));
     setFieldVal('prof-hire',getHireDate(emp));
     setFieldVal('prof-service',getField(emp,'سنوات الخدمة ','سنوات الخدمة','yearsService','years service'));
-    setFieldVal('prof-qual',localizedValue(emp,['المؤهل','qualification'],['qualification']));
-    setFieldVal('prof-qual-auth',localizedValue(emp,['جهة المؤهل ','جهة المؤهل','qualAuth'],['qulification issuing authority','qualAuth','issuer']));
+    setFieldVal('prof-qual', currentLang === 'ar' ? (getField(emp, 'المؤهل', 'qualification') || '--') : (getField(emp, 'qualification') || '--'));
+    setFieldVal('prof-qual-auth', currentLang === 'ar' ? (getField(emp, 'جهة المؤهل ', 'جهة المؤهل', 'qualAuth') || '--') : (getField(emp, 'qulification issuing authority', 'qualAuth', 'issuer') || '--'));
     setFieldVal('prof-dob',excelDateToJSDate(getField(emp,'تاريخ الميلاد','dob')));
     setFieldVal('prof-age',getField(emp,'السن حتى تاريخه ','السن حتى تاريخه','age','age to date'));
-    setFieldVal('prof-insurance',localizedValue(emp,['الحالة التأمينية ','الحالة التأمينية','insuranceStatus'],['insurance status','insuranceStatus']));
-    setFieldVal('prof-pob',localizedValue(emp,['مكان الميلاد','pob'],['pob']));
+    setFieldVal('prof-insurance', currentLang === 'ar' ? (getField(emp, 'الحالة التأمينية ', 'الحالة التأمينية', 'insuranceStatus') || '--') : (getField(emp, 'insurance status ', 'insuranceStatus') || '--'));
+    setFieldVal('prof-pob', currentLang === 'ar' ? (getField(emp, 'مكان الميلاد', 'pob') || '--') : (getField(emp, 'pob') || '--'));
     document.getElementById('profile-img').src=getField(emp,'photoUrl','photo','رابط الصورة') || 'default-avatar.png';
     document.getElementById('btn-save')?.classList.add('hidden'); document.getElementById('btn-edit')?.classList.remove('hidden'); document.getElementById('btn-photo')?.classList.add('hidden');
     setFieldsEditable(true); renderDynamicFields();
@@ -529,10 +535,10 @@ async function executeSave(){
         const savePath = emp._firebasePath || `employees/${activeEmployeeCode}`;
         await db.ref(savePath).update(updatedData);
         Object.assign(emp,updatedData); showToast(); setFieldsEditable(true); document.getElementById('btn-save')?.classList.add('hidden'); document.getElementById('btn-edit')?.classList.remove('hidden'); document.getElementById('btn-photo')?.classList.add('hidden'); renderTable(allEmployees); renderDynamicFields();
-    }catch(error){console.error(error);showToast(currentLang==='ar'?'حدث خطأ أثناء الحفظ':'Save error',true);}
+    }catch(error){showToast(tr('login_error'),true);}
 }
 
-function uploadEmployeePhoto(event){const file=event.target.files?.[0];if(!file||activeEmployeeCode===null)return;const reader=new FileReader();reader.onload=async e=>{const base64=e.target.result;document.getElementById('profile-img').src=base64;try{const emp=allEmployees.find(x=>String(getEmployeeCode(x))===String(activeEmployeeCode));const savePath=emp?emp._firebasePath:`employees/${activeEmployeeCode}`;await db.ref(savePath).update({photoUrl:base64});if(emp)emp.photoUrl=base64;showToast();}catch(err){console.error(err);}};reader.readAsDataURL(file);}
+function uploadEmployeePhoto(event){const file=event.target.files?.[0];if(!file||activeEmployeeCode===null)return;const reader=new FileReader();reader.onload=async e=>{const base64=e.target.result;document.getElementById('profile-img').src=base64;try{const emp=allEmployees.find(x=>String(getEmployeeCode(x))===String(activeEmployeeCode));const savePath=emp?emp._firebasePath:`employees/${activeEmployeeCode}`;await db.ref(savePath).update({photoUrl:base64});if(emp)emp.photoUrl=base64;showToast();}catch(err){}};reader.readAsDataURL(file);}
 
 function showToast(message=null,isError=false){const toast=document.getElementById('toast-notification');const msg=document.getElementById('toast-message');if(!toast||!msg)return;msg.innerText=message||tr('toast_success');msg.classList.toggle('text-red-300',isError);msg.classList.toggle('text-white',!isError);toast.classList.remove('translate-y-32','opacity-0');setTimeout(()=>toast.classList.add('translate-y-32','opacity-0'),3200);}
 function updateDashboardStats(){const el=document.getElementById('total-employees-count');if(el)el.innerText=allEmployees.length;}
@@ -566,7 +572,7 @@ async function saveNewEmployee(){
     try{
         const ref=db.ref('employees/'+code);const exists=await ref.once('value');if(exists.exists()){if(err)err.innerText=tr('employee_exists');return;}
         data[codeKey]=code;await ref.set(data);allEmployees.push(data);closeAddEmployeeModal();renderTable(allEmployees);updateDashboardStats();showToast(tr('employee_saved'));
-    }catch(error){console.error(error);if(err)err.innerText=currentLang==='ar'?'حدث خطأ أثناء الإضافة.':'Error while adding employee.';}
+    }catch(error){if(err)err.innerText=tr('login_error');}
 }
 
 function openAddCustomFieldModal(){if(activeEmployeeCode===null){showToast(currentLang==='ar'?'افتح ملف موظف أولاً':'Open an employee profile first',true);return;}document.getElementById('custom-field-modal')?.classList.remove('hidden');document.getElementById('custom-field-name').value='';document.getElementById('custom-field-value').value='';document.getElementById('custom-field-error').innerText='';}
@@ -579,7 +585,7 @@ async function saveCustomField(){
         await db.ref('employees/'+activeEmployeeCode).update({[key]:value});
         const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(activeEmployeeCode));if(emp)emp[key]=value;
         closeAddCustomFieldModal();renderDynamicFields();showToast(tr('custom_field_saved'));
-    }catch(error){console.error(error);err.innerText=currentLang==='ar'?'حدث خطأ أثناء التحديث.':'Update failed.';}
+    }catch(error){err.innerText=tr('login_error');}
 }
 
 function randomVerificationCode(){const arr=new Uint32Array(1);crypto.getRandomValues(arr);return String(100000+(arr[0]%900000));}
@@ -593,12 +599,11 @@ async function sendPasswordVerificationCode(){
         if(!email){msg.style.color='#f87171';msg.innerText=tr('email_required');return;}
         const verificationCode=randomVerificationCode();const expiresAt=Date.now()+10*60*1000;
         await db.ref('password_resets/'+code).set({email,code:verificationCode,expiresAt,createdAt:firebase.database.ServerValue.TIMESTAMP,used:false});
-        // Firebase Trigger Email extension / Cloud Function can listen to this node.
         const mailRef=db.ref('mail').push();
         await mailRef.set({to:email,message:{subject:currentLang==='ar'?'رمز استعادة كلمة مرور Lacto Misr HR':'Lacto Misr HR Password Recovery Code',html:`<div style="font-family:Arial,sans-serif"><h2>Lacto Misr HR</h2><p>${currentLang==='ar'?'رمز التحقق الخاص بك هو':'Your verification code is'} <strong style="font-size:24px;letter-spacing:5px">${verificationCode}</strong></p><p>${currentLang==='ar'?'صلاحية الرمز 10 دقائق.':'The code expires in 10 minutes.'}</p></div>`}});
         document.getElementById('forgot-code-step').classList.remove('hidden');document.getElementById('forgot-send-btn').classList.add('hidden');
         msg.style.color='#67e8f9';msg.innerText=tr('code_sent');
-    }catch(error){console.error(error);msg.style.color='#f87171';msg.innerText=tr('code_sent_no_email');}
+    }catch(error){msg.style.color='#f87171';msg.innerText=tr('code_sent_no_email');}
 }
 async function verifyAndResetPassword(){
     const code=document.getElementById('forgot-emp-code').value.trim();const verification=document.getElementById('forgot-verification-code').value.trim();const newPass=document.getElementById('forgot-new-password').value.trim();const msg=document.getElementById('forgot-message');
@@ -611,7 +616,7 @@ async function verifyAndResetPassword(){
         localStorage.removeItem('lacto_saved_code');localStorage.removeItem('lacto_saved_pass');
         msg.style.color='#67e8f9';msg.innerText=tr('password_changed');
         setTimeout(()=>{closeForgotPassModal();document.getElementById('forgot-code-step').classList.add('hidden');document.getElementById('forgot-send-btn').classList.remove('hidden');document.getElementById('forgot-verification-code').value='';document.getElementById('forgot-new-password').value='';},1500);
-    }catch(error){console.error(error);msg.style.color='#f87171';msg.innerText=tr('login_error');}
+    }catch(error){msg.style.color='#f87171';msg.innerText=tr('login_error');}
 }
 function openForgotPassModal(){document.getElementById('forgot-pass-modal')?.classList.remove('hidden');document.getElementById('forgot-emp-code').value=document.getElementById('login-emp-code')?.value||'';document.getElementById('forgot-email').value='';document.getElementById('forgot-message').innerText='';}
 function closeForgotPassModal(){document.getElementById('forgot-pass-modal')?.classList.add('hidden');}
@@ -651,7 +656,4 @@ window.addEventListener('DOMContentLoaded',async()=>{
     setLanguage(currentLang);
     prepareRememberedLogin();
     runPortalIntro();
-    // If a previous session exists, do not bypass the login screen unless the user explicitly uses saved credentials.
-    const active=sessionStorage.getItem('lacto_active_code');
-    if(active){ /* session is informational only; logout still clears it */ }
 });
