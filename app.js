@@ -1,30 +1,4 @@
-// Lacto Misr HR Portal v7.0 - Pro Dashboard & Real Map Logic
-
-function excelDateToJSDate(serial) {
-    if (!serial || typeof serial !== 'number') return serial || '--';
-    const utc_days = Math.floor(serial - 25569);
-    const utc_value = utc_days * 86400 * 1000;
-    const date_info = new Date(utc_value);
-    if (isNaN(date_info.getTime())) return serial;
-    const year = date_info.getUTCFullYear();
-    const month = String(date_info.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date_info.getUTCDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-function updatePasswordEyeIcon() {
-    const input = document.getElementById('login-password');
-    const icon = document.getElementById('eye-icon');
-    if (!input || !icon) return;
-    const visible = input.type === 'text';
-    icon.innerHTML = visible ? '👁️‍🗨️' : '👁️';
-}
-function togglePasswordVisibility() {
-    const input = document.getElementById('login-password');
-    if (!input) return;
-    input.type = input.type === 'password' ? 'text' : 'password';
-    updatePasswordEyeIcon();
-}
+// Lacto Misr HR Portal v7.2 - Pro Version
 
 const firebaseConfig = {
     apiKey: "AIzaSyA-ywy51h3TM6YF_n0bNj1D5lAMJ7uMnO4",
@@ -37,14 +11,10 @@ const firebaseConfig = {
     measurementId: "G-Z6K3VG2SJ6"
 };
 
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 let allEmployees = [];
-let currentLang = 'ar';
-let activeEmployeeCode = null;
 let ageChartInstance = null;
 let trendChartInstance = null;
 let donutChartInstance = null;
@@ -77,6 +47,7 @@ async function loadEmployeesFromFirebase() {
         allEmployees = await readEmployeeSources();
         renderTable(allEmployees);
         updateDashboardStats();
+        renderCharts();
     } catch (error) {
         console.error(error);
     }
@@ -85,11 +56,8 @@ async function loadEmployeesFromFirebase() {
 function updateDashboardStats() {
     const totalEl = document.getElementById('dash-total-emp');
     if (totalEl) totalEl.innerText = allEmployees.length;
-    const sideTotal = document.getElementById('total-employees-count');
-    if (sideTotal) sideTotal.innerText = allEmployees.length;
 }
 
-// التنقل بين الصفحات وجعل الـ Dashboard هي الافتراضية
 function openDashboardView() {
     document.getElementById('employees-list-view').classList.add('hidden');
     document.getElementById('employee-profile-view').classList.add('hidden');
@@ -104,7 +72,7 @@ function backToEmployeesList() {
 }
 
 function renderCharts() {
-    // 1. Bar Chart للأعمار
+    // 1. Age Chart
     const ageCtx = document.getElementById('ageChart')?.getContext('2d');
     if (ageCtx) {
         let brackets = { '< 30': 0, '30 - 40': 0, '41 - 50': 0, '50+': 0 };
@@ -115,28 +83,21 @@ function renderCharts() {
             else if (age <= 50) brackets['41 - 50']++;
             else brackets['50+']++;
         });
-
         if (ageChartInstance) ageChartInstance.destroy();
         ageChartInstance = new Chart(ageCtx, {
             type: 'bar',
-            data: {
-                labels: Object.keys(brackets),
-                datasets: [{ data: Object.values(brackets), backgroundColor: ['#38bdf8', '#0284c7', '#0369a1', '#0f172a'], borderRadius: 6 }]
-            },
+            data: { labels: Object.keys(brackets), datasets: [{ data: Object.values(brackets), backgroundColor: ['#38bdf8', '#0284c7', '#0369a1', '#0f172a'], borderRadius: 6 }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { color: '#94a3b8' } }, x: { ticks: { color: '#94a3b8' } } } }
         });
     }
 
-    // 2. Trend Line Chart
+    // 2. Trend Chart
     const trendCtx = document.getElementById('trendChart')?.getContext('2d');
     if (trendCtx) {
         if (trendChartInstance) trendChartInstance.destroy();
         trendChartInstance = new Chart(trendCtx, {
             type: 'line',
-            data: {
-                labels: ['2022', '2023', '2024', '2025', '2026'],
-                datasets: [{ label: 'التعيينات', data: [20, 45, 80, 120, 346], borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.1)', fill: true, tension: 0.4 }]
-            },
+            data: { labels: ['2022', '2023', '2024', '2025', '2026'], datasets: [{ data: [20, 45, 80, 120, 346], borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.1)', fill: true, tension: 0.4 }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
         });
     }
@@ -147,35 +108,31 @@ function renderCharts() {
         if (donutChartInstance) donutChartInstance.destroy();
         donutChartInstance = new Chart(donutCtx, {
             type: 'doughnut',
-            data: {
-                labels: ['إداري', 'فني ومصانع', 'إشراف ومبيعات'],
-                datasets: [{ data: [110, 186, 50], backgroundColor: ['#38bdf8', '#ec4899', '#f59e0b'] }]
-            },
+            data: { labels: ['إداري', 'فني ومصانع', 'مبيعات'], datasets: [{ data: [110, 186, 50], backgroundColor: ['#38bdf8', '#ec4899', '#f59e0b'] }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#cbd5e1', font: { size: 10 } } } } }
         });
     }
 }
 
-// التفاعل مع خريطة مصر الجغرافية
 function selectGov(govName) {
     const title = document.getElementById('selected-gov-title');
     const desc = document.getElementById('selected-gov-desc');
     const empCount = document.getElementById('gov-emp-count');
     const busCount = document.getElementById('gov-bus-count');
 
-    if (govName.includes('الشرقية')) {
+    if (govName === 'الشرقية') {
         title.innerText = '📍 الشرقية (العاشر من رمضان) - المقر الرئيسي';
         desc.innerText = 'المقر التشغيلي الرئيسي ومصانع لاكتو مصر مع أكبر تجمع عمالي.';
         empCount.innerText = '185 موظف';
         busCount.innerText = '6 خطوط رئيسية';
-    } else if (govName.includes('القاهرة')) {
+    } else if (govName === 'القاهرة') {
         title.innerText = '📍 القاهرة الكبرى والجيزة';
         desc.innerText = 'المكاتب الإدارية وخطوط سير النقل لموظفي القاهرة والجيزة.';
         empCount.innerText = '95 موظف';
         busCount.innerText = '10 خطوط نقل';
     } else {
-        title.innerText = `📍 محافظة ${govName}`;
-        desc.innerText = 'توزيعات الموظفين وبدل الانتقالات الإقليمية.';
+        title.innerText = '📍 الإسكندرية والبحيرة';
+        desc.innerText = 'توزيعات الموظفين وبدل الانتقالات الإقليمية الساحلية.';
         empCount.innerText = '66 موظف';
         busCount.innerText = '8 خطوط سير';
     }
@@ -197,14 +154,12 @@ function renderTable(dataList) {
 }
 
 function viewEmployee(code) {
-    activeEmployeeCode = code;
     const emp = allEmployees.find(e => String(e.code) === String(code)); if (!emp) return;
     document.getElementById('dashboard-analytics-view').classList.add('hidden');
     document.getElementById('employees-list-view').classList.add('hidden');
     document.getElementById('employee-profile-view').classList.remove('hidden');
     document.getElementById('prof-code').value = code;
     document.getElementById('prof-name').value = emp.name || emp['اسم الموظف'] || '';
-    document.getElementById('prof-dept').value = emp.department || emp['الإدارة'] || '';
 }
 
 function handleLogin() {
@@ -212,9 +167,7 @@ function handleLogin() {
     const pass = document.getElementById('login-password').value.trim();
     if (!code || !pass) { document.getElementById('login-error').innerText = 'أدخل الكود وكلمة المرور'; return; }
     document.getElementById('login-modal').style.display = 'none';
-    loadEmployeesFromFirebase().then(() => {
-        openDashboardView(); // فتح الـ Dashboard فوراً كصفحة رئيسية بعد الدخول!
-    });
+    loadEmployeesFromFirebase().then(() => openDashboardView());
 }
 
 function handleLogout() { window.location.reload(); }
@@ -238,8 +191,7 @@ function runPortalIntro(){
         onComplete: () => {
             intro.classList.add('fade-out');
             setTimeout(() => {
-                document.getElementById('login-brand').classList.add('intro-ready', 'compact');
-                document.getElementById('login-panel').classList.add('visible', 'compact-mode');
+                document.getElementById('login-modal').style.display = 'flex';
             }, 400);
         }
     }).to(chars, { duration: 2, y: 0, opacity: 1, stagger: 0.05, ease: 'power2.out' })
@@ -250,4 +202,5 @@ function runPortalIntro(){
 
 window.addEventListener('DOMContentLoaded', () => {
     runPortalIntro();
+    loadEmployeesFromFirebase();
 });
