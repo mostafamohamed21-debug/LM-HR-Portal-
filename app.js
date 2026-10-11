@@ -130,11 +130,43 @@ function getField(emp, ...keys) {
     return '';
 }
 function getEmployeeCode(emp) { return String(getField(emp, 'الكود', 'code', 'employeeCode', 'empCode', 'EmployeeCode', 'employee_code', 'ID', 'id') || '').trim(); }
-function getEmployeeName(emp) { return getField(emp, 'اسم الموظف ', 'اسم الموظف', 'name', 'emp_name _en') || '--'; }
-function getEmployeeDept(emp) { return getField(emp, 'الإدارة ', 'الإدارة', 'department', 'dept') || '--'; }
-function getEmployeeJob(emp) { return getField(emp, 'الوظيفة', 'الوظيفة ', 'jobTitle', 'job title', 'job') || '--'; }
-function getHireDate(emp) { const v=getField(emp,'تاريخ التعيين ','تاريخ التعيين','hireDate','date_of_hiring '); return typeof v==='number'?excelDateToJSDate(v):v||'--'; }
-function localizedValue(emp, arKeys, enKeys) { return currentLang==='ar' ? getField(emp,...arKeys) : (getField(emp,...enKeys) || getField(emp,...arKeys)); }
+function getEmployeeName(emp) { return localizedValue(emp, ['اسم الموظف ', 'اسم الموظف', 'name_ar'], ['emp_name_en', 'emp_name _en', 'name_en', 'employee_name_en']) || '--'; }
+function getEmployeeDept(emp) { return localizedValue(emp, ['الإدارة ', 'الإدارة', 'department_ar'], ['department', 'department_en', 'dept_en']) || '--'; }
+function getEmployeeJob(emp) { return localizedValue(emp, ['الوظيفة', 'الوظيفة ', 'job_title_ar'], ['job_title', 'job title', 'jobTitle', 'job_en']) || '--'; }
+function getHireDate(emp) { const v=localizedValue(emp,['تاريخ التعيين ','تاريخ التعيين','hire_date_ar'],['date_of_hiring','date_of_hiring ','hireDate','hire_date']); return typeof v==='number'?excelDateToJSDate(v):v||'--'; }
+// Prefer the selected language's Firebase field. Do not silently display Arabic values in English mode.
+function localizedValue(emp, arKeys, enKeys) {
+    if (currentLang === 'ar') return getField(emp, ...arKeys) || getField(emp, ...enKeys);
+    return getField(emp, ...enKeys) || '';
+}
+
+const bilingualFieldGroups = [
+    { ar:['اسم الموظف ','اسم الموظف','name_ar'], en:['emp_name_en','emp_name _en','name_en','employee_name_en'] },
+    { ar:['الإدارة ','الإدارة','department_ar'], en:['department','department_en','dept_en'] },
+    { ar:['الوظيفة','الوظيفة ','job_title_ar'], en:['job_title','job title','jobTitle','job_en'] },
+    { ar:['المدير المباشر ','المدير المباشر','direct_manager_ar'], en:['direct manager','direct_manager','directManager','direct_manager_en'] },
+    { ar:['تاريخ التعيين ','تاريخ التعيين','hire_date_ar'], en:['date_of_hiring','date_of_hiring ','hireDate','hire_date'] },
+    { ar:['سنوات الخدمة ','سنوات الخدمة','years_service_ar'], en:['years of service','years_of_service','yearsService'] },
+    { ar:['المؤهل','المؤهل '], en:['qualification','qualification_en'] },
+    { ar:['جهة المؤهل ','جهة المؤهل','جهة إصدار المؤهل'], en:['qualification issuing authority','qualification_issuing_authority','qulification issuing authority','qualAuth','issuer'] },
+    { ar:['تاريخ الميلاد','تاريخ الميلاد '], en:['dob','date_of_birth'] },
+    { ar:['السن حتى تاريخه ','السن حتى تاريخه'], en:['age to date','age_to_date','age'] },
+    { ar:['الحالة التأمينية ','الحالة التأمينية'], en:['insurance status','insurance_status','insuranceStatus'] },
+    { ar:['مكان الميلاد','مكان الميلاد ','محل الميلاد','محل الميلاد '], en:['place of birth','place_of_birth','pob','pob_en'] }
+];
+function isOppositeLanguageKey(key) {
+    const list = currentLang === 'en' ? bilingualFieldGroups.flatMap(g => g.ar) : bilingualFieldGroups.flatMap(g => g.en);
+    return list.includes(key);
+}
+function localizedGroupForKey(key) {
+    return bilingualFieldGroups.find(g => g.ar.includes(key) || g.en.includes(key));
+}
+function setLocalizedMapped(target, source, arKeys, enKeys, value, fallback) {
+    // Update only the selected language's field; never overwrite the other language's value.
+    const preferred = currentLang === 'ar' ? arKeys : enKeys;
+    const key = existingKey(source, preferred, fallback || preferred[0]);
+    target[key] = value;
+}
 
 function existingKey(obj, keys, fallback) {
     for (const key of keys) if (Object.prototype.hasOwnProperty.call(obj || {}, key)) return key;
@@ -236,7 +268,7 @@ async function readEmployeeSources() {
     const addRecord = (key, data, path) => {
         if (!data || typeof data !== 'object' || Array.isArray(data)) return;
         const code = String(getField(data, 'الكود', 'code', 'employeeCode', 'empCode', 'EmployeeCode', 'employee_code', 'ID', 'id') || key || '').trim();
-        const name = getField(data, 'اسم الموظف ', 'اسم الموظف', 'name', 'emp_name _en', 'employeeName');
+        const name = getEmployeeName(data) || getField(data, 'اسم الموظف ', 'اسم الموظف', 'name', 'emp_name_en', 'emp_name _en', 'employeeName');
         // A real employee record should have a code or a recognizable employee name.
         if (!code || (!name && !getField(data, 'الإدارة', 'الإدارة ', 'department', 'الوظيفة', 'jobTitle', 'job title'))) return;
         const unique = code;
@@ -362,7 +394,7 @@ async function createFirstPassword() {
         updates[`users/${code}/password`] = pass;
         if (!userSnap.exists()) {
             updates[`users/${code}/code`] = code;
-            const name = getField(employeeData, 'اسم الموظف', 'اسم الموظف ', 'name', 'emp_name _en');
+            const name = getEmployeeName(employeeData) || getField(employeeData, 'اسم الموظف', 'اسم الموظف ', 'name', 'emp_name_en', 'emp_name _en');
             if (name) updates[`users/${code}/name`] = name;
             const email = getField(employeeData, 'email', 'Email', 'البريد الإلكتروني', 'البريد الالكتروني');
             if (email) updates[`users/${code}/email`] = email;
@@ -444,9 +476,9 @@ function renderTable(dataList) {
     if(!dataList.length){ tableBody.innerHTML=`<tr><td colspan="6" class="p-6 text-center text-slate-400">${tr('no_results')}</td></tr>`; return; }
     dataList.forEach(emp=>{
         const code=getEmployeeCode(emp)||'--';
-        const name=localizedValue(emp,['اسم الموظف ','اسم الموظف','name'],['emp_name _en','name'])||'--';
-        const dept=localizedValue(emp,['الإدارة ','الإدارة','department'],['department','dept'])||'--';
-        const job=localizedValue(emp,['الوظيفة','الوظيفة ','jobTitle'],['job title','jobTitle','job'])||'--';
+        const name=getEmployeeName(emp)||'--';
+        const dept=getEmployeeDept(emp)||'--';
+        const job=getEmployeeJob(emp)||'--';
         const hire=getHireDate(emp);
         const row=document.createElement('tr'); row.className='hover:bg-slate-800/40 transition text-slate-300';
         row.innerHTML=`<td class="p-3.5 font-mono text-sky-400">${escapeHtml(code)}</td><td class="p-3.5 font-semibold text-white">${escapeHtml(String(name).trim())}</td><td class="p-3.5">${escapeHtml(String(dept).trim())}</td><td class="p-3.5">${escapeHtml(String(job).trim())}</td><td class="p-3.5 font-mono text-xs">${escapeHtml(String(hire))}</td><td class="p-3.5 text-center"><button onclick="viewEmployee('${escapeAttr(code)}')" class="px-3.5 py-1.5 bg-sky-600/30 hover:bg-sky-600 text-sky-200 rounded-lg text-xs border border-sky-400/30 transition shadow-lg">${tr('action_btn')}</button></td>`;
@@ -465,18 +497,18 @@ function viewEmployee(code) {
     if (listView) { listView.classList.add('hidden'); listView.style.display='none'; }
     if (profileView) { profileView.classList.remove('hidden'); profileView.style.display='block'; }
     setFieldVal('prof-code',code);
-    setFieldVal('prof-name',localizedValue(emp,['اسم الموظف ','اسم الموظف','name'],['emp_name _en','name']));
-    setFieldVal('prof-dept',localizedValue(emp,['الإدارة ','الإدارة','department'],['department','dept']));
-    setFieldVal('prof-job',localizedValue(emp,['الوظيفة','الوظيفة ','jobTitle'],['job title','jobTitle','job']));
-    setFieldVal('prof-manager',localizedValue(emp,['المدير المباشر ','المدير المباشر','directManager'],['direct manager','directManager']));
+    setFieldVal('prof-name',getEmployeeName(emp)==='--'?'':getEmployeeName(emp));
+    setFieldVal('prof-dept',getEmployeeDept(emp)==='--'?'':getEmployeeDept(emp));
+    setFieldVal('prof-job',getEmployeeJob(emp)==='--'?'':getEmployeeJob(emp));
+    setFieldVal('prof-manager',localizedValue(emp,['المدير المباشر ','المدير المباشر','direct_manager_ar'],['direct manager','direct_manager','directManager','direct_manager_en']));
     setFieldVal('prof-hire',getHireDate(emp));
-    setFieldVal('prof-service',getField(emp,'سنوات الخدمة ','سنوات الخدمة','yearsService','years service'));
-    setFieldVal('prof-qual',localizedValue(emp,['المؤهل','qualification'],['qualification']));
-    setFieldVal('prof-qual-auth',localizedValue(emp,['جهة المؤهل ','جهة المؤهل','qualAuth'],['qulification issuing authority','qualAuth','issuer']));
-    setFieldVal('prof-dob',excelDateToJSDate(getField(emp,'تاريخ الميلاد','dob')));
-    setFieldVal('prof-age',getField(emp,'السن حتى تاريخه ','السن حتى تاريخه','age','age to date'));
-    setFieldVal('prof-insurance',localizedValue(emp,['الحالة التأمينية ','الحالة التأمينية','insuranceStatus'],['insurance status','insuranceStatus']));
-    setFieldVal('prof-pob',localizedValue(emp,['مكان الميلاد','pob'],['pob']));
+    setFieldVal('prof-service',localizedValue(emp,['سنوات الخدمة ','سنوات الخدمة','years_service_ar'],['years of service','years_of_service','yearsService']));
+    setFieldVal('prof-qual',localizedValue(emp,['المؤهل','المؤهل '],['qualification','qualification_en']));
+    setFieldVal('prof-qual-auth',localizedValue(emp,['جهة المؤهل ','جهة المؤهل','جهة إصدار المؤهل'],['qualification issuing authority','qualification_issuing_authority','qulification issuing authority','qualAuth','issuer']));
+    { const dob=localizedValue(emp,['تاريخ الميلاد','تاريخ الميلاد '],['dob','date_of_birth']); setFieldVal('prof-dob',typeof dob==='number'?excelDateToJSDate(dob):dob); }
+    setFieldVal('prof-age',localizedValue(emp,['السن حتى تاريخه ','السن حتى تاريخه'],['age to date','age_to_date','age']));
+    setFieldVal('prof-insurance',localizedValue(emp,['الحالة التأمينية ','الحالة التأمينية'],['insurance status','insurance_status','insuranceStatus']));
+    setFieldVal('prof-pob',localizedValue(emp,['مكان الميلاد','مكان الميلاد ','محل الميلاد','محل الميلاد '],['place of birth','place_of_birth','pob','pob_en']));
     document.getElementById('profile-img').src=getField(emp,'photoUrl','photo','رابط الصورة') || 'default-avatar.png';
     document.getElementById('btn-save')?.classList.add('hidden'); document.getElementById('btn-edit')?.classList.remove('hidden'); document.getElementById('btn-photo')?.classList.add('hidden');
     setFieldsEditable(true); renderDynamicFields();
@@ -492,11 +524,13 @@ function renderDynamicFields(){
     container.innerHTML='';
     Object.keys(emp).sort().forEach(key=>{
         if(['code','_firebasePath','_firebaseKey'].includes(key) || ['الكود'].includes(key)) return;
+        if (isOppositeLanguageKey(key)) return;
         const value=emp[key];
         if(value && typeof value==='object') return;
         const card=document.createElement('div'); card.className='dynamic-field-card';
         const inputType=/date|dob|تاريخ/i.test(key)?'date':'text';
-        card.innerHTML=`<div class="flex items-center justify-between gap-2 mb-1"><label class="text-xs text-slate-400">${escapeHtml(displayKey(key))}</label><span class="firebase-key-badge">${escapeHtml(key)}</span></div><input data-firebase-key="${escapeAttr(key)}" type="${inputType}" value="${escapeHtml(value??'')}" ${key==='password'?'autocomplete="new-password"':''} class="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm" disabled>`;
+        const displayValue = typeof value === 'number' && /date|dob|تاريخ/i.test(key) ? excelDateToJSDate(value) : value;
+        card.innerHTML=`<div class="flex items-center justify-between gap-2 mb-1"><label class="text-xs text-slate-400">${escapeHtml(displayKey(key))}</label><span class="firebase-key-badge">${escapeHtml(key)}</span></div><input data-firebase-key="${escapeAttr(key)}" type="${inputType}" value="${escapeHtml(displayValue??'')}" ${key==='password'?'autocomplete="new-password"':''} class="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm" disabled>`;
         container.appendChild(card);
     });
 }
@@ -509,18 +543,18 @@ async function executeSave(){
     const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(activeEmployeeCode)); if(!emp)return;
     const updatedData={};
     putMapped(updatedData, emp, ['الكود','code','employeeCode','empCode'], activeEmployeeCode, 'code');
-    putMapped(updatedData, emp, ['اسم الموظف ','اسم الموظف','name','emp_name _en'], document.getElementById('prof-name').value, 'name');
-    putMapped(updatedData, emp, ['الإدارة ','الإدارة','department','dept'], document.getElementById('prof-dept').value, 'department');
-    putMapped(updatedData, emp, ['الوظيفة','الوظيفة ','jobTitle','job title','job'], document.getElementById('prof-job').value, 'jobTitle');
-    putMapped(updatedData, emp, ['المدير المباشر ','المدير المباشر','directManager','direct manager'], document.getElementById('prof-manager').value, 'directManager');
-    putMapped(updatedData, emp, ['تاريخ التعيين ','تاريخ التعيين','hireDate','date_of_hiring '], document.getElementById('prof-hire').value, 'hireDate');
-    putMapped(updatedData, emp, ['سنوات الخدمة ','سنوات الخدمة','yearsService','years service'], document.getElementById('prof-service').value, 'yearsService');
-    putMapped(updatedData, emp, ['المؤهل','qualification'], document.getElementById('prof-qual').value, 'qualification');
-    putMapped(updatedData, emp, ['جهة المؤهل ','جهة المؤهل','qualAuth','qulification issuing authority','issuer'], document.getElementById('prof-qual-auth').value, 'qualAuth');
-    putMapped(updatedData, emp, ['تاريخ الميلاد','dob'], document.getElementById('prof-dob').value, 'dob');
-    putMapped(updatedData, emp, ['السن حتى تاريخه ','السن حتى تاريخه','age','age to date'], document.getElementById('prof-age').value, 'age');
-    putMapped(updatedData, emp, ['الحالة التأمينية ','الحالة التأمينية','insuranceStatus','insurance status'], document.getElementById('prof-insurance').value, 'insuranceStatus');
-    putMapped(updatedData, emp, ['مكان الميلاد','pob'], document.getElementById('prof-pob').value, 'pob');
+    setLocalizedMapped(updatedData, emp, ['اسم الموظف ','اسم الموظف','name_ar'], ['emp_name_en','emp_name _en','name_en'], document.getElementById('prof-name').value, currentLang==='ar'?'اسم الموظف':'emp_name_en');
+    setLocalizedMapped(updatedData, emp, ['الإدارة ','الإدارة','department_ar'], ['department','department_en','dept_en'], document.getElementById('prof-dept').value, currentLang==='ar'?'الإدارة':'department');
+    setLocalizedMapped(updatedData, emp, ['الوظيفة','الوظيفة ','job_title_ar'], ['job_title','job title','jobTitle','job_en'], document.getElementById('prof-job').value, currentLang==='ar'?'الوظيفة':'job_title');
+    setLocalizedMapped(updatedData, emp, ['المدير المباشر ','المدير المباشر','direct_manager_ar'], ['direct manager','direct_manager','directManager','direct_manager_en'], document.getElementById('prof-manager').value, currentLang==='ar'?'المدير المباشر':'direct manager');
+    setLocalizedMapped(updatedData, emp, ['تاريخ التعيين ','تاريخ التعيين','hire_date_ar'], ['date_of_hiring','date_of_hiring ','hireDate','hire_date'], document.getElementById('prof-hire').value, currentLang==='ar'?'تاريخ التعيين':'date_of_hiring');
+    setLocalizedMapped(updatedData, emp, ['سنوات الخدمة ','سنوات الخدمة','years_service_ar'], ['years of service','years_of_service','yearsService'], document.getElementById('prof-service').value, currentLang==='ar'?'سنوات الخدمة':'years of service');
+    setLocalizedMapped(updatedData, emp, ['المؤهل','المؤهل '], ['qualification','qualification_en'], document.getElementById('prof-qual').value, currentLang==='ar'?'المؤهل':'qualification');
+    setLocalizedMapped(updatedData, emp, ['جهة المؤهل ','جهة المؤهل','جهة إصدار المؤهل'], ['qualification issuing authority','qualification_issuing_authority','qulification issuing authority','qualAuth','issuer'], document.getElementById('prof-qual-auth').value, currentLang==='ar'?'جهة المؤهل':'qualification issuing authority');
+    setLocalizedMapped(updatedData, emp, ['تاريخ الميلاد','تاريخ الميلاد '], ['dob','date_of_birth'], document.getElementById('prof-dob').value, currentLang==='ar'?'تاريخ الميلاد':'dob');
+    setLocalizedMapped(updatedData, emp, ['السن حتى تاريخه ','السن حتى تاريخه'], ['age to date','age_to_date','age'], document.getElementById('prof-age').value, currentLang==='ar'?'السن حتى تاريخه':'age');
+    setLocalizedMapped(updatedData, emp, ['الحالة التأمينية ','الحالة التأمينية'], ['insurance status','insurance_status','insuranceStatus'], document.getElementById('prof-insurance').value, currentLang==='ar'?'الحالة التأمينية':'insurance status');
+    setLocalizedMapped(updatedData, emp, ['مكان الميلاد','مكان الميلاد ','محل الميلاد','محل الميلاد '], ['place of birth','place_of_birth','pob','pob_en'], document.getElementById('prof-pob').value, currentLang==='ar'?'مكان الميلاد':'place of birth');
     putMapped(updatedData, emp, ['photoUrl','photo','رابط الصورة'], document.getElementById('profile-img').src, 'photoUrl');
     document.querySelectorAll('#dynamic-fields-container [data-firebase-key]').forEach(input=>{
         const key=input.getAttribute('data-firebase-key'); if(isValidFirebaseKey(key)) updatedData[key]=input.value;
