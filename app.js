@@ -220,17 +220,60 @@ function hideLogin() {
     setTimeout(() => modal.style.display='none', 350);
 }
 
-async function findEmployeeRecord(code) {
-    const snap = await db.ref('employees').once('value');
-    if (!snap.exists()) return null;
-    const records = snap.val() || {};
-    for (const key of Object.keys(records)) {
-        const record = records[key];
-        if (!record || typeof record !== 'object') continue;
-        const recordCode = String(getField(record, 'الكود', 'code', 'employeeCode', 'empCode', 'EmployeeCode', 'employee_code', 'ID', 'id') || key).trim();
-        if (recordCode === String(code).trim()) return { key, data: record, path: `employees/${key}` };
+async function readEmployeeSources() {
+    // The ESS app stores employee records at the database root in some deployments,
+    // while the portal may also use /employees. Read both without treating users/mail
+    // metadata as employee records.
+    let root = {};
+    let employeesOnly = {};
+    try { const rootSnap = await db.ref('/').once('value'); root = rootSnap.exists() ? (rootSnap.val() || {}) : {}; }
+    catch (rootError) { console.warn('Root read denied; trying /employees directly.', rootError); }
+    try { const employeesSnap = await db.ref('employees').once('value'); employeesOnly = employeesSnap.exists() ? (employeesSnap.val() || {}) : {}; }
+    catch (employeesError) { console.warn('Could not read /employees directly.', employeesError); }
+    const records = [];
+    const seen = new Set();
+
+    const addRecord = (key, data, path) => {
+        if (!data || typeof data !== 'object' || Array.isArray(data)) return;
+        const code = String(getField(data, 'الكود', 'code', 'employeeCode', 'empCode', 'EmployeeCode', 'employee_code', 'ID', 'id') || key || '').trim();
+        const name = getField(data, 'اسم الموظف ', 'اسم الموظف', 'name', 'emp_name _en', 'employeeName');
+        // A real employee record should have a code or a recognizable employee name.
+        if (!code || (!name && !getField(data, 'الإدارة', 'الإدارة ', 'department', 'الوظيفة', 'jobTitle', 'job title'))) return;
+        const unique = code;
+        if (seen.has(unique)) {
+            // Prefer the explicit /employees record when duplicates exist.
+            const existingIndex = records.findIndex(item => item.code === unique);
+            if (existingIndex >= 0 && path.startsWith('employees/')) {
+                records[existingIndex] = { ...data, code, _firebasePath: path, _firebaseKey: key };
+            }
+            return;
+        }
+        seen.add(unique);
+        records.push({ ...data, code, _firebasePath: path, _firebaseKey: key });
+    };
+
+    const employeeNode = (root.employees && typeof root.employees === 'object') ? root.employees : employeesOnly;
+    if (employeeNode && typeof employeeNode === 'object') {
+        Object.entries(employeeNode).forEach(([key, data]) => addRecord(key, data, `employees/${key}`));
     }
-    return null;
+
+    Object.entries(root).forEach(([key, data]) => {
+        if (['employees', 'users', 'mail', 'password_resets', 'permissions', 'settings', 'roles', 'audit_logs'].includes(key)) return;
+        addRecord(key, data, key);
+    });
+
+    return records;
+}
+
+async function findEmployeeRecord(code) {
+    const records = await readEmployeeSources();
+    const match = records.find(record => String(getEmployeeCode(record)).trim() === String(code).trim());
+    if (!match) return null;
+    return {
+        key: match._firebaseKey || String(code),
+        data: match,
+        path: match._firebasePath || `employees/${match._firebaseKey || code}`
+    };
 }
 
 function showFirstPasswordSetup(code, employeeRecord) {
@@ -243,9 +286,13 @@ function showFirstPasswordSetup(code, employeeRecord) {
     panel.dataset.employeePath = employeeRecord ? employeeRecord.path : '';
     panel.classList.remove('hidden');
     const note = document.getElementById('first-password-note');
-    if (note) note.innerText = tr('setup_password_title');
+    if (note) note.innerText = currentLang === 'ar'
+        ? 'أول مرة تدخل؟ اكتب كلمة مرور جديدة في الخانة الأولى، ثم أكدها في الخانة التالية. لن يتم تسجيل الدخول أو الحفظ قبل التأكيد.'
+        : 'First sign-in: enter a new password in the first field, then confirm it below. Nothing is saved and you are not signed in until you confirm.';
+    const password = document.getElementById('login-password');
+    if (password) { password.value = ''; password.placeholder = currentLang === 'ar' ? 'أنشئ كلمة مرور جديدة' : 'Create a new password'; password.setAttribute('autocomplete', 'new-password'); }
     const confirm = document.getElementById('confirm-new-password');
-    if (confirm) { confirm.value = ''; confirm.focus(); }
+    if (confirm) { confirm.value = ''; confirm.placeholder = currentLang === 'ar' ? 'أعد كتابة كلمة المرور للتأكيد' : 'Re-enter password to confirm'; confirm.focus(); }
     const create = document.getElementById('create-password-btn');
     if (create) create.innerText = tr('create_password_btn');
     showLoginMessage('', 'success');
@@ -334,6 +381,8 @@ async function createFirstPassword() {
 }
 
 async function completeLogin(code, pass, remember, user) {
+    const loginPasswordInput = document.getElementById('login-password');
+    if (loginPasswordInput) { loginPasswordInput.placeholder = tr('pass_placeholder'); loginPasswordInput.setAttribute('autocomplete', 'current-password'); }
     currentUserData = { ...(user || {}), code };
     if (remember) {
         localStorage.setItem('lacto_saved_code', code);
@@ -369,20 +418,17 @@ async function loadEmployeesFromFirebase() {
     const tableBody = document.getElementById('employees-table-body');
     if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">${tr('loading')}</td></tr>`;
     try {
-        const snap = await db.ref('employees').once('value');
-        if (snap.exists()) {
-            const raw = snap.val() || {};
-            allEmployees = Object.keys(raw).map(key => ({ ...(raw[key] || {}), code: getField(raw[key]||{},'code','الكود') || key }));
-        } else {
-            allEmployees = [];
-        }
-        renderTable(allEmployees); updateDashboardStats();
+        allEmployees = await readEmployeeSources();
+        renderTable(allEmployees);
+        updateDashboardStats();
+        const status = document.getElementById('connection-status');
+        if (status) status.textContent = currentLang === 'ar'
+            ? `متصل بـ Firebase — ${allEmployees.length} موظف`
+            : `Connected to Firebase — ${allEmployees.length} employees`;
     } catch (error) {
-        console.warn('Firebase employees load failed, using local fallback.', error);
-        fetch('clean_employees_data.json').then(r=>r.json()).then(data=>{
-            allEmployees=data.filter(emp=>(emp['الكود']||emp.code)&&(emp['اسم الموظف ']||emp['اسم الموظف']||emp['emp_name _en']));
-            renderTable(allEmployees); updateDashboardStats();
-        }).catch(()=>{ renderTable([]); });
+        console.error('Firebase employee load failed:', error);
+        if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-300">${currentLang === 'ar' ? 'تعذر تحميل بيانات الموظفين. راجع Console وصلاحيات Firebase.' : 'Could not load employees. Check Console and Firebase rules.'}</td></tr>`;
+        showToast(currentLang === 'ar' ? 'تعذر تحميل بيانات الموظفين من Firebase' : 'Could not load employees from Firebase', true);
     }
 }
 
@@ -414,8 +460,10 @@ function escapeAttr(value){return String(value).replace(/\\/g,'\\\\').replace(/'
 function viewEmployee(code) {
     activeEmployeeCode=code;
     const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(code)); if(!emp) return;
-    document.getElementById('employees-list-view').style.display='none';
-    document.getElementById('employee-profile-view').style.display='block';
+    const listView = document.getElementById('employees-list-view');
+    const profileView = document.getElementById('employee-profile-view');
+    if (listView) { listView.classList.add('hidden'); listView.style.display='none'; }
+    if (profileView) { profileView.classList.remove('hidden'); profileView.style.display='block'; }
     setFieldVal('prof-code',code);
     setFieldVal('prof-name',localizedValue(emp,['اسم الموظف ','اسم الموظف','name'],['emp_name _en','name']));
     setFieldVal('prof-dept',localizedValue(emp,['الإدارة ','الإدارة','department'],['department','dept']));
@@ -436,14 +484,14 @@ function viewEmployee(code) {
 function setFieldVal(id,val){const el=document.getElementById(id);if(el)el.value=val??'';}
 function enableEditing(){setFieldsEditable(false);document.getElementById('btn-edit')?.classList.add('hidden');document.getElementById('btn-save')?.classList.remove('hidden');document.getElementById('btn-photo')?.classList.remove('hidden');}
 function setFieldsEditable(isDisabled){['prof-name','prof-dept','prof-job','prof-manager','prof-hire','prof-service','prof-qual','prof-qual-auth','prof-dob','prof-age','prof-insurance','prof-pob'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.disabled=isDisabled;el.classList.toggle('bg-slate-900/50',isDisabled);el.classList.toggle('border-slate-700',isDisabled);el.classList.toggle('bg-slate-900/90',!isDisabled);el.classList.toggle('border-sky-500/50',!isDisabled);});}
-function backToEmployeesList(){activeEmployeeCode=null;document.getElementById('employee-profile-view').style.display='none';document.getElementById('employees-list-view').style.display='block';}
+function backToEmployeesList(){activeEmployeeCode=null;const profile=document.getElementById('employee-profile-view');const list=document.getElementById('employees-list-view');if(profile){profile.classList.add('hidden');profile.style.display='none';}if(list){list.classList.remove('hidden');list.style.display='block';}}
 
 function renderDynamicFields(){
     const container=document.getElementById('dynamic-fields-container'); if(!container||activeEmployeeCode===null)return;
     const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(activeEmployeeCode)); if(!emp)return;
     container.innerHTML='';
     Object.keys(emp).sort().forEach(key=>{
-        if(['code'].includes(key) || ['الكود'].includes(key)) return;
+        if(['code','_firebasePath','_firebaseKey'].includes(key) || ['الكود'].includes(key)) return;
         const value=emp[key];
         if(value && typeof value==='object') return;
         const card=document.createElement('div'); card.className='dynamic-field-card';
@@ -478,19 +526,20 @@ async function executeSave(){
         const key=input.getAttribute('data-firebase-key'); if(isValidFirebaseKey(key)) updatedData[key]=input.value;
     });
     try{
-        await db.ref('employees/'+activeEmployeeCode).update(updatedData);
+        const savePath = emp._firebasePath || `employees/${activeEmployeeCode}`;
+        await db.ref(savePath).update(updatedData);
         Object.assign(emp,updatedData); showToast(); setFieldsEditable(true); document.getElementById('btn-save')?.classList.add('hidden'); document.getElementById('btn-edit')?.classList.remove('hidden'); document.getElementById('btn-photo')?.classList.add('hidden'); renderTable(allEmployees); renderDynamicFields();
     }catch(error){console.error(error);showToast(currentLang==='ar'?'حدث خطأ أثناء الحفظ':'Save error',true);}
 }
 
-function uploadEmployeePhoto(event){const file=event.target.files?.[0];if(!file||activeEmployeeCode===null)return;const reader=new FileReader();reader.onload=async e=>{const base64=e.target.result;document.getElementById('profile-img').src=base64;try{await db.ref('employees/'+activeEmployeeCode).update({photoUrl:base64});const emp=allEmployees.find(x=>String(getEmployeeCode(x))===String(activeEmployeeCode));if(emp)emp.photoUrl=base64;showToast();}catch(err){console.error(err);}};reader.readAsDataURL(file);}
+function uploadEmployeePhoto(event){const file=event.target.files?.[0];if(!file||activeEmployeeCode===null)return;const reader=new FileReader();reader.onload=async e=>{const base64=e.target.result;document.getElementById('profile-img').src=base64;try{const emp=allEmployees.find(x=>String(getEmployeeCode(x))===String(activeEmployeeCode));const savePath=emp?emp._firebasePath:`employees/${activeEmployeeCode}`;await db.ref(savePath).update({photoUrl:base64});if(emp)emp.photoUrl=base64;showToast();}catch(err){console.error(err);}};reader.readAsDataURL(file);}
 
 function showToast(message=null,isError=false){const toast=document.getElementById('toast-notification');const msg=document.getElementById('toast-message');if(!toast||!msg)return;msg.innerText=message||tr('toast_success');msg.classList.toggle('text-red-300',isError);msg.classList.toggle('text-white',!isError);toast.classList.remove('translate-y-32','opacity-0');setTimeout(()=>toast.classList.add('translate-y-32','opacity-0'),3200);}
 function updateDashboardStats(){const el=document.getElementById('total-employees-count');if(el)el.innerText=allEmployees.length;}
 
 function getFirebaseSchema(){
     const keys=new Set();
-    allEmployees.forEach(emp=>Object.keys(emp||{}).forEach(k=>keys.add(k)));
+    allEmployees.forEach(emp=>Object.keys(emp||{}).filter(k=>!k.startsWith('_')).forEach(k=>keys.add(k)));
     if(!keys.size) ['code','name','department','jobTitle','directManager','hireDate','yearsService','qualification','qualAuth','dob','age','insuranceStatus','pob','photoUrl','email'].forEach(k=>keys.add(k));
     const codeKey=allEmployees.length ? existingKey(allEmployees[0], ['الكود','code','employeeCode','empCode'], 'code') : 'code';
     keys.delete(codeKey); keys.delete('code'); keys.delete('الكود'); keys.delete('employeeCode'); keys.delete('empCode');
