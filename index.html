@@ -240,6 +240,22 @@
 .hr-stat-label{font-size:12px;color:#94a3b8}.hr-stat-value{font-size:29px;color:#7dd3fc;font-weight:800;margin-top:6px}
 .hr-mini-track{height:9px;background:#182b46;border-radius:12px;overflow:hidden}.hr-mini-fill{height:100%;background:linear-gradient(90deg,#0369a1,#67e8f9);border-radius:12px}
 
+
+/* HR navigation: full-height hover dock, never obscures workspace */
+.sidebar-collapsed{top:0!important;bottom:0!important;height:100dvh!important;width:76px!important;z-index:40!important;overflow-y:auto!important;overflow-x:hidden!important}
+.sidebar-collapsed:hover,.sidebar-collapsed:focus-within{width:326px!important}
+.sidebar-collapsed .hr-side-icon{flex-shrink:0;stroke:#67e8f9!important}
+.sidebar-collapsed .sidebar-item{white-space:nowrap;min-height:66px}
+.sidebar-collapsed .sidebar-title{display:inline-block}
+body>header{padding-inline-start:88px;transition:padding-inline-start .25s ease}
+body>div.flex.flex-1.overflow-hidden>main{min-width:0;margin-inline-start:76px;transition:margin-inline-start .25s ease}
+@supports selector(body:has(.sidebar-collapsed:hover)){
+ body:has(.sidebar-collapsed:hover)>header,body:has(.sidebar-collapsed:focus-within)>header{padding-inline-start:338px}
+ body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden>main,body:has(.sidebar-collapsed:focus-within)>div.flex.flex-1.overflow-hidden>main{margin-inline-start:326px}
+}
+@media(max-width:767px){.sidebar-collapsed{width:60px!important}.sidebar-collapsed:hover,.sidebar-collapsed:focus-within{width:min(290px,85vw)!important}body>header{padding-inline-start:68px!important}body>div.flex.flex-1.overflow-hidden>main{margin-inline-start:60px!important;padding:12px!important}body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden>main{margin-inline-start:60px!important}}
+.hr-custom-field{background:rgba(15,23,42,.6);border:1px solid rgba(56,189,248,.23);border-radius:12px;padding:12px;overflow-wrap:anywhere}
+
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -347,10 +363,10 @@
                     <span class="text-xl neon-blue-icon">🎛️</span> <span class="sidebar-title" data-translate="control_panel">غرفة التحكم</span>
                 </div>
                 <nav class="space-y-3 text-sm" aria-label="HR navigation">
-                    <button type="button" onclick="showHRPage('dashboard')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="dashboard"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="nav-text" data-ar="لوحة التحكم" data-en="Dashboard">لوحة التحكم</span></button>
-                    <button type="button" onclick="showHRPage('employees')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="employees"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="nav-text" data-ar="الموظفون" data-en="Employees">الموظفون</span></button>
-                    <button type="button" onclick="showHRPage('payroll')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="payroll"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9h.01M18 15h.01"/></svg><span class="nav-text" data-ar="المرتبات" data-en="Payroll">المرتبات</span></button>
-                    <button type="button" onclick="showHRPage('notifications')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="notifications"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span class="nav-text" data-ar="الإشعارات والطلبات" data-en="Notifications">الإشعارات والطلبات</span></button>
+                    <button type="button" onclick="showHRPage('dashboard')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="dashboard"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="nav-text" data-ar="لوحة التحكم" data-en="Dashboard">لوحة التحكم</span></button>
+                    <button type="button" onclick="showHRPage('employees')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="employees"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="nav-text" data-ar="الموظفون" data-en="Employees">الموظفون</span></button>
+                    <button type="button" onclick="showHRPage('payroll')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="payroll"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9h.01M18 15h.01"/></svg><span class="nav-text" data-ar="المرتبات" data-en="Payroll">المرتبات</span></button>
+                    <button type="button" onclick="showHRPage('notifications')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="notifications"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span class="nav-text" data-ar="الإشعارات والطلبات" data-en="Notifications">الإشعارات والطلبات</span></button>
                 </nav>
             </div>
             <div class="p-4 border-t border-sky-500/20 text-[10px] text-slate-400 text-center truncate">
@@ -416,10 +432,13 @@
                 <div class="flex justify-between items-center glass-card p-4 rounded-2xl">
                     <button onclick="backToEmployeesList()" class="px-4 py-2 bg-sky-600/30 hover:bg-sky-600 text-sky-200 rounded-xl text-sm border border-sky-400/30 transition shadow-lg" data-translate="back_btn">← العودة للقائمة</button>
                     <div class="flex gap-3">
+                        <button type="button" onclick="openAddCustomFieldModal()" class="portal-ghost-btn px-4 py-2 rounded-xl text-sm font-bold" data-ar="+ إضافة بيانات" data-en="+ Add field">+ إضافة بيانات</button>
                         <button id="btn-edit" onclick="enableEditing()" class="px-5 py-2 bg-sky-600/40 hover:bg-sky-600 text-white font-bold rounded-xl text-sm border border-sky-400/30 transition shadow-lg" data-translate="edit_btn">تعديل البيانات</button>
                         <button id="btn-save" onclick="confirmSave()" class="hidden px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition shadow-lg" data-translate="save_btn">حفظ</button>
                     </div>
                 </div>
+
+                <section id="hr-custom-fields" class="glass-card rounded-2xl p-5" aria-label="Additional employee fields"></section>
 
                 <!-- بيانات الموظف والصورة (افتراضياً disabled للعرض فقط) -->
                 <div class="glass-card p-6 rounded-3xl shadow-2xl grid grid-cols-1 lg:grid-cols-4 gap-6 items-center">
@@ -536,7 +555,9 @@
                 <button onclick="closeAddCustomFieldModal()" class="portal-ghost-btn w-9 h-9 rounded-full">✕</button>
             </div>
             <label class="text-xs text-slate-400" data-translate="field_name_label">اسم الخانة</label>
-            <input id="custom-field-name" class="w-full mt-1 px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-white" placeholder="مثال: الرقم التأميني">
+            <input id="custom-field-name" list="hr-field-suggestions" class="w-full mt-1 px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-white" placeholder="مثال: الرقم التأميني">
+            <datalist id="hr-field-suggestions"><option value="address"><option value="governorate"><option value="phone"><option value="emergency_contact"><option value="national_id"></datalist>
+            <p class="text-xs text-slate-400 mt-2" data-ar="استخدم مفتاح ثابت بالإنجليزية (مثال: address). الاسم العربي والإنجليزي للعرض فقط." data-en="Use a stable English key (e.g. address). Labels are only for display.">استخدم مفتاح ثابت بالإنجليزية (مثال: address).</p>
             <label class="text-xs text-slate-400 block mt-4" data-translate="field_value_label">القيمة</label>
             <input id="custom-field-value" class="w-full mt-1 px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-white" placeholder="القيمة">
             <div id="custom-field-error" class="min-h-5 text-center text-xs text-red-400 mt-3"></div>
@@ -616,6 +637,6 @@
     </script>
 
     <!-- ربط ملف الـ JS -->
-    <script src="app.js?v=20261011-6"></script>
+    <script src="app.js?v=20261011-fields-sidebar-3"></script>
 </body>
 </html>
