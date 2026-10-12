@@ -442,9 +442,18 @@ async function loadEmployeesFromFirebase() {
 }
 
 function filterEmployees() {
-    const input=document.getElementById('search-input'); if(!input) return;
-    const query=input.value.toLowerCase().trim();
-    renderTable(allEmployees.filter(emp => JSON.stringify(emp).toLowerCase().includes(query)));
+    const input = document.getElementById('search-input');
+    if (!input) return;
+    const query = input.value.trim();
+    if (!query) { renderTable(allEmployees); return; }
+    const numericQuery = /^[0-9]+$/.test(query);
+    const normalizedQuery = query.toLocaleLowerCase();
+    renderTable(allEmployees.filter(emp => {
+        if (numericQuery) {
+            return String(getEmployeeCode(emp) ?? '').trim() === query;
+        }
+        return String(getEmployeeName(emp) ?? '').toLocaleLowerCase().includes(normalizedQuery);
+    }));
 }
 
 function renderTable(dataList) {
