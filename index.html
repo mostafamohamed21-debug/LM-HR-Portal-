@@ -356,6 +356,12 @@ body > div.flex.flex-1.overflow-hidden > main { box-sizing:border-box; overflow-
 .hr-map-stage .hr-world>svg{display:block!important;flex:1 1 auto!important;width:100%!important;height:100%!important;min-height:0!important;max-width:none!important;max-height:none!important;object-fit:fill!important;border-radius:12px}
 .hr-map-stage .hr-world .hr-map-hint{flex:0 0 auto!important;margin:5px 0 0!important;line-height:1.5!important}
 
+/* Phase 1 navigation: allow all tabs on short displays */
+.sidebar-collapsed nav{padding-bottom:18px}.sidebar-collapsed .sidebar-item{min-height:54px!important}
+.sidebar-collapsed{scrollbar-width:thin;scrollbar-color:#164e63 transparent}
+.hr-feature-table{width:100%;border-collapse:collapse;font-size:13px}
+.hr-feature-table th,.hr-feature-table td{padding:12px;text-align:start;border-bottom:1px solid rgba(56,189,248,.14)}
+.hr-feature-input{width:100%;background:#081529;border:1px solid #24607d;border-radius:10px;padding:12px;color:#e2e8f0}
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -467,6 +473,10 @@ body > div.flex.flex-1.overflow-hidden > main { box-sizing:border-box; overflow-
                     <button type="button" onclick="showHRPage('employees')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="employees"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="nav-text" data-ar="الموظفون" data-en="Employees">الموظفون</span></button>
                     <button type="button" onclick="showHRPage('payroll')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="payroll"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9h.01M18 15h.01"/></svg><span class="nav-text" data-ar="المرتبات" data-en="Payroll">المرتبات</span></button>
                     <button type="button" onclick="showHRPage('notifications')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="notifications"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span class="nav-text" data-ar="الإشعارات والطلبات" data-en="Notifications">الإشعارات والطلبات</span></button>
+<button type="button" onclick="showHRPage('attendance')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="attendance"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg><span class="nav-text" data-ar="الحضور والانصراف" data-en="Attendance">الحضور والانصراف</span></button>
+<button type="button" onclick="showHRPage('leave-balances')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="leave-balances"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></svg><span class="nav-text" data-ar="أرصدة الإجازات" data-en="Leave balances">أرصدة الإجازات</span></button>
+<button type="button" onclick="showHRPage('permissions')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="permissions"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v5a2 2 0 0 0 0 4v5H4v-5a2 2 0 0 0 0-4V5Z"/><path d="M12 5v14" stroke-dasharray="2 2"/></svg><span class="nav-text" data-ar="الأذون الشخصية" data-en="Personal permissions">الأذون الشخصية</span></button>
+<button type="button" onclick="showHRPage('bradford')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="bradford"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l6-6 4 3 8-9"/><path d="M3 21h18"/></svg><span class="nav-text" data-ar="Bradford Factor" data-en="Bradford Factor">Bradford Factor</span></button>
                 </nav>
             </div>
             <div class="p-4 border-t border-sky-500/20 text-[10px] text-slate-400 text-center truncate">
@@ -480,6 +490,10 @@ body > div.flex.flex-1.overflow-hidden > main { box-sizing:border-box; overflow-
             <section id="hr-dashboard-view" class="hidden"></section>
             <section id="hr-payroll-view" class="hidden"></section>
             <section id="hr-notifications-view" class="hidden"></section>
+<section id="hr-attendance-view" class="hidden"></section>
+<section id="hr-leave-balances-view" class="hidden"></section>
+<section id="hr-permissions-view" class="hidden"></section>
+<section id="hr-bradford-view" class="hidden"></section>
             <!-- جدول القائمة الرئيسية -->
             <div id="employees-list-view">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -738,6 +752,6 @@ body > div.flex.flex-1.overflow-hidden > main { box-sizing:border-box; overflow-
 
     <!-- ربط ملف الـ JS -->
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
-    <script src="app.js?v=20261012-egypt-map"></script>
+    <script src="app.js?v=20261012-ess-phase1"></script>
 </body>
 </html>
