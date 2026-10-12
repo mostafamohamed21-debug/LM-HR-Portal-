@@ -687,9 +687,9 @@ window.addEventListener('DOMContentLoaded',async()=>{
 let hrActivePage='dashboard';
 const hrText=(ar,en)=>currentLang==='ar'?ar:en;
 function showHRPage(page){
-    if(!['dashboard','employees','payroll','notifications'].includes(page))return;
+    if(!['dashboard','employees','payroll','notifications','attendance','leave-balances','permissions','bradford'].includes(page))return;
     hrActivePage=page;
-    ['dashboard','payroll','notifications'].forEach(p=>document.getElementById('hr-'+p+'-view')?.classList.toggle('hidden',p!==page));
+    ['dashboard','payroll','notifications','attendance','leave-balances','permissions','bradford'].forEach(p=>document.getElementById('hr-'+p+'-view')?.classList.toggle('hidden',p!==page));
     const list=document.getElementById('employees-list-view'),profile=document.getElementById('employee-profile-view');
     if(page==='employees'){if(activeEmployeeCode!==null){if(profile){profile.classList.remove('hidden');profile.style.display='block';}if(list){list.classList.add('hidden');list.style.display='none';}}else{if(list){list.classList.remove('hidden');list.style.display='block';}if(profile){profile.classList.add('hidden');profile.style.display='none';}}}
     else {if(list){list.classList.add('hidden');list.style.display='none';}if(profile){profile.classList.add('hidden');profile.style.display='none';}}
@@ -700,6 +700,7 @@ function hrCard(label,value,foot=''){return `<div class="hr-kpi"><p class="text-
 function renderHRWorkspace(){
     document.querySelectorAll('.hr-nav [data-ar]').forEach(el=>{el.textContent=el.dataset[currentLang]});
     if(hrActivePage==='dashboard'){renderRichDashboard();}
+    if(['attendance','leave-balances','permissions','bradford'].includes(hrActivePage)) renderHRFeature(hrActivePage);
     if(hrActivePage==='payroll'){
         const d=document.getElementById('hr-payroll-view');if(!d)return;
         const demo=allEmployees.slice(0,30).map((e,i)=>{const base=5500+(i%9)*850,allowance=500+(i%4)*250,deduction=(i%3)*175;return {e,base,allowance,deduction,net:base+allowance-deduction}});
@@ -823,4 +824,24 @@ async function hrRenderGeographicEgypt(counts){
   current.innerHTML=`<text x="270" y="220" text-anchor="middle" fill="#7dd3fc" font-size="15">${hrText('تعذر تحميل حدود المحافظات','Could not load governorate boundaries')}</text><text x="270" y="255" text-anchor="middle" fill="#94a3b8" font-size="11">${hrText('تأكد من الاتصال بالإنترنت','Check internet connection')}</text>`;
   console.warn('Egypt geographic map:',err);
  }
+}
+
+
+// ESS phase 1: clearly-labelled read-only scaffolding; no invented employee balances or attendance.
+function hrFeatureShell(title,subtitle,body){return `<h1 class="text-2xl font-extrabold text-sky-100 mb-2">${title}</h1><p class="text-sm text-slate-400 mb-5">${subtitle}</p>${body}`}
+function hrFeatureNotice(ar,en){return `<div class="hr-panel border-amber-500/30 text-amber-200 text-sm mb-5">${hrText(ar,en)}</div>`}
+function renderHRFeature(page){
+ const d=document.getElementById('hr-'+page+'-view');if(!d)return;
+ const pending=hrFeatureNotice('بانتظار ربط ESS الآمن ومراجعة صلاحيات الوصول. لا توجد بيانات حضور أو إجازات فعلية معروضة حاليًا.','Awaiting secure ESS integration and access review. No actual attendance or leave data is displayed yet.');
+ if(page==='attendance') d.innerHTML=hrFeatureShell(hrText('الحضور والانصراف','Attendance & departure'),hrText('سجلات موحدة مستقبلًا من ESS وأجهزة ZKTeco','Future consolidated records from ESS and ZKTeco'),pending+`<div class="grid grid-cols-1 md:grid-cols-3 gap-4">${hrCard(hrText('سجلات اليوم','Today records'),'—',hrText('بانتظار المصدر','Source pending'))}${hrCard(hrText('التأخيرات','Late arrivals'),'—',hrText('بانتظار الشيفتات','Shifts pending'))}${hrCard(hrText('الغياب','Absences'),'—',hrText('بانتظار سياسة الغياب','Policy pending'))}</div><div class="hr-panel mt-5 text-slate-300 text-sm">${hrText('البيانات المطلوبة: كود الموظف، التوقيت، مصدر الحركة، الشيفت، ونوع الدخول/الخروج إن توفر.','Required: employee code, timestamp, source, shift and check-in/out type when available.')}</div>`);
+ if(page==='leave-balances')d.innerHTML=hrFeatureShell(hrText('أرصدة الإجازات','Leave balances'),hrText('الاستحقاق والمستخدم والمتبقي لكل موظف','Entitled, used and remaining per employee'),pending+`<div class="hr-panel"><table class="hr-feature-table"><thead><tr>${[hrText('الموظف','Employee'),hrText('الاستحقاق','Entitled'),hrText('المستخدم','Used'),hrText('المتبقي','Remaining')].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody><tr><td colspan="4" class="text-slate-400">${hrText('لا توجد أرصدة معتمدة للعرض حتى الآن','No approved balances available yet')}</td></tr></tbody></table></div>`);
+ if(page==='permissions')d.innerHTML=hrFeatureShell(hrText('الأذون الشخصية','Personal permissions'),hrText('طلبات الخروج المبكر والتأخير والأذون بالساعة','Early exit, late arrival and hourly permissions'),pending+`<div class="hr-panel"><table class="hr-feature-table"><thead><tr>${[hrText('الموظف','Employee'),hrText('التاريخ','Date'),hrText('المدة','Duration'),hrText('الحالة','Status')].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody><tr><td colspan="4" class="text-slate-400">${hrText('لا توجد طلبات متصلة حتى الآن','No connected requests yet')}</td></tr></tbody></table></div>`);
+ if(page==='bradford')d.innerHTML=hrFeatureShell('Bradford Factor',hrText('مؤشر تكرار الغياب: B = S² × D — أداة مراجعة وليست قرارًا تأديبيًا آليًا','Absence frequency indicator: B = S² × D — a review aid, not an automated disciplinary decision'),`<div class="hr-panel mb-5"><p class="text-sm text-slate-300 mb-4">${hrText('حاسبة تجريبية: أدخل عدد فترات الغياب المنفصلة وإجمالي أيام الغياب خلال فترة موحدة (مثل آخر 52 أسبوعًا). لا تُحفظ المدخلات.','Local preview calculator: enter separate absence spells and total absent days for a consistent period (e.g. 52 weeks). Inputs are not saved.')}</p><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><label class="text-sm">${hrText('فترات الغياب (S)','Absence spells (S)')}<input id="bradford-spells" type="number" min="0" step="1" class="hr-feature-input mt-2" placeholder="0" oninput="calculateBradford()"></label><label class="text-sm">${hrText('إجمالي أيام الغياب (D)','Total absent days (D)')}<input id="bradford-days" type="number" min="0" step="1" class="hr-feature-input mt-2" placeholder="0" oninput="calculateBradford()"></label></div><div id="bradford-result" class="mt-5 text-sky-300 font-bold" aria-live="polite">—</div></div>`+hrFeatureNotice('Clear / Action required لا يمكن تحديدهما بمصداقية قبل اعتماد سياسة الشركة وحدود المؤشر، وتصنيف الإجازات المستثناة ومراجعة الحالات الفردية.','Clear / Action required statuses require an approved company policy, thresholds, absence exclusions and individual review.')+pending);
+}
+function calculateBradford(){
+ const s=document.getElementById('bradford-spells'),d=document.getElementById('bradford-days'),out=document.getElementById('bradford-result');if(!s||!d||!out)return;
+ if(s.value===''||d.value===''){out.textContent='—';return}
+ const spells=Number(s.value),days=Number(d.value);
+ if(!Number.isInteger(spells)||!Number.isInteger(days)||spells<0||days<0||(spells===0)!==(days===0)||spells>days){out.textContent=hrText('تحقق من الأرقام: عدد الفترات لا يزيد عن عدد الأيام، والصفر يجب أن يكون في الخانتين.','Check inputs: spells cannot exceed days, and zero must appear in both fields.');return}
+ out.textContent=`Bradford Factor = ${spells*spells*days}  (${spells}² × ${days})`;
 }
