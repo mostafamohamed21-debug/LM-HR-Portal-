@@ -274,7 +274,39 @@ body:has(.sidebar-collapsed:focus-within:not(:hover))>div.flex.flex-1.overflow-h
 .hr-donut-layout{display:flex;align-items:center;gap:20px;flex-wrap:wrap}.hr-donut{width:155px;height:155px;flex:none;border-radius:50%;display:grid;place-items:center}.hr-donut>div{width:110px;height:110px;border-radius:50%;background:#0d182d;display:flex;flex-direction:column;align-items:center;justify-content:center}.hr-donut b{font-size:26px;color:#e0f2fe}.hr-donut small{font-size:10px;color:#94a3b8}.hr-donut-legend{flex:1;min-width:140px}.hr-donut-legend>div{display:flex;align-items:center;gap:8px;font-size:11px;margin:8px 0}.hr-donut-legend i{width:9px;height:9px;border-radius:50%;flex:none}.hr-donut-legend span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hr-donut-legend b{color:#7dd3fc}.hr-hbar-row{display:grid;grid-template-columns:minmax(80px,1fr) minmax(80px,1.5fr) 35px;gap:8px;align-items:center;margin:12px 0;font-size:11px}.hr-hbar-row span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hr-hbar-row>div{height:11px;background:#1c2d49;border-radius:8px;overflow:hidden}.hr-hbar-row i{display:block;height:100%;border-radius:8px}.hr-hbar-row b{color:#7dd3fc;text-align:end}.hr-widget{cursor:pointer;transition:transform .2s,border-color .2s}.hr-widget:hover{transform:translateY(-3px);border-color:#38bdf8}
 @media(max-width:650px){.hr-egypt-layout{grid-template-columns:1fr 1fr}.hr-map-stage{min-height:330px}.hr-donut{width:120px;height:120px}.hr-donut>div{width:85px;height:85px}}
 
-    </style>
+    
+/* v6.4 layout: fixed sidebar dock and independent, bilingual header */
+body>header{position:relative;z-index:30;min-height:76px;box-sizing:border-box;padding-inline:24px 100px!important}
+body>header>div:first-child{min-width:0;display:flex;align-items:center;gap:12px;flex-shrink:1}
+#hr-header-brand{display:inline-block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:clamp(15px,1.7vw,24px);direction:inherit}
+.sidebar-collapsed{inset-inline-start:0!important;inset-inline-end:auto!important;top:0!important;bottom:0!important;width:76px!important;height:100dvh!important;overflow:hidden!important}
+.sidebar-collapsed:hover{width:326px!important}
+.sidebar-collapsed:focus-within:not(:hover){width:76px!important}
+.sidebar-collapsed>div:first-child{padding:12px 0!important}
+.sidebar-collapsed nav{padding:0 8px!important;display:flex;flex-direction:column;gap:8px}
+.sidebar-collapsed .sidebar-item{width:100%;height:58px;min-height:58px;box-sizing:border-box;display:grid!important;grid-template-columns:44px minmax(0,1fr);align-items:center!important;justify-content:initial!important;gap:12px!important;padding:0 7px!important;text-align:start}
+.sidebar-collapsed .hr-side-icon{width:26px!important;height:26px!important;min-width:26px!important;justify-self:center;align-self:center;display:block!important;flex:none!important;transform:none}
+.sidebar-collapsed .sidebar-item:hover .hr-side-icon{transform:scale(1.07)}
+.sidebar-collapsed .nav-text{min-width:0;overflow:hidden;text-overflow:ellipsis;opacity:0!important;pointer-events:none}
+.sidebar-collapsed:hover .nav-text{opacity:1!important;pointer-events:auto}
+.sidebar-collapsed .sidebar-title{display:none!important}
+body>div.flex.flex-1.overflow-hidden>main{margin-inline-start:76px!important;min-width:0;transition:margin-inline-start .25s ease!important}
+body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden>main{margin-inline-start:326px!important}
+body:has(.sidebar-collapsed:hover)>header{padding-inline-start:24px!important;padding-inline-end:338px!important}
+body>header{padding-inline-start:24px!important;padding-inline-end:88px!important;transition:padding-inline-end .25s ease}
+html[dir=ltr] body>header{padding-inline-start:88px!important;padding-inline-end:24px!important}
+html[dir=ltr] body:has(.sidebar-collapsed:hover)>header{padding-inline-start:338px!important;padding-inline-end:24px!important}
+html[dir=ltr] body>div.flex.flex-1.overflow-hidden>main{margin-inline-start:76px!important;margin-inline-end:0!important}
+html[dir=rtl] body>div.flex.flex-1.overflow-hidden>main{margin-inline-end:76px!important;margin-inline-start:0!important}
+html[dir=rtl] body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden>main{margin-inline-end:326px!important;margin-inline-start:0!important}
+#login-brand{transition:transform 2.4s cubic-bezier(.22,1,.36,1),opacity 1.35s ease,left 2.4s cubic-bezier(.22,1,.36,1),right 2.4s cubic-bezier(.22,1,.36,1)!important}
+#login-panel{transition:opacity 1.35s ease .35s,transform 1.6s cubic-bezier(.22,1,.36,1) .35s!important}
+.hr-world svg{max-height:325px!important;width:100%;display:block}
+.hr-world{padding:12px!important}.hr-map-stage{min-height:390px!important}
+.hr-egypt-target{cursor:pointer}.hr-egypt-target:hover{filter:drop-shadow(0 0 8px #67e8f9)}
+@media(max-width:767px){body>header{padding-inline:14px 68px!important}html[dir=ltr] body>header{padding-inline:68px 14px!important}#hr-header-brand{font-size:14px}.sidebar-collapsed{width:60px!important}.sidebar-collapsed .sidebar-item{grid-template-columns:38px minmax(0,1fr);padding:0 3px!important}.sidebar-collapsed:hover{width:min(290px,85vw)!important}body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden>main{margin-inline-start:60px!important;margin-inline-end:0!important}html[dir=rtl] body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden>main{margin-inline-start:0!important;margin-inline-end:60px!important}}
+@media(prefers-reduced-motion:reduce){#login-brand,#login-panel,.hr-world,.hr-egypt-zoom{transition:none!important}}
+</style>
 </head>
 <body class="min-h-screen flex flex-col">
 
@@ -353,7 +385,7 @@ body:has(.sidebar-collapsed:focus-within:not(:hover))>div.flex.flex-1.overflow-h
             <div class="w-10 h-10 flex items-center justify-center">
                 <img src="logo.png" alt="Company Logo" class="w-full h-full object-contain logo-soft-3d">
             </div>
-            <span class="text-2xl font-bold text-sky-400 tracking-wider">Lacto Misr HR</span>
+            <span id="hr-header-brand" class="text-2xl font-bold text-sky-400 tracking-wider" data-ar="لاكتو مصر - الموارد البشرية" data-en="Lacto Misr HR">لاكتو مصر - الموارد البشرية</span>
         </div>
         
         <div class="flex items-center gap-3 relative">
@@ -378,7 +410,7 @@ body:has(.sidebar-collapsed:focus-within:not(:hover))>div.flex.flex-1.overflow-h
         <aside class="sidebar-collapsed glass-card flex flex-col justify-between border-l z-20 overflow-hidden shadow-2xl">
             <div class="p-4 space-y-6">
                 <div class="text-sm font-bold text-sky-300 text-center border-b border-sky-500/20 pb-3 truncate">
-                    <span class="text-xl neon-blue-icon">🎛️</span> <span class="sidebar-title" data-translate="control_panel">غرفة التحكم</span>
+                    <span class="sidebar-title" data-translate="control_panel">غرفة التحكم</span>
                 </div>
                 <nav class="space-y-3 text-sm" aria-label="HR navigation">
                     <button type="button" onclick="showHRPage('dashboard')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="dashboard"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="nav-text" data-ar="لوحة التحكم" data-en="Dashboard">لوحة التحكم</span></button>
@@ -655,6 +687,6 @@ body:has(.sidebar-collapsed:focus-within:not(:hover))>div.flex.flex-1.overflow-h
     </script>
 
     <!-- ربط ملف الـ JS -->
-    <script src="app.js?v=20261012-globe-1"></script>
+    <script src="app.js?v=20261012-4"></script>
 </body>
 </html>
