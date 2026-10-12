@@ -226,6 +226,7 @@ function setLanguage(lang) {
     renderTable(allEmployees);
     if (typeof renderHRWorkspace === 'function') renderHRWorkspace();
     if (activeEmployeeCode !== null) viewEmployee(activeEmployeeCode);
+    document.querySelectorAll("[data-ar][data-en]:not(.hr-nav [data-ar])").forEach(el=>{el.textContent=el.getAttribute("data-"+currentLang);});
     if (document.getElementById('add-employee-modal') && !document.getElementById('add-employee-modal').classList.contains('hidden')) buildAddEmployeeForm();
 
 }
@@ -490,6 +491,7 @@ function viewEmployee(code) {
     document.getElementById('profile-img').src=getField(emp,'photoUrl','photo','رابط الصورة') || 'default-avatar.png';
     document.getElementById('btn-save')?.classList.add('hidden'); document.getElementById('btn-edit')?.classList.remove('hidden'); document.getElementById('btn-photo')?.classList.add('hidden');
     setFieldsEditable(true);
+    renderExtraEmployeeFields();
 }
 function setFieldVal(id,val){const el=document.getElementById(id);if(el)el.value=val??'';}
 function enableEditing(){setFieldsEditable(false);document.getElementById('btn-edit')?.classList.add('hidden');document.getElementById('btn-save')?.classList.remove('hidden');document.getElementById('btn-photo')?.classList.remove('hidden');}
@@ -581,15 +583,32 @@ async function saveNewEmployee(){
 
 function openAddCustomFieldModal(){if(activeEmployeeCode===null){showToast(currentLang==='ar'?'افتح ملف موظف أولاً':'Open an employee profile first',true);return;}document.getElementById('custom-field-modal')?.classList.remove('hidden');document.getElementById('custom-field-name').value='';document.getElementById('custom-field-value').value='';document.getElementById('custom-field-error').innerText='';}
 function closeAddCustomFieldModal(){document.getElementById('custom-field-modal')?.classList.add('hidden');}
+const HR_FIELD_LABELS={address:['العنوان','Address'],governorate:['المحافظة','Governorate'],phone:['رقم الهاتف','Phone'],emergency_contact:['رقم الطوارئ','Emergency contact'],national_id:['الرقم القومي','National ID']};
+const HR_PROTECTED_KEYS=new Set(['password','pass','photoUrl','photo','code','_firebasePath','_firebaseKey','employeeCode','id','role','permissions']);
+function getHRCustomKeys(){try{return JSON.parse(localStorage.getItem("lacto_custom_keys")||"[]")}catch{return []}}
+function renderExtraEmployeeFields(){
+ const box=document.getElementById('hr-custom-fields');if(!box)return;
+ const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(activeEmployeeCode));if(!emp){box.innerHTML='';return;}
+ const keys=Object.keys(emp).filter(k=>(Object.prototype.hasOwnProperty.call(HR_FIELD_LABELS,k)||Boolean(emp.hr_custom_fields?.[k])) && emp[k]!==undefined && emp[k]!==null && String(emp[k]).trim()!=='');
+ box.innerHTML=`<h3 class="text-sky-300 font-bold mb-3">${currentLang==='ar'?'بيانات إضافية':'Additional details'}</h3>`+(keys.length?`<div class="grid grid-cols-1 md:grid-cols-2 gap-3">${keys.map(k=>`<div class="hr-custom-field"><p class="text-xs text-slate-400">${escapeHtml((HR_FIELD_LABELS[k]||[k.replace(/_/g," "),k.replace(/_/g," ")])[currentLang==='ar'?0:1])}</p><p class="text-sm text-slate-100 mt-1">${escapeHtml(String(emp[k]))}</p></div>`).join('')}</div>`:`<p class="text-sm text-slate-400">${currentLang==='ar'?'لا توجد بيانات إضافية بعد':'No additional fields yet'}</p>`);
+}
 async function saveCustomField(){
-    const key=document.getElementById('custom-field-name').value.trim();const value=document.getElementById('custom-field-value').value.trim();const err=document.getElementById('custom-field-error');
-    if(!isValidFirebaseKey(key)){err.innerText=tr('custom_field_invalid');return;}
-    if(!key){err.innerText=tr('field_name_label');return;}
-    try{
-        await db.ref('employees/'+activeEmployeeCode).update({[key]:value});
-        const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(activeEmployeeCode));if(emp)emp[key]=value;
-        closeAddCustomFieldModal();renderDynamicFields();showToast(tr('custom_field_saved'));
-    }catch(error){err.innerText=tr('login_error');}
+ const key=document.getElementById('custom-field-name').value.trim();
+ const value=document.getElementById('custom-field-value').value.trim();
+ const err=document.getElementById('custom-field-error');
+ const normalized=key.toLowerCase();
+ if(!/^[a-z][a-z0-9_]{1,49}$/.test(key)||HR_PROTECTED_KEYS.has(key)||normalized.includes('password')){err.textContent=currentLang==='ar'?'استخدم مفتاح إنجليزي آمن مثل address أو governorate':'Use a safe English key such as address or governorate';return;}
+ if(!value){err.textContent=currentLang==='ar'?'أدخل القيمة':'Enter a value';return;}
+ const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(activeEmployeeCode));
+ if(!emp||!emp._firebasePath){err.textContent=currentLang==='ar'?'تعذر تحديد سجل الموظف':'Employee record path not found';return;}
+ if(Object.prototype.hasOwnProperty.call(emp,key)&&!Object.prototype.hasOwnProperty.call(HR_FIELD_LABELS,key)) {err.textContent=currentLang==='ar'?'الحقل موجود بالفعل؛ لا يمكن استبداله من هنا':'Existing field cannot be overwritten here';return;}
+ try{
+   await db.ref(emp._firebasePath).update({[key]:value,[`hr_custom_fields/${key}`]:true});
+   emp[key]=value;emp.hr_custom_fields={...(emp.hr_custom_fields||{}),[key]:true};
+   if(!HR_FIELD_LABELS[key]){const keys=getHRCustomKeys();if(!keys.includes(key)){keys.push(key);localStorage.setItem("lacto_custom_keys",JSON.stringify(keys));}}
+   if(!HR_FIELD_LABELS[key])HR_FIELD_LABELS[key]=[key.replace(/_/g,' '),key.replace(/_/g,' ')];
+   closeAddCustomFieldModal();renderExtraEmployeeFields();showToast(tr('custom_field_saved'));
+ }catch(error){console.error('Field save failed',error);err.textContent=tr('login_error');}
 }
 
 function randomVerificationCode(){const arr=new Uint32Array(1);crypto.getRandomValues(arr);return String(100000+(arr[0]%900000));}
