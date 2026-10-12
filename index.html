@@ -320,7 +320,43 @@ html[dir=rtl] body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden
 .hr-egypt-zoom .hr-map-status{position:absolute;bottom:8px;inset-inline-start:12px;font-size:10px;color:#8bb4cb;pointer-events:none}
 @media(max-width:650px){.hr-map-stage{height:450px;min-height:450px}}
 
-</style>
+
+/* v6.6: RTL/LTR dock clearance — sidebar is on inline-start, not inline-end. */
+html[dir="rtl"] body > div.flex.flex-1.overflow-hidden > main {
+  margin-inline-start:76px!important;
+  margin-inline-end:0!important;
+}
+html[dir="rtl"] body:has(.sidebar-collapsed:hover) > div.flex.flex-1.overflow-hidden > main {
+  margin-inline-start:326px!important;
+  margin-inline-end:0!important;
+}
+html[dir="rtl"] body > header {
+  padding-inline-start:88px!important;
+  padding-inline-end:24px!important;
+}
+html[dir="rtl"] body:has(.sidebar-collapsed:hover) > header {
+  padding-inline-start:338px!important;
+  padding-inline-end:24px!important;
+}
+body > div.flex.flex-1.overflow-hidden > main { box-sizing:border-box; overflow-x:hidden; }
+@media (max-width:767px) {
+ html[dir="rtl"] body > div.flex.flex-1.overflow-hidden > main,
+ html[dir="rtl"] body:has(.sidebar-collapsed:hover) > div.flex.flex-1.overflow-hidden > main {
+   margin-inline-start:60px!important; margin-inline-end:0!important;
+ }
+ html[dir="rtl"] body > header,
+ html[dir="rtl"] body:has(.sidebar-collapsed:hover) > header {
+   padding-inline-start:68px!important; padding-inline-end:14px!important;
+ }
+}
+
+
+/* v6.7 - World map occupies the full available dashboard map stage. */
+.hr-map-stage .hr-world{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;box-sizing:border-box;display:flex!important;flex-direction:column!important;justify-content:stretch!important;align-items:stretch!important;padding:8px!important;min-width:0!important;min-height:0!important}
+.hr-map-stage .hr-world>svg{display:block!important;flex:1 1 auto!important;width:100%!important;height:100%!important;min-height:0!important;max-width:none!important;max-height:none!important;object-fit:fill!important;border-radius:12px}
+.hr-map-stage .hr-world .hr-map-hint{flex:0 0 auto!important;margin:5px 0 0!important;line-height:1.5!important}
+
+    </style>
 </head>
 <body class="min-h-screen flex flex-col">
 
