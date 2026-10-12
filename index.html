@@ -306,6 +306,20 @@ html[dir=rtl] body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden
 .hr-egypt-target{cursor:pointer}.hr-egypt-target:hover{filter:drop-shadow(0 0 8px #67e8f9)}
 @media(max-width:767px){body>header{padding-inline:14px 68px!important}html[dir=ltr] body>header{padding-inline:68px 14px!important}#hr-header-brand{font-size:14px}.sidebar-collapsed{width:60px!important}.sidebar-collapsed .sidebar-item{grid-template-columns:38px minmax(0,1fr);padding:0 3px!important}.sidebar-collapsed:hover{width:min(290px,85vw)!important}body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden>main{margin-inline-start:60px!important;margin-inline-end:0!important}html[dir=rtl] body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden>main{margin-inline-start:0!important;margin-inline-end:60px!important}}
 @media(prefers-reduced-motion:reduce){#login-brand,#login-panel,.hr-world,.hr-egypt-zoom{transition:none!important}}
+
+/* v6.5 - full-card geographic Egypt map */
+.hr-map-stage{height:clamp(430px,43vw,590px);min-height:430px}
+.hr-egypt-zoom{padding:12px 14px!important;overflow:hidden!important;display:flex;flex-direction:column;gap:8px}
+.hr-zoom-top{flex:0 0 auto;min-height:32px}
+.hr-egypt-layout{display:flex!important;flex:1 1 auto;height:auto!important;min-height:0;gap:0!important;position:relative}
+.hr-egypt-svg{height:100%!important;width:100%!important;max-height:none!important;object-fit:contain;display:block}
+.hr-geo-list{display:none!important}
+.hr-map-tooltip{margin-top:8px!important;min-height:38px!important;padding:8px 12px!important;flex:0 0 auto}
+.hr-egypt-region{stroke:#70a9c9;stroke-width:.7;vector-effect:non-scaling-stroke;cursor:pointer;transition:fill .18s ease,filter .18s ease,stroke .18s ease}
+.hr-egypt-region:hover,.hr-egypt-region:focus{stroke:#fff;stroke-width:1.8;filter:drop-shadow(0 0 7px #38bdf8);outline:none}
+.hr-egypt-zoom .hr-map-status{position:absolute;bottom:8px;inset-inline-start:12px;font-size:10px;color:#8bb4cb;pointer-events:none}
+@media(max-width:650px){.hr-map-stage{height:450px;min-height:450px}}
+
 </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -687,6 +701,7 @@ html[dir=rtl] body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden
     </script>
 
     <!-- ربط ملف الـ JS -->
-    <script src="app.js?v=20261012-4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+    <script src="app.js?v=20261012-egypt-map"></script>
 </body>
 </html>
