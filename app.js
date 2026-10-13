@@ -876,7 +876,7 @@ function essRenderRequestPanel(){
    }catch(err){const p=document.getElementById('ess-auth-error');if(p)p.textContent=hrText('فشل تسجيل الدخول الإداري إلى ESS. تحقق من كلمة المرور والصلاحيات.','ESS admin sign-in failed. Check credentials and permissions.');}
   });return;
  }
- panel.innerHTML=`<div class="flex flex-wrap gap-3 items-center mb-4"><span class="text-emerald-300">${hrText('متصل بحساب إدارة ESS','ESS admin connected')}</span><button id="ess-signout" class="border border-slate-600 px-3 py-1 rounded-lg">${hrText('فصل ESS','Disconnect ESS')}</button></div><div id="ess-requests-content">${hrText('جاري تحميل الطلبات...','Loading requests...')}</div>`;
+ panel.innerHTML=`<div class="flex flex-wrap gap-3 items-center mb-4"><span class="text-emerald-300">${hrText('متصل بحساب إدارة ESS','ESS admin connected')}</span><button id="ess-signout" class="border border-slate-600 px-3 py-1 rounded-lg">${hrText('فصل ESS','Disconnect ESS')}</button></div><div class="border border-slate-600 rounded-xl p-3 mb-4 flex flex-wrap gap-2"><strong class="w-full">${hrText('إرسال إشعار إلى ESS','Send ESS notification')}</strong><input id="ess-notify-code" class="p-2 bg-slate-900 rounded" placeholder="Employee code: 2 / 102"><input id="ess-notify-title" class="p-2 bg-slate-900 rounded" maxlength="120" placeholder="${hrText('عنوان الإشعار','Title')}"><input id="ess-notify-body" class="p-2 bg-slate-900 rounded" maxlength="1000" placeholder="${hrText('نص الإشعار','Message')}"><button class="px-3 py-2 bg-sky-700 rounded" onclick="essSendNotification()">${hrText('إرسال','Send')}</button></div><div id="ess-requests-content">${hrText('جاري تحميل الطلبات...','Loading requests...')}</div>`;
  panel.querySelector('#ess-signout').onclick=()=>essAuth.signOut();
  essStopListeners();essRequestState={};essRequestErrors={};
  essPaths.forEach(([path])=>{
@@ -896,7 +896,7 @@ function essDrawRequests(){
    Object.entries(requests).forEach(([id,req])=>{
     if(!req||typeof req!=='object')return;
     const t=Number(req.timestamp||req.createdAt||0);
-    rows.push({type:hrText(ar,en),code,id,req,time:t});
+    rows.push({type:hrText(ar,en),path,code,id,req,time:t});
    });
   });
  });
@@ -904,11 +904,29 @@ function essDrawRequests(){
  const errors=Object.entries(essRequestErrors).map(([p,e])=>`${essEscape(p)}: ${essEscape(e)}`).join(' | ');
  const msg=errors?`<p class="text-amber-300 mb-3">${hrText('تعذر قراءة بعض المسارات','Some paths could not be read')}: ${errors}</p>`:'';
  if(!rows.length){area.innerHTML=msg+`<p>${hrText('لا توجد طلبات حاليًا، أو لم تصل بيانات بعد.','No requests yet, or still loading.')}</p>`;return;}
- area.innerHTML=msg+`<p class="mb-3">${rows.length} ${hrText('طلب','requests')}</p><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr>${[hrText('النوع','Type'),hrText('الكود','Code'),hrText('الحالة','Status'),hrText('التاريخ','Date'),hrText('التفاصيل','Details')].map(x=>`<th class="p-2 text-start border-b border-slate-700">${x}</th>`).join('')}</tr></thead><tbody>${rows.slice(0,300).map(r=>{
+ area.innerHTML=msg+`<p class="mb-3">${rows.length} ${hrText('طلب','requests')}</p><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr>${[hrText('النوع','Type'),hrText('الكود','Code'),hrText('الحالة','Status'),hrText('التاريخ','Date'),hrText('التفاصيل','Details'),hrText('إجراء','Action')].map(x=>`<th class="p-2 text-start border-b border-slate-700">${x}</th>`).join('')}</tr></thead><tbody>${rows.slice(0,300).map(r=>{
  const date=r.time?new Date(r.time).toLocaleString(currentLang==='ar'?'ar-EG':'en-GB'):'—';
  const status=r.req.status||r.req.verificationStatus||'—';
  const detail=Object.entries(r.req).filter(([k])=>!['code','timestamp','createdAt','status','verificationStatus'].includes(k)).slice(0,8).map(([k,v])=>`${k}: ${typeof v==='object'?'[object]':String(v).slice(0,90)}`).join(' | ');
- return `<tr class="border-b border-slate-700/40"><td class="p-2">${essEscape(r.type)}</td><td class="p-2">${essEscape(r.code)}</td><td class="p-2">${essEscape(status)}</td><td class="p-2">${essEscape(date)}</td><td class="p-2">${essEscape(detail)}</td></tr>`;
+ return `<tr class="border-b border-slate-700/40"><td class="p-2">${essEscape(r.type)}</td><td class="p-2">${essEscape(r.code)}</td><td class="p-2">${essEscape(status)}</td><td class="p-2">${essEscape(date)}</td><td class="p-2">${essEscape(detail)}</td><td class="p-2">${portalIsAdmin() && essAuth.currentUser?.uid===ESS_ADMIN_UID && r.req.status==='Pending' && r.path!=='attendance_requests' && r.path!=='suggestions_and_complaints' ? `<button class="px-2 py-1 bg-emerald-700 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Approved')">${hrText('موافقة','Approve')}</button> <button class="px-2 py-1 bg-red-800 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Rejected')">${hrText('رفض','Reject')}</button>` : '—'}</td></tr>`;
  }).join('')}</tbody></table></div>`;
 }
 essAuth.onAuthStateChanged(()=>{if(document.getElementById('ess-request-panel'))essRenderRequestPanel();else essStopListeners();});
+
+async function essDecide(path,code,id,status){
+ if(!portalIsAdmin()||essAuth.currentUser?.uid!==ESS_ADMIN_UID) return alert('غير مصرح');
+ if(!['permission_requests','leave_requests','loan_requests','mission_requests'].includes(path)||!['Approved','Rejected'].includes(status)||!/^\d+$/.test(code)||!/^[\w-]+$/.test(id))return;
+ if(!confirm(status==='Approved'?'تأكيد الموافقة؟':'تأكيد الرفض؟'))return;
+ const ref=essDb.ref(path+'/'+code+'/'+id);
+ try{
+  const s=await ref.once('value');if(s.val()?.status!=='Pending')throw Error('الطلب لم يعد معلقًا');
+  await ref.update({status,reviewedAt:firebase.database.ServerValue.TIMESTAMP,reviewedBy:ESS_ADMIN_UID});
+  await essDb.ref('notifications/'+code).push({title:status==='Approved'?'تمت الموافقة على الطلب':'تم رفض الطلب',body:'حالة طلبك ('+path+') أصبحت '+status,createdAt:firebase.database.ServerValue.TIMESTAMP,senderUid:ESS_ADMIN_UID});
+ }catch(e){alert('تعذر تسجيل القرار أو إرسال الإشعار: '+(e.code||e.message));console.error(e)}
+}
+async function essSendNotification(){
+ if(!portalIsAdmin()||essAuth.currentUser?.uid!==ESS_ADMIN_UID)return;
+ const code=document.getElementById('ess-notify-code')?.value.trim(),title=document.getElementById('ess-notify-title')?.value.trim(),body=document.getElementById('ess-notify-body')?.value.trim();
+ if(!/^(2|102)$/.test(code)||!title||!body||title.length>120||body.length>1000)return alert('الكود المسموح حاليًا 2 أو 102، والعنوان والرسالة مطلوبان');
+ try{await essDb.ref('notifications/'+code).push({title,body,createdAt:firebase.database.ServerValue.TIMESTAMP,senderUid:ESS_ADMIN_UID});alert('تم إرسال الإشعار')}catch(e){alert('فشل إرسال الإشعار: '+(e.code||e.message))}
+}
