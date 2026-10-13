@@ -914,19 +914,23 @@ function essDrawRequests(){
 essAuth.onAuthStateChanged(()=>{if(document.getElementById('ess-request-panel'))essRenderRequestPanel();else essStopListeners();});
 
 async function essDecide(path,code,id,status){
- if(!portalIsAdmin()||essAuth.currentUser?.uid!==ESS_ADMIN_UID) return alert('غير مصرح');
+ if(!portalIsAdmin()||essAuth.currentUser?.uid!==ESS_ADMIN_UID) return await lmDialog('غير مصرح');
  if(!['permission_requests','leave_requests','loan_requests','mission_requests'].includes(path)||!['Approved','Rejected'].includes(status)||!/^\d+$/.test(code)||!/^[\w-]+$/.test(id))return;
- if(!confirm(status==='Approved'?'تأكيد الموافقة؟':'تأكيد الرفض؟'))return;
+ if(!await lmDialog(status==='Approved'?'تأكيد الموافقة؟':'تأكيد الرفض؟',true))return;
  const ref=essDb.ref(path+'/'+code+'/'+id);
  try{
   const s=await ref.once('value');if(s.val()?.status!=='Pending')throw Error('الطلب لم يعد معلقًا');
-  await ref.update({status,reviewedAt:firebase.database.ServerValue.TIMESTAMP,reviewedBy:ESS_ADMIN_UID});
-  await essDb.ref('notifications/'+code).push({title:status==='Approved'?'تمت الموافقة على الطلب':'تم رفض الطلب',body:'حالة طلبك ('+path+') أصبحت '+status,createdAt:firebase.database.ServerValue.TIMESTAMP,senderUid:ESS_ADMIN_UID});
- }catch(e){alert('تعذر تسجيل القرار أو إرسال الإشعار: '+(e.code||e.message));console.error(e)}
+  await essDb.ref().update({[path+'/'+code+'/'+id+'/status']:status,[path+'/'+code+'/'+id+'/reviewedAt']:firebase.database.ServerValue.TIMESTAMP,[path+'/'+code+'/'+id+'/reviewedBy']:ESS_ADMIN_UID});
+  try {await essDb.ref('notifications/'+code).push({title:status==='Approved'?'تمت الموافقة على الطلب':'تم رفض الطلب',body:'حالة طلبك ('+path+') أصبحت '+status,createdAt:firebase.database.ServerValue.TIMESTAMP,senderUid:ESS_ADMIN_UID});await lmDialog('تم تسجيل القرار وإرسال الإشعار');}catch(notifyError){await lmDialog('تم تسجيل القرار، لكن إرسال الإشعار فشل: '+(notifyError.code||notifyError.message));}
+ }catch(e){await lmDialog('تعذر تسجيل القرار أو إرسال الإشعار: '+(e.code||e.message));console.error(e)}
 }
 async function essSendNotification(){
  if(!portalIsAdmin()||essAuth.currentUser?.uid!==ESS_ADMIN_UID)return;
  const code=document.getElementById('ess-notify-code')?.value.trim(),title=document.getElementById('ess-notify-title')?.value.trim(),body=document.getElementById('ess-notify-body')?.value.trim();
- if(!/^(2|102)$/.test(code)||!title||!body||title.length>120||body.length>1000)return alert('الكود المسموح حاليًا 2 أو 102، والعنوان والرسالة مطلوبان');
- try{await essDb.ref('notifications/'+code).push({title,body,createdAt:firebase.database.ServerValue.TIMESTAMP,senderUid:ESS_ADMIN_UID});alert('تم إرسال الإشعار')}catch(e){alert('فشل إرسال الإشعار: '+(e.code||e.message))}
+ if(!/^(2|102)$/.test(code)||!title||!body||title.length>120||body.length>1000)return await lmDialog('الكود المسموح حاليًا 2 أو 102، والعنوان والرسالة مطلوبان');
+ try{await essDb.ref('notifications/'+code).push({title,body,createdAt:firebase.database.ServerValue.TIMESTAMP,senderUid:ESS_ADMIN_UID});await lmDialog('تم إرسال الإشعار')}catch(e){await lmDialog('فشل إرسال الإشعار: '+(e.code||e.message))}
 }
+
+
+// Branded dark dialog; avoids browser alert/confirm windows.
+function lmDialog(message,ask=false){return new Promise(resolve=>{const overlay=document.createElement('div');overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(2,6,23,.84);display:grid;place-items:center;padding:20px';const card=document.createElement('div');card.style.cssText='width:min(420px,95vw);padding:24px;border-radius:20px;background:#101d35;color:#e2e8f0;border:1px solid #24547c;box-shadow:0 20px 60px #0009;text-align:center;direction:rtl;font-family:inherit';const msg=document.createElement('div');msg.style.cssText='line-height:1.8;white-space:pre-wrap;margin-bottom:22px';msg.textContent=message;const row=document.createElement('div');row.style.cssText='display:flex;justify-content:center;gap:12px';function add(label,result,color){const b=document.createElement('button');b.textContent=label;b.style.cssText='padding:11px 22px;border-radius:12px;border:0;background:'+color+';color:white;font-weight:700;cursor:pointer';b.onclick=()=>{overlay.remove();resolve(result)};row.append(b)}if(ask)add('إلغاء',false,'#475569');add(ask?'تأكيد':'حسنًا',true,'#167bb7');card.append(msg,row);overlay.append(card);document.body.append(overlay)})}
