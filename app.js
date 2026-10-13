@@ -255,17 +255,31 @@ function hideLogin() {
 
 async function readEmployeeSources() {
     if (!portalIsAdmin()) throw new Error('UNAUTHORIZED_ADMIN');
-    const snap = await db.ref('employees').once('value');
-    const node = snap.val() || {};
+    // Original Firebase JSON was imported as a root array: /0, /1, /2 ...
+    // These indices are NOT employee codes. Keep the original paths for edits.
+    const [rootSnap, employeesSnap] = await Promise.all([
+        db.ref('/').once('value'), db.ref('employees').once('value')
+    ]);
     const records = [];
-    Object.entries(node).forEach(([key, data]) => {
-        if (!data || typeof data !== 'object' || Array.isArray(data)) return;
-        const code = String(getField(data, 'الكود', 'code', 'employeeCode', 'empCode', 'EmployeeCode', 'employee_code', 'ID', 'id') || key).trim();
-        if (!code) return;
-        const safeData = {...data};
-        for (const field of Object.keys(safeData)) if (/^(password|pass|passwordhash|كلمة المرور)$/i.test(field)) delete safeData[field];
-        records.push({...safeData, code, _firebasePath: `employees/${key}`, _firebaseKey: key});
-    });
+    const byCode = new Map();
+    function collect(node, prefix) {
+        if (!node || typeof node !== 'object') return;
+        Object.entries(node).forEach(([key, data]) => {
+            if (!data || typeof data !== 'object' || Array.isArray(data)) return;
+            const rawCode = getField(data, 'الكود', 'code', 'employeeCode', 'empCode', 'EmployeeCode', 'employee_code', 'ID', 'id');
+            if (rawCode === undefined || rawCode === null || String(rawCode).trim() === '') return;
+            const code = String(rawCode).trim();
+            const safeData = {...data};
+            for (const field of Object.keys(safeData)) {
+                if (/^(password|pass|passwordhash|كلمة المرور)$/i.test(field)) delete safeData[field];
+            }
+            const record = {...safeData, code, _firebasePath: prefix + key, _firebaseKey: key};
+            if (byCode.has(code)) records[byCode.get(code)] = record;
+            else { byCode.set(code, records.length); records.push(record); }
+        });
+    }
+    collect(rootSnap.val(), '');
+    collect(employeesSnap.val(), 'employees/');
     return records;
 }
 
