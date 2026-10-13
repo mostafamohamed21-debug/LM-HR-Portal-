@@ -643,7 +643,8 @@ function renderHRWorkspace(){
     }
     if(hrActivePage==='notifications'){
         const d=document.getElementById('hr-notifications-view');if(!d)return;
-        d.innerHTML=`<h1 class="text-2xl font-extrabold mb-5">${hrText('الإشعارات والطلبات','Notifications & Requests')}</h1><div class="glass-card rounded-2xl p-6 mb-5"><h2 class="font-bold text-sky-300 mb-3">${hrText('طلبات ESS المعلقة','Pending ESS requests')}</h2><p class="text-slate-400 text-sm">${hrText('لم يتم ربط مصدر طلبات ESS بعد. لا يمكن عرض طلبات حقيقية قبل معرفة مسارها وصلاحيات الوصول.','ESS requests source is not connected. Real requests require the database path and access permissions.')}</p></div><div class="glass-card rounded-2xl p-6"><h2 class="font-bold text-sky-300 mb-3">${hrText('إرسال إشعار للموبايل','Send mobile notification')}</h2><input id="hr-notify-title" maxlength="100" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-3" placeholder="${hrText('عنوان الإشعار','Notification title')}"><textarea id="hr-notify-body" maxlength="500" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-3" placeholder="${hrText('نص الرسالة','Message body')}"></textarea><button type="button" onclick="showToast(hrText('الإرسال غير مفعل: يلزم ربط FCM والتحقق من صلاحيات المرسل','Sending unavailable: FCM and sender permissions must be configured'),true)" class="portal-ghost-btn px-5 py-3 rounded-xl">${hrText('إرسال (يتطلب الربط)','Send (integration required)')}</button><p class="text-xs text-slate-500 mt-3">${hrText('لن يتم إرسال أي إشعار حقيقي قبل تفعيل الربط الآمن.','No real notification will be sent before secure integration.')}</p></div>`;
+        d.innerHTML=`<h1 class="text-2xl font-extrabold mb-5">${hrText('الإشعارات والطلبات','Notifications & Requests')}</h1><div class="glass-card rounded-2xl p-6 mb-5"><h2 class="font-bold text-sky-300 mb-3">${hrText('طلبات ESS المعلقة','Pending ESS requests')}</h2><div id="ess-request-panel" class="text-slate-300 text-sm">${hrText('جاري فحص اتصال ESS...','Checking ESS connection...')}</div></div><div class="glass-card rounded-2xl p-6"><h2 class="font-bold text-sky-300 mb-3">${hrText('إرسال إشعار للموبايل','Send mobile notification')}</h2><input id="hr-notify-title" maxlength="100" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-3" placeholder="${hrText('عنوان الإشعار','Notification title')}"><textarea id="hr-notify-body" maxlength="500" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-3" placeholder="${hrText('نص الرسالة','Message body')}"></textarea><button type="button" onclick="showToast(hrText('الإرسال غير مفعل: يلزم ربط FCM والتحقق من صلاحيات المرسل','Sending unavailable: FCM and sender permissions must be configured'),true)" class="portal-ghost-btn px-5 py-3 rounded-xl">${hrText('إرسال (يتطلب الربط)','Send (integration required)')}</button><p class="text-xs text-slate-500 mt-3">${hrText('لن يتم إرسال أي إشعار حقيقي قبل تفعيل الربط الآمن.','No real notification will be sent before secure integration.')}</p></div>`;
+        setTimeout(essRenderRequestPanel,0);
     }
 }
 document.addEventListener('DOMContentLoaded',()=>showHRPage('dashboard'));
@@ -831,3 +832,83 @@ async function hrShowImportedData(type){
 }
 const _hrFeatureOriginal=renderHRFeature;
 renderHRFeature=function(page){_hrFeatureOriginal(page);if(['attendance','leave-balances'].includes(page)){const container=document.getElementById('hr-'+page+'-view');if(container){container.insertAdjacentHTML('beforeend',hrExtraTools(page)+`<div class="hr-panel mt-5"><h2 class="font-bold text-sky-300 mb-3">${hrText('البيانات المستوردة فعليًا','Actual imported records')}</h2><button class="portal-ghost-btn px-4 py-2 rounded-xl mb-3" onclick="hrShowImportedData('${page}')">${hrText('عرض آخر دفعة','View latest batch')}</button><div id="hr-import-records-${page}"></div></div>`)}hrLoadImport(page)}};
+
+
+// ESS cross-project read-only integration. Credentials are never stored in source.
+const ESS_ADMIN_UID = 'wNAq91LfdQcrcQCfSSWsJpNtFP82';
+const ESS_ADMIN_EMAIL = 'mostafa.el-sayed@lactomisr.com';
+const essFirebaseConfig = {
+  apiKey: 'AIzaSyBObCeo4PM20UNYObThwdY4UaOiIhWdXa0',
+  authDomain: 'lacto-hr-system.firebaseapp.com',
+  databaseURL: 'https://lacto-hr-system-default-rtdb.firebaseio.com',
+  projectId: 'lacto-hr-system',
+  storageBucket: 'lacto-hr-system.firebasestorage.app',
+  messagingSenderId: '671259800401',
+  appId: '1:671259800401:web:905e1a36adba52ba2d1970'
+};
+const essApp = firebase.apps.find(app=>app.name==='ESS_ADMIN') || firebase.initializeApp(essFirebaseConfig,'ESS_ADMIN');
+const essAuth = essApp.auth();
+const essDb = essApp.database();
+const essPaths = [
+ ['permission_requests','أذونات','Permissions'],['leave_requests','إجازات','Leaves'],
+ ['loan_requests','سلف','Loans'],['mission_requests','مأموريات','Missions'],
+ ['suggestions_and_complaints','شكاوى ومقترحات','Feedback'],
+ ['attendance_requests','طلبات حضور','Attendance requests']
+];
+let essRequestUnsubscribers=[];
+let essRequestState={};
+let essRequestErrors={};
+function essEscape(v){return escapeHtml(String(v??''));}
+function essStopListeners(){essRequestUnsubscribers.forEach(f=>f());essRequestUnsubscribers=[];}
+function essRenderRequestPanel(){
+ const panel=document.getElementById('ess-request-panel');if(!panel)return;
+ if(!portalIsAdmin()) {essStopListeners();panel.textContent=hrText('هذه الصفحة متاحة للإدارة فقط','Admin only');return;}
+ const u=essAuth.currentUser;
+ if(!u||u.uid!==ESS_ADMIN_UID){
+  essStopListeners();
+  panel.innerHTML=`<p class="mb-3">${hrText('لرؤية طلبات ESS سجّل الدخول مرة واحدة بالحساب الإداري المنفصل. لن تتغير جلسة البورتال.','Sign in to the separate ESS admin account to view requests. Your Portal session stays active.')}</p><form id="ess-admin-form" class="flex flex-col gap-3 max-w-md"><input id="ess-admin-email" type="email" readonly value="${ESS_ADMIN_EMAIL}" class="p-3 rounded-lg bg-slate-900 border border-slate-700"><input id="ess-admin-password" type="password" required autocomplete="current-password" placeholder="${hrText('كلمة مرور حساب إدارة ESS','ESS admin password')}" class="p-3 rounded-lg bg-slate-900 border border-slate-700"><button class="px-4 py-3 rounded-lg bg-sky-700" type="submit">${hrText('اتصال آمن بـ ESS','Connect to ESS securely')}</button><p id="ess-auth-error" role="alert" class="text-red-300"></p></form>`;
+  panel.querySelector('#ess-admin-form').addEventListener('submit',async e=>{
+   e.preventDefault();const password=panel.querySelector('#ess-admin-password').value;
+   panel.querySelector('#ess-admin-password').value='';
+   try{const c=await essAuth.signInWithEmailAndPassword(ESS_ADMIN_EMAIL,password);
+    if(c.user.uid!==ESS_ADMIN_UID){await essAuth.signOut();throw Error('ESS admin UID mismatch');}
+    essRenderRequestPanel();
+   }catch(err){const p=document.getElementById('ess-auth-error');if(p)p.textContent=hrText('فشل تسجيل الدخول الإداري إلى ESS. تحقق من كلمة المرور والصلاحيات.','ESS admin sign-in failed. Check credentials and permissions.');}
+  });return;
+ }
+ panel.innerHTML=`<div class="flex flex-wrap gap-3 items-center mb-4"><span class="text-emerald-300">${hrText('متصل بحساب إدارة ESS','ESS admin connected')}</span><button id="ess-signout" class="border border-slate-600 px-3 py-1 rounded-lg">${hrText('فصل ESS','Disconnect ESS')}</button></div><div id="ess-requests-content">${hrText('جاري تحميل الطلبات...','Loading requests...')}</div>`;
+ panel.querySelector('#ess-signout').onclick=()=>essAuth.signOut();
+ essStopListeners();essRequestState={};essRequestErrors={};
+ essPaths.forEach(([path])=>{
+  const ref=essDb.ref(path);
+  const cb=s=>{essRequestState[path]=s.val()||{};delete essRequestErrors[path];essDrawRequests();};
+  const err=e=>{essRequestErrors[path]=e.code||e.message;essDrawRequests();};
+  ref.on('value',cb,err);essRequestUnsubscribers.push(()=>ref.off('value',cb));
+ });
+}
+function essDrawRequests(){
+ const area=document.getElementById('ess-requests-content');if(!area)return;
+ const rows=[];
+ essPaths.forEach(([path,ar,en])=>{
+  const codes=essRequestState[path]||{};
+  Object.entries(codes).forEach(([code,requests])=>{
+   if(!requests||typeof requests!=='object')return;
+   Object.entries(requests).forEach(([id,req])=>{
+    if(!req||typeof req!=='object')return;
+    const t=Number(req.timestamp||req.createdAt||0);
+    rows.push({type:hrText(ar,en),code,id,req,time:t});
+   });
+  });
+ });
+ rows.sort((a,b)=>b.time-a.time);
+ const errors=Object.entries(essRequestErrors).map(([p,e])=>`${essEscape(p)}: ${essEscape(e)}`).join(' | ');
+ const msg=errors?`<p class="text-amber-300 mb-3">${hrText('تعذر قراءة بعض المسارات','Some paths could not be read')}: ${errors}</p>`:'';
+ if(!rows.length){area.innerHTML=msg+`<p>${hrText('لا توجد طلبات حاليًا، أو لم تصل بيانات بعد.','No requests yet, or still loading.')}</p>`;return;}
+ area.innerHTML=msg+`<p class="mb-3">${rows.length} ${hrText('طلب','requests')}</p><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr>${[hrText('النوع','Type'),hrText('الكود','Code'),hrText('الحالة','Status'),hrText('التاريخ','Date'),hrText('التفاصيل','Details')].map(x=>`<th class="p-2 text-start border-b border-slate-700">${x}</th>`).join('')}</tr></thead><tbody>${rows.slice(0,300).map(r=>{
+ const date=r.time?new Date(r.time).toLocaleString(currentLang==='ar'?'ar-EG':'en-GB'):'—';
+ const status=r.req.status||r.req.verificationStatus||'—';
+ const detail=Object.entries(r.req).filter(([k])=>!['code','timestamp','createdAt','status','verificationStatus'].includes(k)).slice(0,8).map(([k,v])=>`${k}: ${typeof v==='object'?'[object]':String(v).slice(0,90)}`).join(' | ');
+ return `<tr class="border-b border-slate-700/40"><td class="p-2">${essEscape(r.type)}</td><td class="p-2">${essEscape(r.code)}</td><td class="p-2">${essEscape(status)}</td><td class="p-2">${essEscape(date)}</td><td class="p-2">${essEscape(detail)}</td></tr>`;
+ }).join('')}</tbody></table></div>`;
+}
+essAuth.onAuthStateChanged(()=>{if(document.getElementById('ess-request-panel'))essRenderRequestPanel();else essStopListeners();});
