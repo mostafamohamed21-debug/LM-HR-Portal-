@@ -643,7 +643,7 @@ function renderHRWorkspace(){
     }
     if(hrActivePage==='notifications'){
         const d=document.getElementById('hr-notifications-view');if(!d)return;
-        d.innerHTML=`<h1 class="text-2xl font-extrabold mb-5">${hrText('الإشعارات والطلبات','Notifications & Requests')}</h1><div class="glass-card rounded-2xl p-6 mb-5"><h2 class="font-bold text-sky-300 mb-3">${hrText('طلبات ESS المعلقة','Pending ESS requests')}</h2><div id="ess-request-panel" class="text-slate-300 text-sm">${hrText('جاري فحص اتصال ESS...','Checking ESS connection...')}</div></div><div class="glass-card rounded-2xl p-6"><h2 class="font-bold text-sky-300 mb-3">${hrText('إنشاء إشعار إداري','Compose HR notification')}</h2><label class="block text-sm mb-1">${hrText('العنوان','Title')}</label><input id="hr-notify-title" maxlength="120" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-3" placeholder="${hrText('عنوان الإشعار','Notification title')}"><label class="block text-sm mb-1">${hrText('الرسالة','Message')}</label><textarea id="hr-notify-body" maxlength="1000" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-3" placeholder="${hrText('نص الرسالة','Message body')}"></textarea><label class="block text-sm mb-1">${hrText('إرسال إلى','Audience')}</label><select id="hr-notify-target" onchange="hrNotificationAudienceChanged()" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-3"><option value="all">${hrText('الشركة بالكامل','Entire company')}</option><option value="department">${hrText('إدارة كاملة','Department')}</option><option value="employees">${hrText('موظفون محددون','Selected employees')}</option></select><div id="hr-notify-target-fields" class="mb-3"></div><label class="flex items-center gap-3 mb-4 text-sm"><input id="hr-notify-ack" type="checkbox" class="w-5 h-5 accent-sky-500">${hrText('هذا الإشعار يتطلب إقرار الموظف بالاطلاع','Employee acknowledgement required')}</label><button type="button" onclick="hrPreviewNotification()" class="portal-action-btn px-5 py-3 rounded-xl">${hrText('معاينة المستلمين','Preview recipients')}</button><div id="hr-notify-preview" class="mt-4 text-sm text-slate-300" aria-live="polite"></div><p class="text-xs text-amber-300 mt-3">${hrText('مرحلة تجهيز آمنة: المعاينة فقط، لا يتم إرسال رسائل حتى توصيل الخادم وسجل التدقيق.','Safe preparation stage: preview only; no sending until backend and audit log are connected.')}</p></div>`;
+        d.innerHTML=`<h1 class="text-2xl font-extrabold mb-5">${hrText('الإشعارات والطلبات','Notifications & Requests')}</h1><div class="glass-card rounded-2xl p-6 mb-5"><h2 class="font-bold text-sky-300 mb-3">${hrText('طلبات ESS المعلقة','Pending ESS requests')}</h2><div id="ess-request-panel" class="text-slate-300 text-sm">${hrText('جاري فحص اتصال ESS...','Checking ESS connection...')}</div></div><div class="glass-card rounded-2xl p-6"><h2 class="font-bold text-sky-300 mb-3">${hrText('إنشاء إشعار إداري','Compose HR notification')}</h2><label class="block text-sm mb-1">${hrText('العنوان','Title')}</label><input id="hr-notify-title" maxlength="120" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-3" placeholder="${hrText('عنوان الإشعار','Notification title')}"><label class="block text-sm mb-1">${hrText('الرسالة','Message')}</label><textarea id="hr-notify-body" maxlength="1000" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-3" placeholder="${hrText('نص الرسالة','Message body')}"></textarea><label class="block text-sm mb-1">${hrText('إرسال إلى','Audience')}</label><select id="hr-notify-target" onchange="hrNotificationAudienceChanged()" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-3"><option value="all">${hrText('الشركة بالكامل','Entire company')}</option><option value="department">${hrText('إدارة كاملة','Department')}</option><option value="employees">${hrText('موظفون محددون','Selected employees')}</option></select><div id="hr-notify-target-fields" class="mb-3"></div><label class="flex items-center gap-3 mb-4 text-sm"><input id="hr-notify-ack" type="checkbox" class="w-5 h-5 accent-sky-500">${hrText('هذا الإشعار يتطلب إقرار الموظف بالاطلاع','Employee acknowledgement required')}</label><button type="button" onclick="hrPreviewNotification()" class="portal-action-btn px-5 py-3 rounded-xl">${hrText('معاينة المستلمين','Preview recipients')}</button> <button type="button" id="hr-notify-send" onclick="hrSendNotification()" class="portal-action-btn px-5 py-3 rounded-xl ml-2" style="background:#0878ad">${hrText('إرسال الإشعار','Send notification')}</button><div id="hr-notify-preview" class="mt-4 text-sm text-slate-300" aria-live="polite"></div><p class="text-xs text-amber-300 mt-3">${hrText('إرسال داخلي مجاني على Spark للكودين 2 و102 فقط، دون Push في الخلفية. يلزم تسجيل دخول إدارة ESS.','Free Spark internal delivery for codes 2 and 102 only; no background push. ESS admin sign-in required.')}</p></div>`;
         hrNotificationAudienceChanged();
         setTimeout(essRenderRequestPanel,0);
     }
@@ -941,17 +941,20 @@ function hrNotificationAudienceChanged(){
  const target=document.getElementById('hr-notify-target')?.value;
  const el=document.getElementById('hr-notify-target-fields');if(!el)return;
  const opts=[...new Set(allEmployees.map(e=>String(getEmployeeDept(e)||'').trim()).filter(x=>x&&x!=='--'))].sort();
+ if(target!=='employees')hrSelectedNotificationCodes.clear();
  if(target==='department')el.innerHTML='<label class="block text-sm mb-1">'+hrText('الإدارة','Department')+'</label><select id="hr-notify-department" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30">'+opts.map((x,i)=>'<option value="'+i+'">'+escapeHtml(x)+'</option>').join('')+'</select>';
  else if(target==='employees')el.innerHTML='<label class="block text-sm mb-1">'+hrText('بحث واختيار الموظفين','Search and select employees')+'</label><input id="hr-notify-search" oninput="hrFilterNotificationEmployees()" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-2" placeholder="'+hrText('الاسم أو الكود','Name or code')+'"><div id="hr-notify-employee-list" class="max-h-52 overflow-auto border border-slate-700 rounded-xl p-2"></div>',hrFilterNotificationEmployees();
  else el.innerHTML='';
  const p=document.getElementById('hr-notify-preview');if(p)p.replaceChildren();
 }
+let hrSelectedNotificationCodes=new Set();
 function hrFilterNotificationEmployees(){
  const area=document.getElementById('hr-notify-employee-list');if(!area)return;
- const checked=new Set([...area.querySelectorAll('input:checked')].map(e=>e.value));
+ const checked=hrSelectedNotificationCodes;
  const q=String(document.getElementById('hr-notify-search')?.value||'').toLocaleLowerCase();
  const employees=allEmployees.filter(e=>String(getEmployeeCode(e)).includes(q)||String(getEmployeeName(e)).toLocaleLowerCase().includes(q)).slice(0,150);
  area.innerHTML=employees.map(e=>{const code=getEmployeeCode(e);return '<label class="flex items-center gap-2 p-1 text-sm"><input class="hr-recipient-checkbox" type="checkbox" value="'+escapeHtml(code)+'" '+(checked.has(code)?'checked':'')+'><span>'+escapeHtml(getEmployeeName(e))+' — '+escapeHtml(code)+'</span></label>'}).join('')||hrText('لا توجد نتائج','No results');
+ area.querySelectorAll('.hr-recipient-checkbox').forEach(el=>el.addEventListener('change',()=>{if(el.checked)hrSelectedNotificationCodes.add(el.value);else hrSelectedNotificationCodes.delete(el.value);}));
 }
 function hrPreviewNotification(){
  const area=document.getElementById('hr-notify-preview');if(!area)return;
@@ -962,7 +965,48 @@ function hrPreviewNotification(){
  if(target==='all')recipients=allEmployees;
  else if(target==='department'){
  const opts=[...new Set(allEmployees.map(e=>String(getEmployeeDept(e)||'').trim()).filter(x=>x&&x!=='--'))].sort();const dept=opts[Number(document.getElementById('hr-notify-department')?.value)];recipients=allEmployees.filter(e=>String(getEmployeeDept(e)||'').trim()===dept);
- }else{const codes=new Set([...document.querySelectorAll('.hr-recipient-checkbox:checked')].map(e=>e.value));recipients=allEmployees.filter(e=>codes.has(getEmployeeCode(e)));}
+ }else{recipients=allEmployees.filter(e=>hrSelectedNotificationCodes.has(getEmployeeCode(e)));}
  const ack=!!document.getElementById('hr-notify-ack')?.checked;
  area.replaceChildren();const p=document.createElement('p');p.className='p-3 rounded-xl border border-sky-500/30 bg-slate-900/50';p.textContent=hrText('معاينة فقط — ','Preview only — ')+recipients.length+' '+hrText('موظف من بيانات البورتال. الإقرار: ','employees from portal data. Acknowledgement: ')+(ack?hrText('مطلوب','Required'):hrText('غير مطلوب','Not required'))+'. '+hrText('لا يُفترض أن لديهم جميعًا حساب ESS أو اشتراك Push.','Not all necessarily have ESS accounts or push subscriptions.');area.appendChild(p);
+}
+
+
+// Spark-only internal delivery: ESS admin Firebase Auth, no FCM server secrets.
+// Pilot restricted to codes 2 and 102. This is NOT background push.
+async function hrSendNotification(){
+ const title=String(document.getElementById('hr-notify-title')?.value||'').trim();
+ const body=String(document.getElementById('hr-notify-body')?.value||'').trim();
+ const target=document.getElementById('hr-notify-target')?.value;
+ if(!title||!body||title.length>120||body.length>1000)return lmDialog(hrText('أدخل عنوانًا ورسالة صالحين','Enter a valid title and message'));
+ if(!portalIsAdmin()||!portalAuth.currentUser)return lmDialog(hrText('غير مصرح بالإرسال','Not authorized'));
+ if(essAuth.currentUser?.uid!==ESS_ADMIN_UID)return lmDialog(hrText('اربط حساب إدارة ESS أولًا من لوحة الطلبات','Connect the ESS admin account from the requests panel first'));
+ let recipients=[];
+ if(target==='all')recipients=allEmployees;
+ else if(target==='department'){
+  const opts=[...new Set(allEmployees.map(e=>String(getEmployeeDept(e)||'').trim()).filter(x=>x&&x!=='--'))].sort();
+  const dept=opts[Number(document.getElementById('hr-notify-department')?.value)]||'';
+  if(!dept)return lmDialog(hrText('اختر الإدارة','Select department'));
+  recipients=allEmployees.filter(e=>String(getEmployeeDept(e)||'').trim()===dept);
+ }else if(target==='employees')recipients=allEmployees.filter(e=>hrSelectedNotificationCodes.has(String(getEmployeeCode(e))));
+ else return lmDialog('Invalid target');
+ const codes=[...new Set(recipients.map(e=>String(getEmployeeCode(e)||'').trim()).filter(Boolean))];
+ if(!codes.length)return lmDialog(hrText('لا يوجد مستلمون','No recipients'));
+ const pilot=['2','102'];
+ if(codes.some(c=>!pilot.includes(c)))return lmDialog(hrText('مرحلة الاختبار تسمح بالكودين 2 و102 فقط. اخترهما من الموظفين المحددين.','Pilot only permits codes 2 and 102. Select specific employees.'));
+ const ack=!!document.getElementById('hr-notify-ack')?.checked;
+ const ok=await lmDialog(hrText('تأكيد إرسال إشعار داخلي إلى ','Confirm internal message to ')+codes.join(', ')+' ؟',true);
+ if(!ok)return;
+ const btn=document.getElementById('hr-notify-send');if(btn)btn.disabled=true;
+ try{
+  const senderUid=portalAuth.currentUser.uid;
+  const essUid=essAuth.currentUser.uid;
+  const batchId=essDb.ref('notification_audit').push().key;
+  const msg={title,body,requiresAcknowledgement:ack,createdAt:firebase.database.ServerValue.TIMESTAMP,senderUid:essUid,portalSenderUid:senderUid,batchId};
+  const updates={};
+  for(const code of codes)updates['notifications/'+code+'/'+batchId]=msg;
+  updates['notification_audit/'+batchId]={title,body,requiresAcknowledgement:ack,createdAt:firebase.database.ServerValue.TIMESTAMP,senderUid:essUid,portalSenderUid:senderUid,recipientCodes:codes,recipientCount:codes.length};
+  await essDb.ref().update(updates);
+  await lmDialog(hrText('تم حفظ الإشعار داخل ESS بنجاح لـ ','Internal ESS message saved for ')+codes.length+hrText(' موظف. لا يتضمن إرسال Push والهاتف مقفول.',' employees. No background push was sent.'));
+ }catch(e){await lmDialog(hrText('فشل الإرسال: ','Sending failed: ')+(e.code||e.message));}
+ finally{if(btn)btn.disabled=false;}
 }
