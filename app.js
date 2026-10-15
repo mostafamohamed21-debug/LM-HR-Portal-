@@ -973,7 +973,28 @@ async function essSendNotification(){
 
 
 // Branded dark dialog; avoids browser alert/confirm windows.
-function lmDialog(message,ask=false){return new Promise(resolve=>{const overlay=document.createElement('div');overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(2,6,23,.84);display:grid;place-items:center;padding:20px';const card=document.createElement('div');card.style.cssText='width:min(420px,95vw);padding:24px;border-radius:20px;background:#101d35;color:#e2e8f0;border:1px solid #24547c;box-shadow:0 20px 60px #0009;text-align:center;direction:rtl;font-family:inherit';const msg=document.createElement('div');msg.style.cssText='line-height:1.8;white-space:pre-wrap;margin-bottom:22px';msg.textContent=message;const row=document.createElement('div');row.style.cssText='display:flex;justify-content:center;gap:12px';function add(label,result,color){const b=document.createElement('button');b.textContent=label;b.style.cssText='padding:11px 22px;border-radius:12px;border:0;background:'+color+';color:white;font-weight:700;cursor:pointer';b.onclick=()=>{overlay.remove();resolve(result)};row.append(b)}if(ask)add('إلغاء',false,'#475569');add(ask?'تأكيد':'حسنًا',true,'#167bb7');card.append(msg,row);overlay.append(card);document.body.append(overlay)})}
+function lmDialog(message,ask=false){
+ return new Promise(resolve=>{
+  const lang=currentLang==='en'?'en':'ar';
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(2,6,23,.84);display:grid;place-items:center;padding:20px';
+  const card=document.createElement('div');
+  card.setAttribute('role','dialog');card.setAttribute('aria-modal','true');
+  card.setAttribute('aria-label',lang==='ar'?'رسالة النظام':'System message');
+  card.dir=lang==='ar'?'rtl':'ltr';
+  card.style.cssText='width:min(420px,95vw);padding:24px;border-radius:20px;background:#101d35;color:#e2e8f0;border:1px solid #24547c;box-shadow:0 20px 60px #0009;text-align:center;font-family:inherit';
+  const msg=document.createElement('div');msg.style.cssText='line-height:1.8;white-space:pre-wrap;margin-bottom:22px;overflow-wrap:anywhere';
+  msg.textContent=message;
+  const row=document.createElement('div');row.style.cssText='display:flex;justify-content:center;gap:12px';
+  const close=(result)=>{document.removeEventListener('keydown',onKey,true);overlay.remove();resolve(result)};
+  const onKey=(event)=>{if(event.key==='Escape'){event.preventDefault();close(false)}};
+  document.addEventListener('keydown',onKey,true);
+  function add(label,result,color){const button=document.createElement('button');button.type='button';button.textContent=label;button.style.cssText='padding:11px 22px;border-radius:12px;border:0;background:'+color+';color:white;font-weight:700;cursor:pointer';button.onclick=()=>close(result);row.append(button);return button}
+  if(ask)add(lang==='ar'?'إلغاء':'Cancel',false,'#475569');
+  const primary=add(ask?(lang==='ar'?'تأكيد':'Confirm'):(lang==='ar'?'حسنًا':'OK'),true,'#167bb7');
+  card.append(msg,row);overlay.append(card);document.body.append(overlay);primary.focus();
+ });
+}
 
 // Notification audience preview only. Actual sends must use an authenticated trusted backend.
 function hrNotificationAudienceChanged(){
