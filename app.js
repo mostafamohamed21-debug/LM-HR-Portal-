@@ -912,7 +912,7 @@ function essDrawRequests(){
  const detail=Object.entries(r.req).filter(([k])=>!['selfieData','code','timestamp','createdAt','status','verificationStatus'].includes(k)).slice(0,8).map(([k,v])=>`${k}: ${typeof v==='object'?'[object]':String(v).slice(0,90)}`).join(' | ');
  const selfie=r.path==='attendance_requests' && typeof r.req.selfieData==='string' && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(r.req.selfieData) ? `<img src="${r.req.selfieData}" alt="Selfie evidence" style="width:72px;height:72px;object-fit:cover;border-radius:10px">` : '';
  const review=r.path==='attendance_requests'&&r.req.verificationStatus==='PENDING_REVIEW'&&String(r.code)==='2' ? ['APPROVED','REJECTED','HELD'].map((v,i)=>`<button class="px-2 py-1 rounded bg-slate-700 mr-1" onclick="essReviewAttendance('${r.code}','${r.id}','${v}')">${[hrText('موافقة','Approve'),hrText('رفض','Reject'),hrText('تعليق','Hold')][i]}</button>`).join(' ') : '';
- return `<tr class="border-b border-slate-700/40"><td class="p-2">${essEscape(r.type)}</td><td class="p-2">${essEscape(r.code)}</td><td class="p-2">${essEscape(status)}</td><td class="p-2">${essEscape(date)}</td><td class="p-2">${essEscape(detail)} ${selfie}</td><td class="p-2">${review || (portalIsAdmin() && essAuth.currentUser?.uid===ESS_ADMIN_UID && r.req.status==='Pending' && r.path!=='attendance_requests' && r.path!=='suggestions_and_complaints' ? `<button class="px-2 py-1 bg-emerald-700 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Approved')">${hrText('موافقة','Approve')}</button> <button class="px-2 py-1 bg-red-800 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Rejected')">${hrText('رفض','Reject')}</button>` : '—')}</td></tr>`;
+ return `<tr class="border-b border-slate-700/40"><td class="p-2">${essEscape(r.type)}</td><td class="p-2">${essEscape(r.code)}</td><td class="p-2">${essEscape(status)}</td><td class="p-2">${essEscape(date)}</td><td class="p-2">${essEscape(detail)} ${selfie}</td><td class="p-2">${(r.path==='attendance_requests' && String(r.code)==='2' && essPilotReady() ? `<button class="ess-pilot-delete px-2 py-1 rounded bg-rose-950 text-rose-100 border border-rose-700 mt-1" data-request-id="${escapeHtml(r.id)}">${hrText('حذف اختبار','Delete test')}</button>` : '')} ${review || (portalIsAdmin() && essAuth.currentUser?.uid===ESS_ADMIN_UID && r.req.status==='Pending' && r.path!=='attendance_requests' && r.path!=='suggestions_and_complaints' ? `<button class="px-2 py-1 bg-emerald-700 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Approved')">${hrText('موافقة','Approve')}</button> <button class="px-2 py-1 bg-red-800 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Rejected')">${hrText('رفض','Reject')}</button>` : '—')}</td></tr>`;
  }).join('')}</tbody></table></div>`;
 }
 essAuth.onAuthStateChanged(()=>{if(document.getElementById('ess-request-panel'))essRenderRequestPanel();else essStopListeners();});
@@ -1019,7 +1019,7 @@ const ESS_ATTENDANCE_PILOT_CODES=new Set(['2']);
 const ESS_PILOT_TTL=86400000;
 let essPilotSweepRunning=false;
 function essPilotReady(){return portalIsAdmin() && essAuth.currentUser?.uid===ESS_ADMIN_UID;}
-function essCairoDay(ts){return new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(ts));}
+function essCairoDay(ts){const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(ts));const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));return `${p.year}-${p.month}-${p.day}`;}
 // Idempotent repair: a previously approved request is still copied to the immutable ledger.
 async function essFinalizeApproved(code,id){
  if(!essPilotReady()||String(code)!=='2'||!/^[-\w]+$/.test(id))throw Error('UNAUTHORIZED');
@@ -1071,6 +1071,38 @@ async function essPilotSweep(){
   }
  }finally{essPilotSweepRunning=false;}
 }
+// TEST ONLY: administrator resets one Code 2 attendance request and its derived ledger event.
+// A durable audit is written first; deletion is deliberately NOT available for legacy attendance.
+async function essDeletePilotRequest(id){
+ if(!essPilotReady()||!/^[-\w]+$/.test(id))return;
+ const requestRef=essDb.ref('attendance_requests/2/'+id);
+ const ledgerRef=essDb.ref('approved_attendance/2/'+id);
+ try{
+  const [requestSnap,ledgerSnap]=await Promise.all([requestRef.once('value'),ledgerRef.once('value')]);
+  const request=requestSnap.val();
+  if(!request){await lmDialog(hrText('الطلب غير موجود بالفعل.','Request no longer exists.'));return;}
+  const expected=String(request.punchType||'');
+  const typed=window.prompt(hrText('حذف نهائي لبصمة اختبار الكود 2. اكتب DELETE للتأكيد:','Permanently delete Code 2 test punch. Type DELETE to confirm:'));
+  if(typed!=='DELETE')return;
+  if(!await lmDialog(hrText('سيتم حذف طلب '+id+' وسجل اعتماده المرتبط (إن وجد). متابعة؟','Delete request '+id+' and linked approved ledger event (if any)?'),true))return;
+  // Check again before writing audit; audit is append-only and cannot be deleted from the client.
+  const fresh=(await requestRef.once('value')).val();
+  if(!fresh||fresh.createdAt!==request.createdAt||fresh.punchType!==expected)throw Error('REQUEST_CHANGED');
+  const auditRef=essDb.ref('pilot_deletion_audit/2').push();
+  await auditRef.set({adminUid:ESS_ADMIN_UID,deletedAt:firebase.database.ServerValue.TIMESTAMP,code:'2',requestId:id,reason:'PILOT_RESET',punchType:expected,verificationStatus:String(fresh.verificationStatus||'UNKNOWN'),hadLedger:ledgerSnap.exists()});
+  // Ledger must be deleted before request, because ledger rules refer to approved request.
+  if(ledgerSnap.exists())await ledgerRef.remove();
+  await requestRef.remove();
+  await lmDialog(hrText('تم حذف بصمة الاختبار وتسجيل العملية في سجل المراجعة.','Test punch deleted and audit saved.'));
+ }catch(e){console.error('[CODE2] PILOT_DELETE_FAILED',id,e);await lmDialog(hrText('فشل الحذف أو اكتمل جزئيًا. راجع Console وسجل المراجعة: ','Delete failed or partially completed. Check console and audit: ')+(e.code||e.message));}
+}
+document.addEventListener('click',event=>{
+ const btn=event.target.closest?.('.ess-pilot-delete');
+ if(!btn)return;
+ event.preventDefault();
+ const id=btn.getAttribute('data-request-id');
+ if(id)essDeletePilotRequest(id);
+});
 async function essReviewAttendance(code,id,decision){
  if(!await lmDialog(hrText('تأكيد القرار؟','Confirm decision?'),true))return;
  try{const done=await essAttendanceDecision(code,id,decision);await lmDialog(done?hrText('تم القرار وتحديث السجل عند الموافقة','Decision saved; approved event added to ledger'):hrText('الطلب تم التعامل معه سابقًا','Already processed'));}
