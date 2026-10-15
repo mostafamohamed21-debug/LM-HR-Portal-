@@ -886,6 +886,7 @@ function essRenderRequestPanel(){
   const err=e=>{essRequestErrors[path]=e.code||e.message;essDrawRequests();};
   ref.on('value',cb,err);essRequestUnsubscribers.push(()=>ref.off('value',cb));
  });
+ essPilotSweep();
 }
 function essDrawRequests(){
  const area=document.getElementById('ess-requests-content');if(!area)return;
@@ -905,11 +906,13 @@ function essDrawRequests(){
  const errors=Object.entries(essRequestErrors).map(([p,e])=>`${essEscape(p)}: ${essEscape(e)}`).join(' | ');
  const msg=errors?`<p class="text-amber-300 mb-3">${hrText('تعذر قراءة بعض المسارات','Some paths could not be read')}: ${errors}</p>`:'';
  if(!rows.length){area.innerHTML=msg+`<p>${hrText('لا توجد طلبات حاليًا، أو لم تصل بيانات بعد.','No requests yet, or still loading.')}</p>`;return;}
- area.innerHTML=msg+`<p class="mb-3">${rows.length} ${hrText('طلب','requests')}</p><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr>${[hrText('النوع','Type'),hrText('الكود','Code'),hrText('الحالة','Status'),hrText('التاريخ','Date'),hrText('التفاصيل','Details'),hrText('إجراء','Action')].map(x=>`<th class="p-2 text-start border-b border-slate-700">${x}</th>`).join('')}</tr></thead><tbody>${rows.slice(0,300).map(r=>{
+ area.innerHTML=msg+`<div class="mb-3 flex flex-wrap gap-2 items-center"><span>${hrText('اختبار بصمات الكود 2 فقط','Code 2 attendance pilot')}</span><button class="px-2 py-1 bg-sky-800 rounded" onclick="essBulkCode2('APPROVED')">${hrText('اعتماد كل المعلق','Approve all pending')}</button><button class="px-2 py-1 bg-amber-800 rounded" onclick="essBulkCode2('HELD')">${hrText('تعليق كل المعلق','Hold all pending')}</button><button class="px-2 py-1 bg-red-900 rounded" onclick="essBulkCode2('REJECTED')">${hrText('رفض كل المعلق','Reject all pending')}</button></div><p class="mb-3">${rows.length} ${hrText('طلب','requests')}</p><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr>${[hrText('النوع','Type'),hrText('الكود','Code'),hrText('الحالة','Status'),hrText('التاريخ','Date'),hrText('التفاصيل','Details'),hrText('إجراء','Action')].map(x=>`<th class="p-2 text-start border-b border-slate-700">${x}</th>`).join('')}</tr></thead><tbody>${rows.slice(0,300).map(r=>{
  const date=r.time?new Date(r.time).toLocaleString(currentLang==='ar'?'ar-EG':'en-GB'):'—';
  const status=r.req.status||r.req.verificationStatus||'—';
- const detail=Object.entries(r.req).filter(([k])=>!['code','timestamp','createdAt','status','verificationStatus'].includes(k)).slice(0,8).map(([k,v])=>`${k}: ${typeof v==='object'?'[object]':String(v).slice(0,90)}`).join(' | ');
- return `<tr class="border-b border-slate-700/40"><td class="p-2">${essEscape(r.type)}</td><td class="p-2">${essEscape(r.code)}</td><td class="p-2">${essEscape(status)}</td><td class="p-2">${essEscape(date)}</td><td class="p-2">${essEscape(detail)}</td><td class="p-2">${portalIsAdmin() && essAuth.currentUser?.uid===ESS_ADMIN_UID && r.req.status==='Pending' && r.path!=='attendance_requests' && r.path!=='suggestions_and_complaints' ? `<button class="px-2 py-1 bg-emerald-700 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Approved')">${hrText('موافقة','Approve')}</button> <button class="px-2 py-1 bg-red-800 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Rejected')">${hrText('رفض','Reject')}</button>` : '—'}</td></tr>`;
+ const detail=Object.entries(r.req).filter(([k])=>!['selfieData','code','timestamp','createdAt','status','verificationStatus'].includes(k)).slice(0,8).map(([k,v])=>`${k}: ${typeof v==='object'?'[object]':String(v).slice(0,90)}`).join(' | ');
+ const selfie=r.path==='attendance_requests' && typeof r.req.selfieData==='string' && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(r.req.selfieData) ? `<img src="${r.req.selfieData}" alt="Selfie evidence" style="width:72px;height:72px;object-fit:cover;border-radius:10px">` : '';
+ const review=r.path==='attendance_requests'&&r.req.verificationStatus==='PENDING_REVIEW'&&String(r.code)==='2' ? ['APPROVED','REJECTED','HELD'].map((v,i)=>`<button class="px-2 py-1 rounded bg-slate-700 mr-1" onclick="essReviewAttendance('${r.code}','${r.id}','${v}')">${[hrText('موافقة','Approve'),hrText('رفض','Reject'),hrText('تعليق','Hold')][i]}</button>`).join(' ') : '';
+ return `<tr class="border-b border-slate-700/40"><td class="p-2">${essEscape(r.type)}</td><td class="p-2">${essEscape(r.code)}</td><td class="p-2">${essEscape(status)}</td><td class="p-2">${essEscape(date)}</td><td class="p-2">${essEscape(detail)} ${selfie}</td><td class="p-2">${review || (portalIsAdmin() && essAuth.currentUser?.uid===ESS_ADMIN_UID && r.req.status==='Pending' && r.path!=='attendance_requests' && r.path!=='suggestions_and_complaints' ? `<button class="px-2 py-1 bg-emerald-700 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Approved')">${hrText('موافقة','Approve')}</button> <button class="px-2 py-1 bg-red-800 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Rejected')">${hrText('رفض','Reject')}</button>` : '—')}</td></tr>`;
  }).join('')}</tbody></table></div>`;
 }
 essAuth.onAuthStateChanged(()=>{if(document.getElementById('ess-request-panel'))essRenderRequestPanel();else essStopListeners();});
@@ -1010,3 +1013,80 @@ async function hrSendNotification(){
  }catch(e){await lmDialog(hrText('فشل الإرسال: ','Sending failed: ')+(e.code||e.message));}
  finally{if(btn)btn.disabled=false;}
 }
+
+// CODE 2 PILOT: append-only payroll-grade approved event ledger. No writes to legacy attendance.
+const ESS_ATTENDANCE_PILOT_CODES=new Set(['2']);
+const ESS_PILOT_TTL=86400000;
+let essPilotSweepRunning=false;
+function essPilotReady(){return portalIsAdmin() && essAuth.currentUser?.uid===ESS_ADMIN_UID;}
+function essCairoDay(ts){return new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(ts));}
+// Idempotent repair: a previously approved request is still copied to the immutable ledger.
+async function essFinalizeApproved(code,id){
+ if(!essPilotReady()||String(code)!=='2'||!/^[-\w]+$/.test(id))throw Error('UNAUTHORIZED');
+ const r=(await essDb.ref('attendance_requests/'+code+'/'+id).once('value')).val();
+ if(!r||r.verificationStatus!=='APPROVED')throw Error('NOT_APPROVED');
+ const ts=Number(r.createdAt);
+ if(!Number.isFinite(ts)||ts<=0||!['IN','OUT'].includes(r.punchType))throw Error('INVALID_REQUEST');
+ const event={requestId:id,code:'2',punchType:r.punchType,punchTimestamp:ts,dayKey:essCairoDay(ts),decisionMethod:r.decisionMethod,reviewedBy:r.reviewedBy,reviewedAt:r.reviewedAt};
+ const out=await essDb.ref('approved_attendance/2/'+id).transaction(old=>old===null?event:undefined,undefined,false);
+ return out.committed||out.snapshot.exists();
+}
+async function essAttendanceDecision(code,id,decision,auto=false){
+ if(!essPilotReady()||String(code)!=='2'||!/^[-\w]+$/.test(id))throw Error('UNAUTHORIZED');
+ if(!['APPROVED','REJECTED','HELD'].includes(decision))throw Error('INVALID_DECISION');
+ const ref=essDb.ref('attendance_requests/2/'+id);
+ // Use server time offset for UI expiry estimate; the DB rules also enforce auto timing.
+ const offsetSnap=await essDb.ref('.info/serverTimeOffset').once('value');
+ const serverNow=Date.now()+Number(offsetSnap.val()||0);
+ const result=await ref.transaction(old=>{
+  if(!old||old.verificationStatus!=='PENDING_REVIEW')return;
+  if(auto&&(decision!=='APPROVED'||serverNow-Number(old.createdAt||0)<ESS_PILOT_TTL))return;
+  return {...old,verificationStatus:decision,decisionMethod:auto?'AUTO_24H':'MANUAL',reviewedBy:ESS_ADMIN_UID,reviewedAt:firebase.database.ServerValue.TIMESTAMP};
+ },undefined,false);
+ if(!result.committed)return false;
+ if(decision==='APPROVED')await essFinalizeApproved(code,id);
+ return true;
+}
+async function essPilotSweep(){
+ if(essPilotSweepRunning||!essPilotReady())return;
+ essPilotSweepRunning=true;
+ try{
+  const offset=Number((await essDb.ref('.info/serverTimeOffset').once('value')).val()||0);
+  const serverNow=Date.now()+offset;
+  const snap=await essDb.ref('attendance_requests/2').once('value');
+  for(const [id,r] of Object.entries(snap.val()||{})){
+   if(!r||!Number.isFinite(Number(r.createdAt)))continue;
+   const expired=serverNow-Number(r.createdAt)>=ESS_PILOT_TTL;
+   if(expired&&r.verificationStatus==='PENDING_REVIEW'){
+    try{await essAttendanceDecision('2',id,'APPROVED',true);}catch(e){console.warn('Auto approval failed',id,e);}
+   }
+   const fresh=(await essDb.ref('attendance_requests/2/'+id).once('value')).val();
+   if(fresh?.verificationStatus==='APPROVED'){
+    try{await essFinalizeApproved('2',id);}catch(e){console.error('LEDGER REPAIR REQUIRED',id,e);}
+   }
+   // Do not remove held evidence; rejected/approved evidence expires after 24h.
+   if(expired&&fresh?.verificationStatus!=='HELD'&&fresh?.selfieData){
+    try{await essDb.ref('attendance_requests/2/'+id+'/selfieData').remove();}catch(e){console.warn('Evidence cleanup failed',id,e);}
+   }
+  }
+ }finally{essPilotSweepRunning=false;}
+}
+async function essReviewAttendance(code,id,decision){
+ if(!await lmDialog(hrText('تأكيد القرار؟','Confirm decision?'),true))return;
+ try{const done=await essAttendanceDecision(code,id,decision);await lmDialog(done?hrText('تم القرار وتحديث السجل عند الموافقة','Decision saved; approved event added to ledger'):hrText('الطلب تم التعامل معه سابقًا','Already processed'));}
+ catch(e){await lmDialog(hrText('فشل التنفيذ؛ راجع السجل: ','Action failed; check ledger: ')+(e.code||e.message));}
+}
+async function essBulkCode2(decision){
+ if(!essPilotReady()||!['APPROVED','HELD','REJECTED'].includes(decision))return;
+ const snap=await essDb.ref('attendance_requests/2').once('value');
+ const ids=Object.entries(snap.val()||{}).filter(([,r])=>r?.verificationStatus==='PENDING_REVIEW').map(([id])=>id);
+ if(!ids.length){await lmDialog(hrText('لا توجد طلبات معلقة','No pending requests'));return;}
+ if(!await lmDialog(hrText('تطبيق '+decision+' على '+ids.length+' طلب؟','Apply '+decision+' to '+ids.length+' requests?'),true))return;
+ let ok=0,failed=0;
+ for(const id of ids){try{if(await essAttendanceDecision('2',id,decision))ok++;else failed++;}catch(e){failed++;console.error('Bulk failure',id,e);}}
+ await lmDialog(hrText('نجح: ','Succeeded: ')+ok+hrText(' | فشل: ',' | Failed: ')+failed);
+}
+// Trigger sweep after admin authentication and while the notifications view remains open.
+let essPilotInterval=null;
+function essStartPilotTimer(){if(essPilotInterval)clearInterval(essPilotInterval);essPilotInterval=setInterval(()=>{if(essPilotReady()&&document.getElementById('ess-requests-content'))essPilotSweep();},60000);}
+document.addEventListener('DOMContentLoaded',essStartPilotTimer);
