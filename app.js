@@ -1152,10 +1152,19 @@ async function essDeletePilotRequest(id,alreadyConfirmed=false){
   if(!alreadyConfirmed && !await essConfirmDelete([id]))return result(false,'CANCELLED');
   stage='RECHECK_REQUEST';
   const fresh=(await requestRef.once('value')).val();
-  if(!fresh||fresh.createdAt!==request.createdAt||fresh.punchType!==expected)throw Error('REQUEST_CHANGED');
+  // Normalize optional legacy fields; do not mistake missing punchType for a changed request.
+  // Check immutable identity fields, not mutable review status / evidence cleanup.
+  if(!fresh)throw Error('REQUEST_REMOVED_DURING_DELETE');
+  const sameCreatedAt=String(fresh.createdAt??'')===String(request.createdAt??'');
+  const samePunchType=String(fresh.punchType??'')===String(request.punchType??'');
+  const sameCode=String(fresh.code??'')===String(request.code??'');
+  if(!sameCreatedAt||!samePunchType||!sameCode){
+   console.warn('[CODE2] DELETE_RECHECK_MISMATCH',{id,sameCreatedAt,samePunchType,sameCode});
+   throw Error('REQUEST_CHANGED_IDENTITY');
+  }
   stage='WRITE_AUDIT';
   const auditRef=essDb.ref('pilot_deletion_audit/2').push();
-  await auditRef.set({adminUid:ESS_ADMIN_UID,deletedAt:firebase.database.ServerValue.TIMESTAMP,code:'2',requestId:id,reason:'PILOT_RESET',punchType:expected,verificationStatus:String(fresh.verificationStatus||'UNKNOWN'),hadLedger:ledgerSnap.exists()});
+  await auditRef.set({adminUid:ESS_ADMIN_UID,deletedAt:firebase.database.ServerValue.TIMESTAMP,code:'2',requestId:id,reason:'PILOT_RESET',punchType:expected||'UNKNOWN',verificationStatus:String(fresh.verificationStatus||'UNKNOWN'),hadLedger:ledgerSnap.exists()});
   stage='DELETE_LEDGER';
   if(ledgerSnap.exists())await ledgerRef.remove();
   stage='DELETE_REQUEST';
