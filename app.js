@@ -1132,31 +1132,43 @@ async function essPilotSweep(){
 }
 // TEST ONLY: administrator resets one Code 2 attendance request and its derived ledger event.
 // A durable audit is written first; deletion is deliberately NOT available for legacy attendance.
+// Code 2 pilot: return structured results instead of silently swallowing Firebase failures.
 async function essDeletePilotRequest(id,alreadyConfirmed=false){
- if(!/^[-\w]+$/.test(id))return;
+ let stage='VALIDATE';
+ const result=(ok,reason='')=>({ok,id,stage,reason});
+ if(!/^[-\w]+$/.test(id))return result(false,'INVALID_ID');
  if(!essPilotReady()){
-  await lmDialog(hrText('زر الحذف ظاهر لكن يلزم الاتصال بحساب إدارة ESS أولًا، والتأكد من دخول مسؤول البورتال.','Delete button is visible, but ESS admin authentication and Portal admin login are required.'));
-  return;
+  if(!alreadyConfirmed)await lmDialog(hrText('يلزم اتصال إدارة ESS أولًا.','ESS admin sign-in required.'));
+  return result(false,'ESS_ADMIN_NOT_CONNECTED');
  }
  const requestRef=essDb.ref('attendance_requests/2/'+id);
  const ledgerRef=essDb.ref('approved_attendance/2/'+id);
  try{
+  stage='READ_REQUEST_AND_LEDGER';
   const [requestSnap,ledgerSnap]=await Promise.all([requestRef.once('value'),ledgerRef.once('value')]);
   const request=requestSnap.val();
-  if(!request){await lmDialog(hrText('الطلب غير موجود بالفعل.','Request no longer exists.'));return;}
+  if(!request)return result(false,'REQUEST_NOT_FOUND');
   const expected=String(request.punchType||'');
-  if(!alreadyConfirmed && !await essConfirmDelete([id]))return false;
-  // Check again before writing audit; audit is append-only and cannot be deleted from the client.
+  if(!alreadyConfirmed && !await essConfirmDelete([id]))return result(false,'CANCELLED');
+  stage='RECHECK_REQUEST';
   const fresh=(await requestRef.once('value')).val();
   if(!fresh||fresh.createdAt!==request.createdAt||fresh.punchType!==expected)throw Error('REQUEST_CHANGED');
+  stage='WRITE_AUDIT';
   const auditRef=essDb.ref('pilot_deletion_audit/2').push();
   await auditRef.set({adminUid:ESS_ADMIN_UID,deletedAt:firebase.database.ServerValue.TIMESTAMP,code:'2',requestId:id,reason:'PILOT_RESET',punchType:expected,verificationStatus:String(fresh.verificationStatus||'UNKNOWN'),hadLedger:ledgerSnap.exists()});
-  // Ledger must be deleted before request, because ledger rules refer to approved request.
+  stage='DELETE_LEDGER';
   if(ledgerSnap.exists())await ledgerRef.remove();
+  stage='DELETE_REQUEST';
   await requestRef.remove();
-  return true;
- }catch(e){console.error('[CODE2] PILOT_DELETE_FAILED',id,e);return false;}
+  stage='DONE';
+  return result(true);
+ }catch(e){
+  const reason=String(e.code||e.message||'UNKNOWN_ERROR');
+  console.error('[CODE2] PILOT_DELETE_FAILED',{id,stage,reason},e);
+  return result(false,reason);
+ }
 }
+
 function essConfirmDelete(ids){
  return new Promise(resolve=>{
   const overlay=document.createElement('div');
@@ -1188,16 +1200,46 @@ async function essDeleteSelectedPilot(){
  if(!essPilotReady()){await lmDialog(hrText('اتصل بحساب إدارة ESS أولًا.','Sign in with the ESS admin account first.'));return;}
  if(!await essConfirmDelete(ids))return;
  essDeletingBatch=true;
- let ok=0,fail=0;const failedIds=[];
+ const results=[];
  try{
   for(const id of ids){
-   const success=await essDeletePilotRequest(id,true);
-   if(success){ok++;essSelectedPilotIds.delete(id)}else{fail++;failedIds.push(id)}
+   const outcome=await essDeletePilotRequest(id,true);
+   results.push(outcome);
+   if(outcome.ok)essSelectedPilotIds.delete(id);
   }
-  await lmDialog(hrText('تم الحذف: ','Deleted: ')+ok+hrText(' | فشل: ',' | Failed: ')+fail+(failedIds.length?'\n'+hrText('الطلبات الفاشلة: ','Failed IDs: ')+failedIds.join(', '):''));
+  const ok=results.filter(x=>x.ok).length;
+  const failed=results.filter(x=>!x.ok);
+  console.table(results);
+  const summary=hrText('تم الحذف: ','Deleted: ')+ok+hrText(' | فشل: ',' | Failed: ')+failed.length;
+  if(failed.length){
+   await essShowDeletionReport(summary,failed);
+  }else await lmDialog(summary);
   if(typeof essRenderRequestPanel==='function')essRenderRequestPanel();
  }finally{essDeletingBatch=false}
 }
+function essShowDeletionReport(summary,failed){
+ return new Promise(resolve=>{
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#020617d9;display:grid;place-items:center;padding:16px';
+  const panel=document.createElement('section');panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');
+  panel.style.cssText='width:min(680px,96vw);max-height:85vh;overflow:auto;background:#101d35;color:#e2e8f0;border:1px solid #24547c;border-radius:18px;padding:24px;box-shadow:0 24px 65px #000a;direction:'+(currentLang==='ar'?'rtl':'ltr');
+  const title=document.createElement('h3');title.textContent=summary;title.style.cssText='font-weight:800;font-size:19px;margin-bottom:14px';panel.append(title);
+  const note=document.createElement('p');note.textContent=hrText('تفاصيل الطلبات التي لم تُحذف. لم تتم إعادة محاولة الحذف تلقائيًا.','Failed requests. No automatic retry was attempted.');note.style.cssText='color:#a8c1d8;margin-bottom:12px';panel.append(note);
+  const list=document.createElement('div');list.style.cssText='display:grid;gap:8px;max-height:45vh;overflow:auto';
+  failed.forEach(x=>{const row=document.createElement('div');row.style.cssText='background:#1b2e47;border:1px solid #34526e;border-radius:9px;padding:10px;overflow-wrap:anywhere';
+   const id=document.createElement('strong');id.textContent=x.id;const detail=document.createElement('div');detail.textContent=x.stage+' — '+x.reason;detail.style.cssText='font:12px monospace;color:#fda4af;margin-top:4px';row.append(id,detail);list.append(row)});panel.append(list);
+  const actions=document.createElement('div');actions.style.cssText='display:flex;gap:10px;margin-top:18px;justify-content:center';
+  const copy=document.createElement('button');copy.type='button';copy.textContent=hrText('نسخ التقرير','Copy report');
+  const close=document.createElement('button');close.type='button';close.textContent=hrText('حسنًا','OK');
+  [copy,close].forEach(b=>b.style.cssText='background:#1678b6;color:white;border:0;border-radius:9px;padding:10px 18px;cursor:pointer');
+  copy.onclick=async()=>{const content=summary+'\n'+failed.map(x=>x.id+' | '+x.stage+' | '+x.reason).join('\n');try{await navigator.clipboard.writeText(content)}catch(e){console.warn('Clipboard unavailable',e)}};
+  const done=()=>{document.removeEventListener('keydown',onKey,true);overlay.remove();resolve()};
+  const onKey=e=>{if(e.key==='Escape'){e.preventDefault();done()}};
+  document.addEventListener('keydown',onKey,true);close.onclick=done;
+  actions.append(copy,close);panel.append(actions);overlay.append(panel);document.body.append(overlay);close.focus();
+ });
+}
+
 document.addEventListener('click',event=>{
  if(event.target.closest?.('#ess-delete-selected')){event.preventDefault();essDeleteSelectedPilot();}
 });
@@ -1206,7 +1248,7 @@ document.addEventListener('click',event=>{
  if(!btn)return;
  event.preventDefault();
  const id=btn.getAttribute('data-request-id');
- if(id)essDeletePilotRequest(id).then(ok=>{if(ok){essSelectedPilotIds.delete(id);lmDialog(hrText("تم حذف بصمة الاختبار.","Test punch deleted.")).then(()=>essRenderRequestPanel());}else lmDialog(hrText("لم يكتمل الحذف، راجع Console.","Deletion did not complete; check Console."));});
+ if(id)essDeletePilotRequest(id).then(outcome=>{if(outcome.ok){essSelectedPilotIds.delete(id);lmDialog(hrText('تم حذف بصمة الاختبار.','Test punch deleted.')).then(()=>essRenderRequestPanel());}else if(outcome.reason!=='CANCELLED')essShowDeletionReport(hrText('تعذر حذف الطلب','Request deletion failed'),[outcome]);});
 });
 async function essReviewAttendance(code,id,decision){
  const reason=decision==='REJECTED'||decision==='HELD'?await essReasonDialog(decision,1):'';
