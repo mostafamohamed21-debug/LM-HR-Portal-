@@ -906,15 +906,43 @@ function essDrawRequests(){
  const errors=Object.entries(essRequestErrors).map(([p,e])=>`${essEscape(p)}: ${essEscape(e)}`).join(' | ');
  const msg=errors?`<p class="text-amber-300 mb-3">${hrText('تعذر قراءة بعض المسارات','Some paths could not be read')}: ${errors}</p>`:'';
  if(!rows.length){area.innerHTML=msg+`<p>${hrText('لا توجد طلبات حاليًا، أو لم تصل بيانات بعد.','No requests yet, or still loading.')}</p>`;return;}
- area.innerHTML=msg+`<div class="mb-3 flex flex-wrap gap-2 items-center"><span>${hrText('اختبار بصمات الكود 2 فقط','Code 2 attendance pilot')}</span><button class="px-2 py-1 bg-sky-800 rounded" onclick="essBulkCode2('APPROVED')">${hrText('اعتماد كل المعلق','Approve all pending')}</button><button class="px-2 py-1 bg-amber-800 rounded" onclick="essBulkCode2('HELD')">${hrText('تعليق كل المعلق','Hold all pending')}</button><button class="px-2 py-1 bg-red-900 rounded" onclick="essBulkCode2('REJECTED')">${hrText('رفض كل المعلق','Reject all pending')}</button></div><p class="mb-3">${rows.length} ${hrText('طلب','requests')}</p><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr>${[hrText('النوع','Type'),hrText('الكود','Code'),hrText('الحالة','Status'),hrText('التاريخ','Date'),hrText('التفاصيل','Details'),hrText('إجراء','Action')].map(x=>`<th class="p-2 text-start border-b border-slate-700">${x}</th>`).join('')}</tr></thead><tbody>${rows.slice(0,300).map(r=>{
+ area.innerHTML=msg+`<div class="mb-3 flex flex-wrap gap-2 items-center"><span>${hrText('اختبار بصمات الكود 2 فقط','Code 2 attendance pilot')}</span><button class="px-2 py-1 bg-sky-800 rounded" onclick="essBulkCode2('APPROVED')">${hrText('اعتماد كل المعلق','Approve all pending')}</button><button class="px-2 py-1 bg-amber-800 rounded" onclick="essBulkCode2('HELD')">${hrText('تعليق كل المعلق','Hold all pending')}</button><button class="px-2 py-1 bg-red-900 rounded" onclick="essBulkCode2('REJECTED')">${hrText('رفض كل المعلق','Reject all pending')}</button></div><p class="mb-3">${rows.length} ${hrText('طلب','requests')}</p><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr><th class="p-2 border-b border-slate-700"><input type="checkbox" id="ess-select-all" aria-label="${hrText('تحديد كل بصمات الاختبار الظاهرة','Select all visible test punches')}" class="accent-sky-500 w-4 h-4"></th>${[hrText('النوع','Type'),hrText('الكود','Code'),hrText('الحالة','Status'),hrText('التاريخ','Date'),hrText('التفاصيل','Details'),hrText('إجراء','Action')].map(x=>`<th class="p-2 text-start border-b border-slate-700">${x}</th>`).join('')}</tr></thead><tbody>${rows.slice(0,300).map(r=>{
  const date=r.time?new Date(r.time).toLocaleString(currentLang==='ar'?'ar-EG':'en-GB'):'—';
  const status=r.req.status||r.req.verificationStatus||'—';
  const detail=Object.entries(r.req).filter(([k])=>!['selfieData','code','timestamp','createdAt','status','verificationStatus'].includes(k)).slice(0,8).map(([k,v])=>`${k}: ${typeof v==='object'?'[object]':String(v).slice(0,90)}`).join(' | ');
  const selfie=r.path==='attendance_requests' && typeof r.req.selfieData==='string' && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(r.req.selfieData) ? `<img src="${r.req.selfieData}" alt="Selfie evidence" style="width:72px;height:72px;object-fit:cover;border-radius:10px">` : '';
  const review=r.path==='attendance_requests'&&r.req.verificationStatus==='PENDING_REVIEW'&&String(r.code)==='2' ? ['APPROVED','REJECTED','HELD'].map((v,i)=>`<button class="px-2 py-1 rounded bg-slate-700 mr-1" onclick="essReviewAttendance('${r.code}','${r.id}','${v}')">${[hrText('موافقة','Approve'),hrText('رفض','Reject'),hrText('تعليق','Hold')][i]}</button>`).join(' ') : '';
- return `<tr class="border-b border-slate-700/40"><td class="p-2">${essEscape(r.type)}</td><td class="p-2">${essEscape(r.code)}</td><td class="p-2">${essEscape(status)}</td><td class="p-2">${essEscape(date)}</td><td class="p-2">${essEscape(detail)} ${selfie}</td><td class="p-2">${(r.path==='attendance_requests' && String(r.code)==='2' && essPilotReady() ? `<button class="ess-pilot-delete px-2 py-1 rounded bg-rose-950 text-rose-100 border border-rose-700 mt-1" data-request-id="${escapeHtml(r.id)}">${hrText('حذف اختبار','Delete test')}</button>` : '')} ${review || (portalIsAdmin() && essAuth.currentUser?.uid===ESS_ADMIN_UID && r.req.status==='Pending' && r.path!=='attendance_requests' && r.path!=='suggestions_and_complaints' ? `<button class="px-2 py-1 bg-emerald-700 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Approved')">${hrText('موافقة','Approve')}</button> <button class="px-2 py-1 bg-red-800 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Rejected')">${hrText('رفض','Reject')}</button>` : '—')}</td></tr>`;
- }).join('')}</tbody></table></div>`;
+ return `<tr class="border-b border-slate-700/40"><td class="p-2">${r.path==='attendance_requests'&&String(r.code)==='2'&&portalIsAdmin()?`<input type="checkbox" class="ess-pilot-check accent-sky-500 w-4 h-4" value="${escapeHtml(r.id)}" aria-label="${hrText('تحديد الطلب','Select request')} ${escapeHtml(r.id)}">`:''}</td><td class="p-2">${essEscape(r.type)}</td><td class="p-2">${essEscape(r.code)}</td><td class="p-2">${essEscape(status)}</td><td class="p-2">${essEscape(date)}</td><td class="p-2">${essEscape(detail)} ${selfie}</td><td class="p-2">${(r.path==='attendance_requests' && String(r.code)==='2' && portalIsAdmin() ? `<button class="ess-pilot-delete px-2 py-1 rounded bg-rose-950 text-rose-100 border border-rose-700 mt-1" data-request-id="${escapeHtml(r.id)}">${hrText('حذف اختبار','Delete test')}</button>` : '')} ${review || (portalIsAdmin() && essAuth.currentUser?.uid===ESS_ADMIN_UID && r.req.status==='Pending' && r.path!=='attendance_requests' && r.path!=='suggestions_and_complaints' ? `<button class="px-2 py-1 bg-emerald-700 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Approved')">${hrText('موافقة','Approve')}</button> <button class="px-2 py-1 bg-red-800 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Rejected')">${hrText('رفض','Reject')}</button>` : '—')}</td></tr>`;
+ }).join('')}</tbody></table></div><div class="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-slate-700 bg-slate-900/60 p-3"><span class="text-sky-200">${hrText('المحدد للحذف','Selected for deletion')}: <strong id="ess-selected-count">0</strong></span><button type="button" id="ess-delete-selected" disabled class="px-4 py-2 rounded-lg bg-rose-800 text-white disabled:opacity-40 disabled:cursor-not-allowed">${hrText('حذف المحدد','Delete selected')}</button></div>`;
+ essUpdateSelectionUI();
 }
+const essSelectedPilotIds = new Set();
+function essUpdateSelectionUI(){
+ const area=document.getElementById('ess-requests-content');
+ if(!area)return;
+ const checks=[...area.querySelectorAll('.ess-pilot-check')];
+ const visible=new Set(checks.map(x=>x.value));
+ for(const id of [...essSelectedPilotIds])if(!visible.has(id))essSelectedPilotIds.delete(id);
+ checks.forEach(x=>x.checked=essSelectedPilotIds.has(x.value));
+ const counter=area.querySelector('#ess-selected-count');
+ if(counter)counter.textContent=String(essSelectedPilotIds.size);
+ const del=area.querySelector('#ess-delete-selected');
+ if(del)del.disabled=essSelectedPilotIds.size===0;
+ const all=area.querySelector('#ess-select-all');
+ if(all){all.checked=checks.length>0&&checks.every(x=>x.checked);all.indeterminate=checks.some(x=>x.checked)&&!all.checked;}
+}
+document.addEventListener('change',event=>{
+ if(event.target.matches?.('.ess-pilot-check')){
+  if(event.target.checked)essSelectedPilotIds.add(event.target.value);else essSelectedPilotIds.delete(event.target.value);
+  essUpdateSelectionUI();
+ }else if(event.target.matches?.('#ess-select-all')){
+  document.querySelectorAll('#ess-requests-content .ess-pilot-check').forEach(x=>{
+   x.checked=event.target.checked;
+   if(x.checked)essSelectedPilotIds.add(x.value);else essSelectedPilotIds.delete(x.value);
+  });
+  essUpdateSelectionUI();
+ }
+});
 essAuth.onAuthStateChanged(()=>{if(document.getElementById('ess-request-panel'))essRenderRequestPanel();else essStopListeners();});
 
 async function essDecide(path,code,id,status){
@@ -1073,8 +1101,12 @@ async function essPilotSweep(){
 }
 // TEST ONLY: administrator resets one Code 2 attendance request and its derived ledger event.
 // A durable audit is written first; deletion is deliberately NOT available for legacy attendance.
-async function essDeletePilotRequest(id){
- if(!essPilotReady()||!/^[-\w]+$/.test(id))return;
+async function essDeletePilotRequest(id,alreadyConfirmed=false){
+ if(!/^[-\w]+$/.test(id))return;
+ if(!essPilotReady()){
+  await lmDialog(hrText('زر الحذف ظاهر لكن يلزم الاتصال بحساب إدارة ESS أولًا، والتأكد من دخول مسؤول البورتال.','Delete button is visible, but ESS admin authentication and Portal admin login are required.'));
+  return;
+ }
  const requestRef=essDb.ref('attendance_requests/2/'+id);
  const ledgerRef=essDb.ref('approved_attendance/2/'+id);
  try{
@@ -1082,9 +1114,7 @@ async function essDeletePilotRequest(id){
   const request=requestSnap.val();
   if(!request){await lmDialog(hrText('الطلب غير موجود بالفعل.','Request no longer exists.'));return;}
   const expected=String(request.punchType||'');
-  const typed=window.prompt(hrText('حذف نهائي لبصمة اختبار الكود 2. اكتب DELETE للتأكيد:','Permanently delete Code 2 test punch. Type DELETE to confirm:'));
-  if(typed!=='DELETE')return;
-  if(!await lmDialog(hrText('سيتم حذف طلب '+id+' وسجل اعتماده المرتبط (إن وجد). متابعة؟','Delete request '+id+' and linked approved ledger event (if any)?'),true))return;
+  if(!alreadyConfirmed && !await essConfirmDelete([id]))return false;
   // Check again before writing audit; audit is append-only and cannot be deleted from the client.
   const fresh=(await requestRef.once('value')).val();
   if(!fresh||fresh.createdAt!==request.createdAt||fresh.punchType!==expected)throw Error('REQUEST_CHANGED');
@@ -1093,15 +1123,59 @@ async function essDeletePilotRequest(id){
   // Ledger must be deleted before request, because ledger rules refer to approved request.
   if(ledgerSnap.exists())await ledgerRef.remove();
   await requestRef.remove();
-  await lmDialog(hrText('تم حذف بصمة الاختبار وتسجيل العملية في سجل المراجعة.','Test punch deleted and audit saved.'));
- }catch(e){console.error('[CODE2] PILOT_DELETE_FAILED',id,e);await lmDialog(hrText('فشل الحذف أو اكتمل جزئيًا. راجع Console وسجل المراجعة: ','Delete failed or partially completed. Check console and audit: ')+(e.code||e.message));}
+  return true;
+ }catch(e){console.error('[CODE2] PILOT_DELETE_FAILED',id,e);return false;}
 }
+function essConfirmDelete(ids){
+ return new Promise(resolve=>{
+  const overlay=document.createElement('div');
+  overlay.setAttribute('role','presentation');
+  overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(2,6,23,.84);display:grid;place-items:center;padding:20px';
+  const card=document.createElement('div');
+  card.setAttribute('role','dialog');card.setAttribute('aria-modal','true');card.setAttribute('aria-label',hrText('تأكيد حذف الاختبار','Confirm test deletion'));
+  card.style.cssText='width:min(460px,95vw);padding:26px;border-radius:20px;background:#101d35;color:#e2e8f0;border:1px solid #24547c;box-shadow:0 20px 60px #0009;text-align:center;direction:'+(currentLang==='ar'?'rtl':'ltr')+';font-family:inherit';
+  const title=document.createElement('h3');title.textContent=hrText('تأكيد حذف بصمات الاختبار','Confirm deletion of test punches');title.style.cssText='font-size:20px;font-weight:800;margin-bottom:12px;color:#fda4af';
+  const detail=document.createElement('p');detail.textContent=hrText('سيتم حذف ','Delete ')+ids.length+hrText(' طلب للكود 2 مع سجلات الاعتماد المرتبطة، وتسجيل عمليات الحذف في سجل التدقيق. لا يمكن التراجع.',' Code 2 request(s) and linked ledger entries. Deletions are audited and cannot be undone.');
+  detail.style.cssText='line-height:1.8;margin-bottom:20px';
+  const actions=document.createElement('div');actions.style.cssText='display:flex;gap:12px;justify-content:center';
+  const cancel=document.createElement('button');cancel.type='button';cancel.textContent=hrText('إلغاء','Cancel');
+  const confirm=document.createElement('button');confirm.type='button';confirm.textContent=hrText('تأكيد الحذف','Confirm delete');
+  for(const b of [cancel,confirm])b.style.cssText='padding:11px 20px;border-radius:12px;border:0;color:white;font-weight:700;cursor:pointer';
+  cancel.style.background='#475569';confirm.style.background='#be123c';
+  const close=result=>{overlay.remove();document.removeEventListener('keydown',onKey,true);resolve(result)};
+  const onKey=e=>{if(e.key==='Escape'){e.preventDefault();close(false)}};
+  document.addEventListener('keydown',onKey,true);
+  cancel.onclick=()=>close(false);confirm.onclick=()=>close(true);
+  actions.append(cancel,confirm);card.append(title,detail,actions);overlay.append(card);document.body.append(overlay);cancel.focus();
+ });
+}
+let essDeletingBatch=false;
+async function essDeleteSelectedPilot(){
+ if(essDeletingBatch)return;
+ const ids=[...essSelectedPilotIds];
+ if(!ids.length)return;
+ if(!essPilotReady()){await lmDialog(hrText('اتصل بحساب إدارة ESS أولًا.','Sign in with the ESS admin account first.'));return;}
+ if(!await essConfirmDelete(ids))return;
+ essDeletingBatch=true;
+ let ok=0,fail=0;
+ try{
+  for(const id of ids){
+   const success=await essDeletePilotRequest(id,true);
+   if(success){ok++;essSelectedPilotIds.delete(id)}else fail++;
+  }
+  await lmDialog(hrText('تم الحذف: ','Deleted: ')+ok+hrText(' | فشل: ',' | Failed: ')+fail);
+  if(typeof essRenderRequestPanel==='function')essRenderRequestPanel();
+ }finally{essDeletingBatch=false}
+}
+document.addEventListener('click',event=>{
+ if(event.target.closest?.('#ess-delete-selected')){event.preventDefault();essDeleteSelectedPilot();}
+});
 document.addEventListener('click',event=>{
  const btn=event.target.closest?.('.ess-pilot-delete');
  if(!btn)return;
  event.preventDefault();
  const id=btn.getAttribute('data-request-id');
- if(id)essDeletePilotRequest(id);
+ if(id)essDeletePilotRequest(id).then(ok=>{if(ok){essSelectedPilotIds.delete(id);lmDialog(hrText("تم حذف بصمة الاختبار.","Test punch deleted.")).then(()=>essRenderRequestPanel());}else lmDialog(hrText("لم يكتمل الحذف، راجع Console.","Deletion did not complete; check Console."));});
 });
 async function essReviewAttendance(code,id,decision){
  if(!await lmDialog(hrText('تأكيد القرار؟','Confirm decision?'),true))return;
@@ -1122,3 +1196,26 @@ async function essBulkCode2(decision){
 let essPilotInterval=null;
 function essStartPilotTimer(){if(essPilotInterval)clearInterval(essPilotInterval);essPilotInterval=setInterval(()=>{if(essPilotReady()&&document.getElementById('ess-requests-content'))essPilotSweep();},60000);}
 document.addEventListener('DOMContentLoaded',essStartPilotTimer);
+
+// Keyboard support: native buttons already activate with Enter; form fields need explicit actions.
+document.addEventListener('keydown',event=>{
+ if(event.key!=='Enter'||event.isComposing||event.repeat||event.defaultPrevented)return;
+ const target=event.target;
+ if(!target||target.closest?.('[role="dialog"]'))return;
+ if(target.matches?.('textarea,[contenteditable="true"]'))return;
+ if(target.matches?.('#login-emp-code,#login-password')){
+  event.preventDefault();
+  if(typeof handleLogin==='function')handleLogin();
+  return;
+ }
+ if(target.matches?.('#search-input')){
+  event.preventDefault();
+  if(typeof filterEmployees==='function')filterEmployees();
+  return;
+ }
+ // For custom clickable elements only; do not double-fire native button/link behavior.
+ const clickable=target.closest?.('[role="button"][tabindex], [data-keyboard-activate="true"]');
+ if(clickable&&!clickable.matches('button,a,input,select,textarea')){
+  event.preventDefault();clickable.click();
+ }
+});
