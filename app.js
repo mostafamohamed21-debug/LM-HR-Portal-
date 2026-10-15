@@ -906,14 +906,21 @@ function essDrawRequests(){
  const errors=Object.entries(essRequestErrors).map(([p,e])=>`${essEscape(p)}: ${essEscape(e)}`).join(' | ');
  const msg=errors?`<p class="text-amber-300 mb-3">${hrText('تعذر قراءة بعض المسارات','Some paths could not be read')}: ${errors}</p>`:'';
  if(!rows.length){area.innerHTML=msg+`<p>${hrText('لا توجد طلبات حاليًا، أو لم تصل بيانات بعد.','No requests yet, or still loading.')}</p>`;return;}
- area.innerHTML=msg+`<div class="mb-3 flex flex-wrap gap-2 items-center"><span>${hrText('اختبار بصمات الكود 2 فقط','Code 2 attendance pilot')}</span><button class="px-2 py-1 bg-sky-800 rounded" onclick="essBulkCode2('APPROVED')">${hrText('اعتماد كل المعلق','Approve all pending')}</button><button class="px-2 py-1 bg-amber-800 rounded" onclick="essBulkCode2('HELD')">${hrText('تعليق كل المعلق','Hold all pending')}</button><button class="px-2 py-1 bg-red-900 rounded" onclick="essBulkCode2('REJECTED')">${hrText('رفض كل المعلق','Reject all pending')}</button></div><p class="mb-3">${rows.length} ${hrText('طلب','requests')}</p><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr><th class="p-2 border-b border-slate-700"><input type="checkbox" id="ess-select-all" aria-label="${hrText('تحديد كل بصمات الاختبار الظاهرة','Select all visible test punches')}" class="accent-sky-500 w-4 h-4"></th>${[hrText('النوع','Type'),hrText('الكود','Code'),hrText('الحالة','Status'),hrText('التاريخ','Date'),hrText('التفاصيل','Details'),hrText('إجراء','Action')].map(x=>`<th class="p-2 text-start border-b border-slate-700">${x}</th>`).join('')}</tr></thead><tbody>${rows.slice(0,300).map(r=>{
+ area.innerHTML=msg+`<div class="ess-command-bar mb-4" role="toolbar" aria-label="${hrText('غرفة التحكم في الطلبات','Requests control room')}">
+<div class="ess-command-title"><span>◈ ${hrText('غرفة التحكم | بصمات الكود 2','Control room | Code 2 punches')}</span><span class="ess-command-count">${hrText('المحدد','Selected')}: <strong id="ess-selected-count">0</strong></span></div>
+<div class="ess-command-actions">
+<button type="button" class="ess-command-btn ess-command-approve" data-ess-selection-action="APPROVED" disabled>✓ ${hrText('اعتماد المحدد','Approve selected')}</button>
+<button type="button" class="ess-command-btn ess-command-hold" data-ess-selection-action="HELD" disabled>◷ ${hrText('تعليق المحدد','Hold selected')}</button>
+<button type="button" class="ess-command-btn ess-command-reject" data-ess-selection-action="REJECTED" disabled>✕ ${hrText('رفض المحدد','Reject selected')}</button>
+<button type="button" class="ess-command-btn ess-command-delete" id="ess-delete-selected" disabled>▤ ${hrText('حذف المحدد','Delete selected')}</button>
+</div><div class="ess-command-help">${hrText('حدد الطلبات من مربعات الاختيار في الطرف المقابل ثم اختر الإجراء.','Select requests using the checkboxes on the opposite side, then choose an action.')}</div></div><p class="mb-3">${rows.length} ${hrText('طلب','requests')}</p><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr>${[hrText('النوع','Type'),hrText('الكود','Code'),hrText('الحالة','Status'),hrText('التاريخ','Date'),hrText('التفاصيل','Details'),hrText('إجراء','Action')].map(x=>`<th class="p-2 text-start border-b border-slate-700">${x}</th>`).join('')}<th class="ess-selection-col p-2 border-b border-slate-700"><input type="checkbox" id="ess-select-all" aria-label="${hrText('تحديد كل بصمات الاختبار الظاهرة','Select all visible test punches')}" class="ess-choice"></th></tr></thead><tbody>${rows.slice(0,300).map(r=>{
  const date=r.time?new Date(r.time).toLocaleString(currentLang==='ar'?'ar-EG':'en-GB'):'—';
  const status=r.req.status||r.req.verificationStatus||'—';
  const detail=Object.entries(r.req).filter(([k])=>!['selfieData','code','timestamp','createdAt','status','verificationStatus'].includes(k)).slice(0,8).map(([k,v])=>`${k}: ${typeof v==='object'?'[object]':String(v).slice(0,90)}`).join(' | ');
- const selfie=r.path==='attendance_requests' && typeof r.req.selfieData==='string' && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(r.req.selfieData) ? `<img src="${r.req.selfieData}" alt="Selfie evidence" style="width:72px;height:72px;object-fit:cover;border-radius:10px">` : '';
+ const selfie=r.path==='attendance_requests' && typeof r.req.selfieData==='string' && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(r.req.selfieData) ? `<button type="button" class="ess-selfie-open" aria-label="${hrText('تكبير صورة التحقق','Enlarge verification photo')}" data-selfie-id="${escapeHtml(r.id)}"><img src="${r.req.selfieData}" alt="${hrText('صورة التحقق','Verification selfie')}" class="ess-selfie-thumb"></button>` : '';
  const review=r.path==='attendance_requests'&&r.req.verificationStatus==='PENDING_REVIEW'&&String(r.code)==='2' ? ['APPROVED','REJECTED','HELD'].map((v,i)=>`<button class="px-2 py-1 rounded bg-slate-700 mr-1" onclick="essReviewAttendance('${r.code}','${r.id}','${v}')">${[hrText('موافقة','Approve'),hrText('رفض','Reject'),hrText('تعليق','Hold')][i]}</button>`).join(' ') : '';
- return `<tr class="border-b border-slate-700/40"><td class="p-2">${r.path==='attendance_requests'&&String(r.code)==='2'&&portalIsAdmin()?`<input type="checkbox" class="ess-pilot-check accent-sky-500 w-4 h-4" value="${escapeHtml(r.id)}" aria-label="${hrText('تحديد الطلب','Select request')} ${escapeHtml(r.id)}">`:''}</td><td class="p-2">${essEscape(r.type)}</td><td class="p-2">${essEscape(r.code)}</td><td class="p-2">${essEscape(status)}</td><td class="p-2">${essEscape(date)}</td><td class="p-2">${essEscape(detail)} ${selfie}</td><td class="p-2">${(r.path==='attendance_requests' && String(r.code)==='2' && portalIsAdmin() ? `<button class="ess-pilot-delete px-2 py-1 rounded bg-rose-950 text-rose-100 border border-rose-700 mt-1" data-request-id="${escapeHtml(r.id)}">${hrText('حذف اختبار','Delete test')}</button>` : '')} ${review || (portalIsAdmin() && essAuth.currentUser?.uid===ESS_ADMIN_UID && r.req.status==='Pending' && r.path!=='attendance_requests' && r.path!=='suggestions_and_complaints' ? `<button class="px-2 py-1 bg-emerald-700 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Approved')">${hrText('موافقة','Approve')}</button> <button class="px-2 py-1 bg-red-800 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Rejected')">${hrText('رفض','Reject')}</button>` : '—')}</td></tr>`;
- }).join('')}</tbody></table></div><div class="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-slate-700 bg-slate-900/60 p-3"><span class="text-sky-200">${hrText('المحدد للحذف','Selected for deletion')}: <strong id="ess-selected-count">0</strong></span><button type="button" id="ess-delete-selected" disabled class="px-4 py-2 rounded-lg bg-rose-800 text-white disabled:opacity-40 disabled:cursor-not-allowed">${hrText('حذف المحدد','Delete selected')}</button></div>`;
+ return `<tr class="border-b border-slate-700/40"><td class="p-2">${essEscape(r.type)}</td><td class="p-2">${essEscape(r.code)}</td><td class="p-2">${essEscape(status)}</td><td class="p-2">${essEscape(date)}</td><td class="p-2">${essEscape(detail)} ${selfie}</td><td class="p-2">${(r.path==='attendance_requests'&&String(r.code)==='2') ? '—' : ( (portalIsAdmin() && essAuth.currentUser?.uid===ESS_ADMIN_UID && r.req.status==='Pending' && r.path!=='attendance_requests' && r.path!=='suggestions_and_complaints' ? `<button class="px-2 py-1 bg-emerald-700 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Approved')">${hrText('موافقة','Approve')}</button> <button class="px-2 py-1 bg-red-800 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Rejected')">${hrText('رفض','Reject')}</button>` : '—'))}</td><td class="ess-selection-col p-2">${r.path==='attendance_requests'&&String(r.code)==='2'&&portalIsAdmin()?`<input type="checkbox" class="ess-pilot-check ess-choice" value="${escapeHtml(r.id)}" aria-label="${hrText('تحديد الطلب','Select request')} ${escapeHtml(r.id)}">`:''}</td></tr>`;
+ }).join('')}</tbody></table></div>`;
  essUpdateSelectionUI();
 }
 const essSelectedPilotIds = new Set();
@@ -928,6 +935,7 @@ function essUpdateSelectionUI(){
  if(counter)counter.textContent=String(essSelectedPilotIds.size);
  const del=area.querySelector('#ess-delete-selected');
  if(del)del.disabled=essSelectedPilotIds.size===0;
+ area.querySelectorAll('[data-ess-selection-action]').forEach(b=>b.disabled=essSelectedPilotIds.size===0);
  const all=area.querySelector('#ess-select-all');
  if(all){all.checked=checks.length>0&&checks.every(x=>x.checked);all.indeterminate=checks.some(x=>x.checked)&&!all.checked;}
 }
@@ -1059,17 +1067,40 @@ async function essFinalizeApproved(code,id){
  let out;try{out=await essDb.ref('approved_attendance/2/'+id).transaction(old=>old===null?event:undefined,undefined,false);}catch(e){console.error('[CODE2] LEDGER_WRITE_DENIED',{path:'approved_attendance/2/'+id,requestId:id,uid:essAuth.currentUser?.uid,event},e);throw Error('LEDGER_WRITE: '+(e.code||e.message));}
  return out.committed||out.snapshot.exists();
 }
-async function essAttendanceDecision(code,id,decision,auto=false){
+const essDecisionReasons={
+ REJECTED:[['FACE_MISMATCH','الصورة لا تطابق الموظف','Photo does not match employee'],['PHOTO_UNCLEAR','الصورة غير واضحة','Photo is unclear'],['OUTSIDE_GEOFENCE','خارج نطاق العمل المسموح','Outside permitted work zone'],['GPS_UNVERIFIED','تعذر التحقق من الموقع','Location could not be verified'],['DUPLICATE','بصمة مكررة','Duplicate punch'],['INVALID_TIME','تاريخ أو وقت غير صحيح','Invalid timestamp'],['INCOMPLETE_EVIDENCE','بيانات التحقق غير مكتملة','Incomplete evidence'],['OTHER','سبب آخر','Other']],
+ HELD:[['REVIEW_PHOTO','بانتظار مراجعة الصورة','Awaiting photo review'],['REVIEW_GPS','بانتظار مراجعة الموقع','Awaiting location review'],['EMPLOYEE_CLARIFICATION','بانتظار توضيح الموظف','Awaiting employee clarification'],['OTHER','سبب آخر','Other']]
+};
+function essReasonDialog(decision,count){
+ return new Promise(resolve=>{
+  const overlay=document.createElement('div');overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#020617d9;display:grid;place-items:center;padding:18px';
+  const card=document.createElement('div');card.style.cssText='width:min(480px,95vw);background:#101d35;border:1px solid #316083;border-radius:18px;padding:22px;color:#e2e8f0;box-shadow:0 20px 50px #000a;direction:'+(currentLang==='ar'?'rtl':'ltr');card.setAttribute('role','dialog');card.setAttribute('aria-modal','true');
+  const title=document.createElement('h3');title.textContent=(decision==='REJECTED'?hrText('سبب الرفض','Rejection reason'):hrText('سبب التعليق','Hold reason'))+' ('+count+')';title.style.cssText='font-weight:800;font-size:20px;margin-bottom:12px';
+  const select=document.createElement('select');select.style.cssText='width:100%;background:#172b46;border:1px solid #48708d;border-radius:10px;padding:12px;color:white;margin-bottom:12px';
+  const options=essDecisionReasons[decision];options.forEach(([code,ar,en])=>{const o=document.createElement('option');o.value=code;o.textContent=hrText(ar,en);select.appendChild(o)});
+  const note=document.createElement('textarea');note.placeholder=hrText('ملاحظات إضافية (إلزامية عند اختيار سبب آخر)','Additional notes (required for Other)');note.style.cssText='width:100%;min-height:80px;padding:10px;background:#172b46;color:white;border:1px solid #48708d;border-radius:10px;margin-bottom:12px';
+  const err=document.createElement('p');err.style.cssText='color:#fda4af;font-size:13px';
+  const actions=document.createElement('div');actions.style.cssText='display:flex;gap:10px;margin-top:15px';
+  const cancel=document.createElement('button');cancel.textContent=hrText('إلغاء','Cancel');const ok=document.createElement('button');ok.textContent=hrText('تأكيد القرار','Confirm decision');
+  for(const b of [cancel,ok])b.style.cssText='border-radius:10px;padding:10px 16px;color:white;background:#24547c';
+  const finish=v=>{overlay.remove();document.removeEventListener('keydown',key,true);resolve(v)};
+  const key=e=>{if(e.key==='Escape'){e.preventDefault();finish(null)}};document.addEventListener('keydown',key,true);
+  cancel.onclick=()=>finish(null);ok.onclick=()=>{const reason=options.find(x=>x[0]===select.value);const extra=note.value.trim();if(select.value==='OTHER'&&extra.length<5){err.textContent=hrText('اكتب توضيحًا لا يقل عن 5 حروف','Please explain in at least 5 characters');return}finish(reason[0]+': '+hrText(reason[1],reason[2])+(extra?' — '+extra:''))};
+  actions.append(cancel,ok);card.append(title,select,note,err,actions);overlay.append(card);document.body.append(overlay);select.focus();
+ });
+}
+async function essAttendanceDecision(code,id,decision,auto=false,reason=""){
  if(!essPilotReady()||String(code)!=='2'||!/^[-\w]+$/.test(id))throw Error('UNAUTHORIZED');
  if(!['APPROVED','REJECTED','HELD'].includes(decision))throw Error('INVALID_DECISION');
+ if((decision==='REJECTED'||decision==='HELD')&&!reason.trim())throw Error('DECISION_REASON_REQUIRED');
  const ref=essDb.ref('attendance_requests/2/'+id);
  // Use server time offset for UI expiry estimate; the DB rules also enforce auto timing.
  const offsetSnap=await essDb.ref('.info/serverTimeOffset').once('value');
  const serverNow=Date.now()+Number(offsetSnap.val()||0);
  let result;try{result=await ref.transaction(old=>{
-  if(!old||old.verificationStatus!=='PENDING_REVIEW')return;
+  if(!old||!(old.verificationStatus==='PENDING_REVIEW'||(!auto&&old.verificationStatus==='HELD'&&decision!=='HELD')))return;
   if(auto&&(decision!=='APPROVED'||serverNow-Number(old.createdAt||0)<ESS_PILOT_TTL))return;
-  return {...old,verificationStatus:decision,decisionMethod:auto?'AUTO_24H':'MANUAL',reviewedBy:ESS_ADMIN_UID,reviewedAt:firebase.database.ServerValue.TIMESTAMP};
+  return {...old,verificationStatus:decision,decisionMethod:auto?'AUTO_24H':'MANUAL',reviewedBy:ESS_ADMIN_UID,reviewedAt:firebase.database.ServerValue.TIMESTAMP,...(decision==='REJECTED'||decision==='HELD'?{decisionReason:reason}:{})};
  },undefined,false);}catch(e){console.error('[CODE2] REQUEST_UPDATE_DENIED',{path:'attendance_requests/2/'+id,requestId:id,uid:essAuth.currentUser?.uid,decision},e);throw Error('REQUEST_UPDATE: '+(e.code||e.message));}
  if(!result.committed)return false;
  if(decision==='APPROVED')await essFinalizeApproved(code,id);
@@ -1157,13 +1188,13 @@ async function essDeleteSelectedPilot(){
  if(!essPilotReady()){await lmDialog(hrText('اتصل بحساب إدارة ESS أولًا.','Sign in with the ESS admin account first.'));return;}
  if(!await essConfirmDelete(ids))return;
  essDeletingBatch=true;
- let ok=0,fail=0;
+ let ok=0,fail=0;const failedIds=[];
  try{
   for(const id of ids){
    const success=await essDeletePilotRequest(id,true);
-   if(success){ok++;essSelectedPilotIds.delete(id)}else fail++;
+   if(success){ok++;essSelectedPilotIds.delete(id)}else{fail++;failedIds.push(id)}
   }
-  await lmDialog(hrText('تم الحذف: ','Deleted: ')+ok+hrText(' | فشل: ',' | Failed: ')+fail);
+  await lmDialog(hrText('تم الحذف: ','Deleted: ')+ok+hrText(' | فشل: ',' | Failed: ')+fail+(failedIds.length?'\n'+hrText('الطلبات الفاشلة: ','Failed IDs: ')+failedIds.join(', '):''));
   if(typeof essRenderRequestPanel==='function')essRenderRequestPanel();
  }finally{essDeletingBatch=false}
 }
@@ -1178,11 +1209,42 @@ document.addEventListener('click',event=>{
  if(id)essDeletePilotRequest(id).then(ok=>{if(ok){essSelectedPilotIds.delete(id);lmDialog(hrText("تم حذف بصمة الاختبار.","Test punch deleted.")).then(()=>essRenderRequestPanel());}else lmDialog(hrText("لم يكتمل الحذف، راجع Console.","Deletion did not complete; check Console."));});
 });
 async function essReviewAttendance(code,id,decision){
+ const reason=decision==='REJECTED'||decision==='HELD'?await essReasonDialog(decision,1):'';
+ if((decision==='REJECTED'||decision==='HELD')&&!reason)return;
  if(!await lmDialog(hrText('تأكيد القرار؟','Confirm decision?'),true))return;
- try{const done=await essAttendanceDecision(code,id,decision);await lmDialog(done?hrText('تم القرار وتحديث السجل عند الموافقة','Decision saved; approved event added to ledger'):hrText('الطلب تم التعامل معه سابقًا','Already processed'));}
+ try{const done=await essAttendanceDecision(code,id,decision,false,reason);await lmDialog(done?hrText('تم القرار وتحديث السجل عند الموافقة','Decision saved; approved event added to ledger'):hrText('الطلب تم التعامل معه سابقًا','Already processed'));}
  catch(e){await lmDialog(hrText('فشل التنفيذ؛ راجع السجل: ','Action failed; check ledger: ')+(e.code||e.message));}
 }
+let essSelectionBusy=false;
+async function essApplySelectedDecision(decision){
+ if(essSelectionBusy||!['APPROVED','HELD','REJECTED'].includes(decision))return;
+ if(!essPilotReady()){await lmDialog(hrText('يلزم اتصال إدارة ESS أولًا.','ESS admin login required.'));return;}
+ const ids=[...essSelectedPilotIds];if(!ids.length)return;
+ const snap=await essDb.ref('attendance_requests/2').once('value');
+ const values=snap.val()||{};
+ const pending=ids.filter(id=>values[id]?.verificationStatus==='PENDING_REVIEW'||(decision!=='HELD'&&values[id]?.verificationStatus==='HELD'));
+ const skipped=ids.length-pending.length;
+ if(!pending.length){await lmDialog(hrText('الطلبات المحددة ليست معلقة للمراجعة.','Selected requests are not pending review.'));return;}
+ const names={APPROVED:hrText('اعتماد','Approve'),HELD:hrText('تعليق','Hold'),REJECTED:hrText('رفض','Reject')};
+ const reason=(decision==='REJECTED'||decision==='HELD')?await essReasonDialog(decision,pending.length):'';
+ if((decision==='REJECTED'||decision==='HELD')&&!reason)return;
+ if(!await lmDialog(names[decision]+' '+pending.length+' '+hrText('طلب محدد؟','selected request(s)?'),true))return;
+ essSelectionBusy=true;let ok=0,fail=0;
+ try{
+  for(const id of pending){
+   try{if(await essAttendanceDecision('2',id,decision,false,reason)){ok++;essSelectedPilotIds.delete(id)}else fail++}
+   catch(e){fail++;console.error('[CODE2] SELECTED_DECISION_FAILED',id,e)}
+  }
+  await lmDialog(hrText('نجح: ','Succeeded: ')+ok+hrText(' | فشل: ',' | Failed: ')+fail+hrText(' | غير معلق: ',' | Not pending: ')+skipped);
+  essUpdateSelectionUI();
+ }finally{essSelectionBusy=false}
+}
+document.addEventListener('click',event=>{
+ const button=event.target.closest?.('[data-ess-selection-action]');
+ if(button){event.preventDefault();essApplySelectedDecision(button.dataset.essSelectionAction)}
+});
 async function essBulkCode2(decision){
+ if(decision==='REJECTED'||decision==='HELD')return lmDialog(hrText('استخدم غرفة التحكم لتحديد الطلبات وسبب القرار.','Use the control room to select requests and provide a reason.'));
  if(!essPilotReady()||!['APPROVED','HELD','REJECTED'].includes(decision))return;
  const snap=await essDb.ref('attendance_requests/2').once('value');
  const ids=Object.entries(snap.val()||{}).filter(([,r])=>r?.verificationStatus==='PENDING_REVIEW').map(([id])=>id);
@@ -1219,3 +1281,31 @@ document.addEventListener('keydown',event=>{
   event.preventDefault();clickable.click();
  }
 });
+
+// Control-room design uses the portal's slate / sky palette, with raised 3D controls.
+(function essInjectControlRoomStyles(){
+ if(document.getElementById('ess-control-room-styles'))return;
+ const style=document.createElement('style');style.id='ess-control-room-styles';
+ style.textContent=`
+ .ess-command-bar{padding:16px 18px;border:1px solid #294460;border-radius:18px;background:linear-gradient(155deg,#182d47,#0c192e);box-shadow:0 12px 28px #02061770,inset 0 1px #ffffff18;position:relative}
+ .ess-command-title{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;color:#dbeafe;font-weight:750;margin-bottom:12px}
+ .ess-command-count{font-size:13px;background:#0f2743;border:1px solid #34526e;border-radius:20px;padding:5px 12px}
+ .ess-command-actions{display:flex;gap:10px;flex-wrap:wrap}
+ .ess-command-btn{font:inherit;font-size:13px;font-weight:750;padding:11px 16px;border-radius:11px;border:1px solid #47617a;color:#e2e8f0;background:linear-gradient(180deg,#324b66,#1b304a);box-shadow:0 4px 0 #071426,0 8px 14px #0005,inset 0 1px #ffffff2b;cursor:pointer;transition:background .16s,transform .16s,box-shadow .16s,border-color .16s}
+ .ess-command-btn:not(:disabled):hover{transform:translateY(-2px);background:linear-gradient(180deg,#42749e,#234c75);border-color:#6bb6ec;box-shadow:0 6px 0 #071426,0 12px 18px #0006,inset 0 1px #ffffff45}
+ .ess-command-btn:not(:disabled):active{transform:translateY(2px);box-shadow:0 1px 0 #071426,inset 0 2px 7px #0007}
+ .ess-command-btn:focus-visible,.ess-choice:focus-visible{outline:2px solid #7dd3fc;outline-offset:3px}
+ .ess-command-btn:disabled{opacity:.4;cursor:not-allowed}
+ .ess-command-help{font-size:12px;color:#94a3b8;margin-top:12px}
+ .ess-selection-col{width:56px;text-align:center;vertical-align:middle;background:#12253a66}
+ .ess-choice{appearance:none;width:19px;height:19px;border:2px solid #6382a0;border-radius:6px;background:#0b1b30;cursor:pointer;vertical-align:middle;position:relative}
+ .ess-choice:checked{background:#2778b2;border-color:#7dd3fc;box-shadow:0 0 0 3px #0ea5e922}
+ .ess-choice:checked:after{content:'✓';position:absolute;left:3px;top:-3px;color:white;font-size:16px;font-weight:800}
+ @media(max-width:650px){.ess-command-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.ess-command-btn{padding:11px 7px;font-size:12px}.ess-command-bar{padding:12px}}
+ `;
+ document.head.appendChild(style);
+})();
+
+// Secure-ish in-session preview: retrieve selfie only from already loaded ESS request state; do not persist in browser storage.
+document.addEventListener('click',e=>{const btn=e.target.closest?.('.ess-selfie-open');if(!btn)return;const id=btn.dataset.selfieId;const r=essRequestState.attendance_requests?.['2']?.[id];if(!r||typeof r.selfieData!=='string'||!/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(r.selfieData))return;const overlay=document.createElement('div');overlay.className='ess-selfie-overlay';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');const img=document.createElement('img');img.src=r.selfieData;img.alt=hrText('صورة التحقق مكبرة','Enlarged verification selfie');img.style.cssText='max-width:min(92vw,850px);max-height:85vh;object-fit:contain;border-radius:15px';const close=document.createElement('button');close.type='button';close.textContent='✕';close.style.cssText='position:absolute;top:20px;right:20px;width:48px;height:48px;background:#172b46;color:white;border:1px solid #5a83a5;border-radius:12px';const dismiss=()=>{overlay.remove();document.removeEventListener('keydown',esc,true)};const esc=k=>{if(k.key==='Escape')dismiss()};document.addEventListener('keydown',esc,true);close.onclick=dismiss;overlay.onclick=k=>{if(k.target===overlay)dismiss()};overlay.append(img,close);document.body.append(overlay);close.focus()});
+(function(){const st=document.createElement('style');st.textContent='.ess-selfie-open{border:0;background:transparent;cursor:zoom-in;padding:3px;border-radius:12px}.ess-selfie-thumb{width:72px;height:72px;object-fit:cover;border-radius:10px;transition:transform .2s,box-shadow .2s}.ess-selfie-open:hover .ess-selfie-thumb,.ess-selfie-open:focus-visible .ess-selfie-thumb{transform:scale(2.3);box-shadow:0 12px 35px #000a;position:relative;z-index:10}.ess-selfie-overlay{position:fixed;inset:0;z-index:2147483647;background:#020617ee;display:flex;align-items:center;justify-content:center;padding:20px}';document.head.append(st)})();
