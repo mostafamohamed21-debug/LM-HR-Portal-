@@ -1028,7 +1028,7 @@ async function essFinalizeApproved(code,id){
  const ts=Number(r.createdAt);
  if(!Number.isFinite(ts)||ts<=0||!['IN','OUT'].includes(r.punchType))throw Error('INVALID_REQUEST');
  const event={requestId:id,code:'2',punchType:r.punchType,punchTimestamp:ts,dayKey:essCairoDay(ts),decisionMethod:r.decisionMethod,reviewedBy:r.reviewedBy,reviewedAt:r.reviewedAt};
- const out=await essDb.ref('approved_attendance/2/'+id).transaction(old=>old===null?event:undefined,undefined,false);
+ let out;try{out=await essDb.ref('approved_attendance/2/'+id).transaction(old=>old===null?event:undefined,undefined,false);}catch(e){console.error('[CODE2] LEDGER_WRITE_DENIED',{path:'approved_attendance/2/'+id,requestId:id,uid:essAuth.currentUser?.uid,event},e);throw Error('LEDGER_WRITE: '+(e.code||e.message));}
  return out.committed||out.snapshot.exists();
 }
 async function essAttendanceDecision(code,id,decision,auto=false){
@@ -1038,11 +1038,11 @@ async function essAttendanceDecision(code,id,decision,auto=false){
  // Use server time offset for UI expiry estimate; the DB rules also enforce auto timing.
  const offsetSnap=await essDb.ref('.info/serverTimeOffset').once('value');
  const serverNow=Date.now()+Number(offsetSnap.val()||0);
- const result=await ref.transaction(old=>{
+ let result;try{result=await ref.transaction(old=>{
   if(!old||old.verificationStatus!=='PENDING_REVIEW')return;
   if(auto&&(decision!=='APPROVED'||serverNow-Number(old.createdAt||0)<ESS_PILOT_TTL))return;
   return {...old,verificationStatus:decision,decisionMethod:auto?'AUTO_24H':'MANUAL',reviewedBy:ESS_ADMIN_UID,reviewedAt:firebase.database.ServerValue.TIMESTAMP};
- },undefined,false);
+ },undefined,false);}catch(e){console.error('[CODE2] REQUEST_UPDATE_DENIED',{path:'attendance_requests/2/'+id,requestId:id,uid:essAuth.currentUser?.uid,decision},e);throw Error('REQUEST_UPDATE: '+(e.code||e.message));}
  if(!result.committed)return false;
  if(decision==='APPROVED')await essFinalizeApproved(code,id);
  return true;
