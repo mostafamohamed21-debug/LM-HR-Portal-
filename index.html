@@ -363,8 +363,40 @@ body > div.flex.flex-1.overflow-hidden > main { box-sizing:border-box; overflow-
 .hr-feature-table{width:100%;border-collapse:collapse;font-size:13px}
 .hr-feature-table th,.hr-feature-table td{padding:12px;text-align:start;border-bottom:1px solid rgba(56,189,248,.14)}
 .hr-feature-input{width:100%;background:#081529;border:1px solid #24607d;border-radius:10px;padding:12px;color:#e2e8f0}
-    </style>
+    
+/* FAHD1 v8 unified native employee profile */
+#employee-profile-view{display:none}
+#employee-profile-view:not(.hidden){display:block!important}
+#employee-profile-view > :not(#fahd1-native){display:none!important}
+#fahd1-native{display:block;width:100%;min-width:0}
+
+.fahd1-back{margin:0 0 12px;padding:9px 15px;border:1px solid #285c83;border-radius:10px;color:#d5eeff;background:#103154;font-weight:650;cursor:pointer}
+.fahd1-back:hover{background:#194a77}
+/* Original spacious KPI cards with SVG icons, preserve analytics and data views */
+#hr-dashboard-view .hr-stat-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+@media(max-width:800px){#hr-dashboard-view .hr-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:480px){#hr-dashboard-view .hr-stat-grid{grid-template-columns:1fr!important}}
+#hr-dashboard-view .hr-stat-grid{gap:12px!important;margin-bottom:14px!important}
+#hr-dashboard-view .hr-stat-grid>.hr-panel{padding:14px 16px!important;border-radius:14px;min-height:96px;position:relative}
+#hr-dashboard-view .hr-stat-label{font-size:11px!important;padding-inline-end:27px}
+#hr-dashboard-view .hr-stat-value{font-size:25px!important;line-height:1.2;margin-top:5px!important}
+#hr-dashboard-view .hr-stat-grid .text-xs{font-size:10px!important;margin-top:5px!important}
+.hr-stat-icon{position:absolute;inset-inline-end:12px;top:12px;width:24px;height:24px;color:#7dd3fc;opacity:.88}
+#hr-dashboard-view .hr-shortcut-grid{gap:10px!important}
+#hr-dashboard-view .hr-shortcut-grid .hr-widget{padding:13px 15px!important;border-radius:14px;min-height:105px}
+#hr-dashboard-view .hr-shortcut-grid .hr-widget .text-3xl{font-size:22px!important;margin-top:7px!important}
+#hr-dashboard-view .hr-shortcut-grid .hr-widget .text-lg{font-size:14px!important;margin-top:7px!important}
+.hr-shortcut-icon{width:21px;height:21px;vertical-align:middle;margin-inline-end:8px;color:#7dd3fc;display:inline-block}
+@media(max-width:640px){#hr-dashboard-view .hr-stat-grid>.hr-panel{min-height:90px;padding:10px!important}#hr-dashboard-view .hr-stat-value{font-size:20px!important}}
+</style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style id="fahd-v7-dashboard-depth">
+/* 3D depth on existing REAL-DATA dashboard, without changing chart data or layout */
+#hr-dashboard-view .hr-panel{position:relative;transform-style:preserve-3d;transition:transform .32s ease,box-shadow .32s ease;border:1px solid #2c78b45a;box-shadow:0 14px 24px #0005,inset 0 1px #9fe9ff19;background-image:linear-gradient(135deg,#57ccff08,transparent 46%)}
+#hr-dashboard-view .hr-panel:hover{transform:perspective(1100px) translateY(-4px) rotateX(1.5deg);box-shadow:0 22px 36px #0008,0 0 26px #00c8ff24,inset 0 1px #9fe9ff2c}
+#hr-dashboard-view svg{filter:drop-shadow(0 7px 9px #0007)}
+@media(prefers-reduced-motion:reduce){#hr-dashboard-view .hr-panel{transition:none}#hr-dashboard-view .hr-panel:hover{transform:none}}
+</style><style id="fahd-native-style">.fahd-native{color:#e3f3ff;font-family:inherit}.fahd-top,.fahd-content{border:1px solid #17476c;border-radius:20px;background:linear-gradient(135deg,#0b1a33,#071427);padding:24px;margin-bottom:14px}.fahd-top{display:flex;align-items:center;gap:24px;justify-content:space-between}.fahd-top h2{font-size:29px;font-weight:800;color:#62d4ff}.fahd-top small{color:#60a5fa}.fahd-top p{color:#9dbbd0}.fahd-top button,.fahd-actions button{background:#123b64;border:1px solid #2972a5;padding:11px 16px;border-radius:12px;color:#e2f4ff}.fahd-tabs{display:flex;gap:9px;overflow-x:auto;padding:10px 0 18px}.fahd-tabs button{white-space:nowrap;border:1px solid #24527d;border-radius:13px;padding:13px 15px;color:#c1dcef;background:#0c1c36}.fahd-tabs button.selected{background:#125e99;border-color:#47c6ff;color:white}.fahd-summary,.fahd-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}.fahd-tile,.fahd-field{background:linear-gradient(145deg,#112849,#0a1930);border:1px solid #24517a;border-radius:15px;padding:18px;min-width:0;box-shadow:0 10px 30px #0002}.fahd-tile span,.fahd-field label{display:block;color:#9bb9d1;font-size:13px;margin-bottom:9px}.fahd-tile strong{font-size:19px;color:#6fd4ff;overflow-wrap:anywhere}.fahd-field input{width:100%;padding:11px;background:#071427;border:1px solid #31638a;border-radius:9px;color:white}.fahd-actions{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap}.fahd-empty{padding:36px;text-align:center;color:#8fb4d3;border:1px dashed #285477;border-radius:16px}.fahd-pane[hidden]{display:none!important}#fahd-status{color:#7dd3fc;margin-top:14px}@media(max-width:900px){.fahd-summary,.fahd-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.fahd-summary,.fahd-fields{grid-template-columns:1fr}.fahd-top{flex-wrap:wrap}}</style>
 </head>
 <body class="min-h-screen flex flex-col">
 
@@ -545,6 +577,10 @@ body > div.flex.flex-1.overflow-hidden > main { box-sizing:border-box; overflow-
 
             <!-- صفحة الملف الوظيفي (للعرض الافتراضي، وتفتح للتعديل عند الضغط على زرار التعديل) -->
             <div id="employee-profile-view" class="hidden space-y-6">
+<section id="fahd1-native" class="fahd-native" dir="auto">
+<div class="fahd-top"><button type="button" onclick="backToEmployeesList()">← العودة للقائمة / Back</button><div><small>LACTO MISR · EMPLOYEE 360°</small><h2 id="fahd-name">ملف الموظف</h2><p id="fahd-identity"></p></div><span id="fahd-code"></span></div>
+<div class="fahd-tabs" role="tablist"><button class="selected" type="button" onclick="fahdTab('overview',this)">◈ Overview · نظرة عامة</button><button type="button" onclick="fahdTab('personal',this)">♙ Personal & Job · البيانات</button><button type="button" onclick="fahdTab('financial',this)">◉ Financial · المالية</button><button type="button" onclick="fahdTab('attendance',this)">◷ Attendance · الحضور</button><button type="button" onclick="fahdTab('leaves',this)">▦ Leaves · الإجازات</button><button type="button" onclick="fahdTab('performance',this)">◇ Performance · الأداء</button></div>
+<div class="fahd-content"><div id="fahd-tab-overview" class="fahd-pane"><div id="fahd-summary" class="fahd-summary"></div></div><div id="fahd-tab-personal" class="fahd-pane" hidden><div id="fahd-fields" class="fahd-fields"></div><div class="fahd-actions"><button type="button" onclick="fahdSave()" id="fahd-save">💾 حفظ التعديلات في Firebase</button><button type="button" onclick="fahdAddField()">＋ إضافة حقل جديد</button></div></div><div id="fahd-tab-financial" class="fahd-pane" hidden><div id="fahd-financial"></div></div><div id="fahd-tab-attendance" class="fahd-pane" hidden><div class="fahd-empty">يتم عرض بيانات الحضور عند ربط مصدرها الفعلي — لا توجد أرقام تجريبية.</div></div><div id="fahd-tab-leaves" class="fahd-pane" hidden><div class="fahd-empty">بانتظار ملف أرصدة الإجازات الفعلي.</div></div><div id="fahd-tab-performance" class="fahd-pane" hidden><div class="fahd-empty">بانتظار بيانات تقييم الأداء الفعلية.</div></div><p id="fahd-status" role="status"></p></div></section>
                 <div class="flex justify-between items-center glass-card p-4 rounded-2xl">
                     <button onclick="backToEmployeesList()" class="px-4 py-2 bg-sky-600/30 hover:bg-sky-600 text-sky-200 rounded-xl text-sm border border-sky-400/30 transition shadow-lg" data-translate="back_btn">← العودة للقائمة</button>
                     <div class="flex gap-3">
@@ -755,5 +791,6 @@ body > div.flex.flex-1.overflow-hidden > main { box-sizing:border-box; overflow-
     <!-- ربط ملف الـ JS -->
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
     <script src="app.js?v=20261013-ess-admin-link-1"></script>
+    
 </body>
 </html>
