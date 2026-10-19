@@ -410,6 +410,25 @@ body > div.flex.flex-1.overflow-hidden > main { box-sizing:border-box; overflow-
 .fahd-tabs button:hover{transform:translateY(-4px);box-shadow:0 10px 22px #0009,0 0 19px #48c9ff8c!important}
 .fahd-tabs button.selected{background:linear-gradient(145deg,#11598d,#0a2d54)!important;border-color:#79e1ff!important;box-shadow:0 0 0 1px #64d6ff,0 0 23px #35bdff9c!important}
 </style>
+
+<style id="fahd-v11-workspace">
+.fahd-create-workspace{position:fixed;inset:0;z-index:9990;background:radial-gradient(ellipse at 70% 0%,#143d65 0%,#071527 43%,#030b18 100%);color:#e5f5ff;display:flex;flex-direction:column;overflow:hidden;padding:22px 28px}
+.fahd-create-workspace.hidden{display:none!important}
+.fahd-create-top{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:12px 4px 18px;border-bottom:1px solid #25567d}
+.fahd-create-top h2{font-size:clamp(20px,2.2vw,32px);font-weight:850;color:#69d8ff}.fahd-create-top small{color:#5dbef6}.fahd-create-top p{color:#93b9d0;font-size:13px}
+.fahd-create-top button,.fahd-create-footer button{background:#10385c;color:#e6f6ff;border:1px solid #38a7e0;border-radius:12px;padding:11px 19px}
+.fahd-create-tabs{display:flex;gap:12px;overflow-x:auto;padding:20px 4px}.fahd-create-tabs button{white-space:nowrap;border-radius:16px;padding:13px 19px;background:linear-gradient(145deg,#091a32,#164169);border:1px solid #3297d0;color:#d5f2ff;box-shadow:0 8px 22px #0006,0 0 12px #1caaff44;transition:transform .2s}
+.fahd-create-tabs button.selected{background:linear-gradient(145deg,#176eac,#0b335b);border-color:#80e6ff;box-shadow:0 0 0 1px #5cd7ff,0 0 25px #34c4ff90;transform:translateY(-3px)}
+.fahd-create-body{flex:1;min-height:0;overflow:auto;padding:0 4px 20px}.fahd-create-pane[hidden]{display:none!important}
+.fahd-add-section{margin-bottom:22px;background:linear-gradient(135deg,#0c213e,#07192f);border:1px solid #245d8c;border-radius:20px;padding:22px}
+.fahd-add-section h3{font-size:19px;font-weight:800;color:#6edbff}.fahd-add-section p{font-size:12px;color:#8daec5;margin:5px 0 16px}
+.fahd-add-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}.fahd-entry{min-width:0;padding:12px 15px;border:1px solid #285d88;background:#102746;border-radius:13px}
+.fahd-entry label{display:block;font-size:12px;color:#9ad3f4;margin-bottom:9px}.fahd-entry input{width:100%;min-width:0;border:1px solid #276392;border-radius:9px;background:#061529;color:#fff;padding:11px;font-size:14px}
+.fahd-entry input:focus{outline:2px solid #65d9ff}.fahd-entry input[readonly]{color:#80e5ff;background:#143957}
+.fahd-create-footer{display:flex;align-items:center;gap:10px;padding:16px 4px 4px;border-top:1px solid #25567d}.fahd-create-footer #add-employee-error{flex:1;color:#ff8c9c;font-size:13px}.fahd-create-footer [data-save-new]{background:#0875b9;font-weight:800}.fahd-create-footer button:disabled{opacity:.5}
+#fahd-fields .fahd-field[hidden]{display:none!important}
+@media(max-width:680px){.fahd-create-workspace{padding:10px}.fahd-create-top{flex-wrap:wrap}.fahd-add-grid{grid-template-columns:1fr}.fahd-add-section{padding:13px}}
+</style>
 </head>
 <body class="min-h-screen flex flex-col">
 
@@ -693,23 +712,27 @@ body > div.flex.flex-1.overflow-hidden > main { box-sizing:border-box; overflow-
         </main>
     </div>
 
-    <!-- Add Employee Modal -->
-    <div id="add-employee-modal" class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
-        <div class="glass-card modal-panel p-6 rounded-3xl w-full max-w-5xl border border-sky-500/35 shadow-2xl">
-            <div class="flex items-center justify-between gap-3 mb-5">
-                <div>
-                    <h3 class="text-lg font-extrabold text-white" data-translate="add_employee_title">إضافة موظف جديد</h3>
-                    <p class="text-xs text-slate-400 mt-1" data-translate="add_employee_hint">صفحة إنشاء سجل موظف جديد</p>
-                </div>
-                <button onclick="closeAddEmployeeModal()" class="portal-ghost-btn w-9 h-9 rounded-full">✕</button>
-            </div>
-            <div id="add-employee-fields" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-            <div id="add-employee-error" class="min-h-5 text-center text-xs text-red-400 mt-3"></div>
-            <div class="flex justify-end gap-2 mt-5">
-                <button onclick="closeAddEmployeeModal()" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300" data-translate="cancel_btn">إلغاء</button>
-                <button onclick="saveNewEmployee()" class="portal-action-btn px-5 py-2 rounded-xl text-xs font-bold" data-translate="save_employee_btn">حفظ الموظف</button>
-            </div>
-        </div>
+    <!-- Employee creation is a full-screen native portal workspace -->
+    <div id="add-employee-modal" class="hidden fahd-create-workspace" role="dialog" aria-modal="true" aria-labelledby="fahd-create-title">
+      <div class="fahd-create-top">
+        <div><small>LACTO MISR · EMPLOYEE 360°</small><h2 id="fahd-create-title">إضافة موظف جديد · Add Employee</h2><p>ملف جديد باللغتين العربية والإنجليزية · Bilingual employee profile</p></div>
+        <button type="button" onclick="closeAddEmployeeModal()">✕ &nbsp; إغلاق / Close</button>
+      </div>
+      <div class="fahd-create-tabs" role="tablist">
+        <button type="button" class="selected" onclick="fahdCreateTab('personal',this)">♙ Personal & Job · البيانات</button>
+        <button type="button" onclick="fahdCreateTab('financial',this)">▣ Financial · المالية</button>
+        <button type="button" onclick="fahdCreateTab('attendance',this)">◷ Attendance · الحضور</button>
+        <button type="button" onclick="fahdCreateTab('leaves',this)">▦ Leaves · الإجازات</button>
+        <button type="button" onclick="fahdCreateTab('performance',this)">↗ Performance · الأداء</button>
+      </div>
+      <div class="fahd-create-body">
+        <div id="fahd-create-personal" class="fahd-create-pane"><div id="add-employee-fields"></div></div>
+        <div id="fahd-create-financial" class="fahd-create-pane" hidden><div class="fahd-empty">البيانات المالية تُضاف بعد إنشاء السجل من تبويب المالية · Financial fields are available after creating the employee.</div></div>
+        <div id="fahd-create-attendance" class="fahd-create-pane" hidden><div class="fahd-empty">Attendance records are connected after employee creation.</div></div>
+        <div id="fahd-create-leaves" class="fahd-create-pane" hidden><div class="fahd-empty">Leave balances will be connected from the approved leave sheet.</div></div>
+        <div id="fahd-create-performance" class="fahd-create-pane" hidden><div class="fahd-empty">Performance records can be added after creation.</div></div>
+      </div>
+      <div class="fahd-create-footer"><span id="add-employee-error" role="alert"></span><button type="button" onclick="closeAddEmployeeModal()">إلغاء / Cancel</button><button type="button" data-save-new onclick="saveNewEmployee()">حفظ الموظف · Save employee</button></div>
     </div>
 
     <!-- Add Custom Field Modal -->
