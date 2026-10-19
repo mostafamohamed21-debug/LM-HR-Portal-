@@ -563,8 +563,8 @@ function buildAddEmployeeForm(){
  }
  details.append(fahdInput(fahdLang('العمر — تلقائي','Age — calculated'),'','', 'text',{readonly:true}));
  const extra=fahdAddSection(fahdLang('بيانات إضافية','Additional fields'),fahdLang('بيانات اختيارية','Optional information'));
- extra.append(fahdInput(fahdLang('رابط الصورة','Photo URL'),'photoUrl'));
- const err=document.getElementById('add-employee-error');if(err)err.textContent='';fahdUpdateNewAge();
+ extra.insertAdjacentHTML('beforeend','<div class="fahd-entry"><label>'+fahdLang('صورة الموظف','Employee photo')+'</label><img id="fahd-create-photo-preview" class="fahd-photo" alt=""><button type="button" class="fahd-photo-button" onclick="fahdPickPhoto(true)">'+fahdLang('اختيار صورة من الملفات','Choose photo file')+'</button></div><div id="fahd-new-custom"></div><button type="button" class="fahd-photo-button" onclick="fahdNewExtraField()">'+fahdLang('إضافة حقل مخصص','Add custom field')+'</button>');
+ const err=document.getElementById('add-employee-error');if(err)err.textContent='';fahdUpdateNewAge();fahdEnableDropdowns();fahdTranslateUI();
 }
 function fahdUpdateNewAge(){const birth=document.querySelector('#add-employee-fields [data-add-key="تاريخ الميلاد"]');const age=fahdAge(birth?.value);document.querySelectorAll('#add-employee-fields [data-computed-age]').forEach(el=>el.value=age?age+' '+fahdLang('سنة','years'):'—');}
 async function saveNewEmployee(){
@@ -577,10 +577,11 @@ async function saveNewEmployee(){
  if(allEmployees.some(e=>String(getEmployeeCode(e))===code)){err.textContent=tr('employee_exists');return;}
  if(!data['اسم الموظف ']||!data['emp_name _en']){err.textContent=fahdLang('أدخل الاسم بالعربي والإنجليزي','Enter both Arabic and English names');return;}
  const age=fahdAge(data['تاريخ الميلاد']);if(age){data['السن حتى تاريخه ']=age;data['age to date']=age;}
- data['الكود']=code;
+ data['الكود']=code;if(window.fahdNewPhoto)data.photoUrl=window.fahdNewPhoto;
+ document.querySelectorAll('#fahd-new-custom .fahd-entry').forEach(card=>{const key=card.querySelector('[data-custom-name]')?.value.trim(),ar=card.querySelector('[data-custom-ar]')?.value.trim(),en=card.querySelector('[data-custom-en]')?.value.trim();if(/^[A-Za-z][A-Za-z0-9_]{1,49}$/.test(key)&&!['password','role','permissions','authUid'].includes(key)&&!Object.hasOwn(data,key)){data.hr_custom_fields??={};data.hr_custom_fields[key]={labelAr:key,labelEn:key,valueAr:ar||'',valueEn:en||''};}});
  const saveButton=document.querySelector('#add-employee-modal [data-save-new]');if(saveButton)saveButton.disabled=true;
  try{const ref=db.ref('employees/'+code);const snapshot=await ref.once('value');if(snapshot.exists()){err.textContent=tr('employee_exists');return;}
-  await ref.set(data);allEmployees.push({...data,_firebasePath:'employees/'+code,_firebaseKey:code});closeAddEmployeeModal();renderTable(allEmployees);updateDashboardStats();showToast(tr('employee_saved'));
+  await ref.set(data);allEmployees.push({...data,_firebasePath:'employees/'+code,_firebaseKey:code});closeAddEmployeeModal();window.fahdNewPhoto=null;renderTable(allEmployees);updateDashboardStats();showToast(tr('employee_saved'));
  }catch(error){err.textContent=(error?.message||tr('login_error'));}finally{if(saveButton)saveButton.disabled=false;}
 }
 
@@ -751,6 +752,13 @@ function renderRichDashboard(){
  <div class="grid grid-cols-1 xl:grid-cols-3 gap-5 mb-5">${hrPanel(hrText('اتجاه التعيينات السنوية','Annual hiring trend'),yearsHtml)}${hrPanel(hrText('المسميات الوظيفية','Job titles'),hrHorizontalBars(jobs,total,8))}${hrPanel(hrText('جودة بيانات الموظفين','Employee data coverage'),hrBars([[hrText('محافظة معروفة','Known governorate'),mapped],[hrText('سنوات خدمة','Years of service'),yearsService.length],[hrText('حالة تأمينية مسجلة','Insurance status recorded'),insuredKnown],[hrText('مؤهل مسجل','Qualification recorded'),qualification.reduce((s,x)=>s+x[1],0)]],total,5)+`<p class="text-xs text-slate-400 mt-3">${hrText('حالات مؤمن عليه ضمن السجلات المعروفة','Insured among known records')}: ${insured} / ${insuredKnown}</p>`)}</div>
  <div class="hr-shortcut-grid grid grid-cols-1 md:grid-cols-3 gap-5 mb-5"><div class="hr-panel hr-widget" onclick="showHRPage('employees')" role="button" tabindex="0"><div class="text-sky-300 font-bold">${hrSvgIcon('users','hr-shortcut-icon')}${hrText('دليل الموظفين','Employees')}</div><div class="text-3xl font-extrabold mt-3">${total}</div><p class="text-xs text-slate-400 mt-2">${hrText('عرض ملفات الموظفين','Open employee records')} ↗</p></div><div class="hr-panel hr-widget" onclick="showHRPage('payroll')" role="button" tabindex="0"><div class="text-sky-300 font-bold">${hrSvgIcon('briefcase','hr-shortcut-icon')}${hrText('المرتبات','Payroll')}</div><div class="text-lg text-amber-300 mt-3">${hrText('بيانات تجريبية','Demo data')}</div><p class="text-xs text-slate-400 mt-2">${hrText('عرض قسم المرتبات','Open payroll')} ↗</p></div><div class="hr-panel hr-widget" onclick="showHRPage('notifications')" role="button" tabindex="0"><div class="text-sky-300 font-bold">${hrSvgIcon('bell','hr-shortcut-icon')}${hrText('الإشعارات وطلبات ESS','Notifications & ESS')}</div><div class="text-lg text-slate-300 mt-3">${hrText('بانتظار الربط','Integration pending')}</div><p class="text-xs text-slate-400 mt-2">${hrText('عرض مركز الإشعارات','Open notifications')} ↗</p></div></div>
  <div class="hr-panel text-sm text-slate-400">${hrText('تنبيه: الخريطة تستخدم محافظة الإقامة إن وُجدت، ولا تستنتجها من مكان الميلاد. الحضور والمرتبات وطلبات ESS غير متصلة هنا بعد.','Note: Location is based on residence fields where available, never inferred from birthplace. ESS attendance, payroll and requests are not connected yet.')}</div>`;
+
+ // Real-data holographic panels, derived solely from loaded employee records.
+ const maxDept=Math.max(1,...depts.map(x=>x[1]));
+ const skyline=depts.slice(0,13).map(([label,count],i)=>`<div class="fahd-holo-column" title="${escapeHtml(label)}: ${count}"><div class="fahd-holo-value">${count}</div><div class="fahd-holo-bar" style="--height:${Math.max(9,count/maxDept*100)}%;--hue:${185+i*9}"></div><div class="fahd-holo-label">${escapeHtml(label)}</div></div>`).join('');
+ const qTop=qualification.slice(0,6),qSum=qTop.reduce((sum,item)=>sum+item[1],0)||1;
+ const radial=qTop.map(([label,count],i)=>`<div class="fahd-holo-row"><span>${escapeHtml(label)}</span><div class="fahd-holo-track"><i style="width:${Math.round(count/qSum*100)}%;--hue:${185+i*18}"></i></div><b>${count}</b></div>`).join('');
+ d.insertAdjacentHTML('beforeend',`<div class="fahd-holo-grid"><section class="fahd-holo-panel"><div class="fahd-holo-head"><span>◈</span><h2>${hrText('أفق الإدارات — بيانات فعلية','Department skyline — live data')}</h2><small>${depts.length} ${hrText('إدارة','departments')}</small></div><div class="fahd-holo-skyline">${skyline}</div></section><section class="fahd-holo-panel"><div class="fahd-holo-head"><span>◎</span><h2>${hrText('بصمة المؤهلات','Qualification spectrum')}</h2><small>${qualification.reduce((a,b)=>a+b[1],0)} ${hrText('سجل','records')}</small></div><div class="fahd-holo-radial">${radial}</div></section></div>`);
  hrRenderGeographicEgypt(counts);
  d.querySelectorAll('.hr-map-dot').forEach(node=>{const update=()=>{const el=d.querySelector('#hr-geo-tooltip');if(el)el.textContent=node.dataset.geoName+' — '+node.dataset.geoCount+' '+hrText('موظف','employees')};node.addEventListener('mouseenter',update);node.addEventListener('focus',update);node.addEventListener('click',update)});
  const target=d.querySelector('.hr-egypt-target');if(target)target.addEventListener('mouseenter',()=>hrToggleEgypt(true));
@@ -1457,6 +1465,17 @@ const FAHD_FIELDS=[
  ['governorate','المحافظة / Governorate',['governorate','المحافظة']]
 ];
 let fahdEditing=null, fahdBusy=false, fahdIsEditing=false;
+const FAHD_TAB_NAMES={overview:['نظرة عامة','Overview'],personal:['البيانات الشخصية والوظيفية','Personal & Job'],financial:['المالية','Financial'],attendance:['الحضور','Attendance'],leaves:['الإجازات','Leaves'],performance:['الأداء','Performance']};
+function fahdTranslateUI(){
+ const tabIds=['overview','personal','financial','attendance','leaves','performance'];
+ document.querySelectorAll('.fahd-tabs button').forEach((b,i)=>{const svg=b.querySelector('svg');b.replaceChildren();if(svg)b.append(svg);b.append(document.createTextNode(' '+fahdLang(...FAHD_TAB_NAMES[tabIds[i]])));});
+ const buttons={'fahd-edit':['تعديل البيانات','Edit details'],'fahd-cancel':['إلغاء','Cancel'],'fahd-save':['حفظ التعديلات','Save changes'],'fahd-add':['إضافة حقل جديد','Add custom field'],'fahd-photo-change':['تغيير الصورة','Change photo'],'fahd-delete':['أرشفة الموظف','Archive employee']};
+ for(const [id,pair] of Object.entries(buttons)){const b=document.getElementById(id);if(b)b.textContent=fahdLang(...pair);}
+ const back=document.getElementById('fahd-back');if(back)back.textContent=fahdLang('← العودة للقائمة','← Back to list');
+ document.querySelectorAll('.fahd-create-tabs button').forEach((b,i)=>{const key=['personal','financial','attendance','leaves','performance'][i];b.textContent=fahdLang(...FAHD_TAB_NAMES[key]);});
+ const title=document.getElementById('fahd-create-title');if(title)title.textContent=fahdLang('إضافة موظف جديد','Add employee');
+ const footer=document.querySelector('.fahd-create-footer');if(footer){const btns=footer.querySelectorAll('button');if(btns[0])btns[0].textContent=fahdLang('إلغاء','Cancel');if(btns[1])btns[1].textContent=fahdLang('حفظ الموظف','Save employee');}
+}
 function fahdTab(tab,button){document.querySelectorAll('.fahd-pane').forEach(x=>x.hidden=x.id!=='fahd-tab-'+tab);document.querySelectorAll('.fahd-tabs button').forEach(x=>x.classList.toggle('selected',x===button));}
 function fahdRender(emp){
  const root=document.getElementById('fahd1-native');if(!root||!emp)return;
@@ -1464,8 +1483,9 @@ function fahdRender(emp){
  const name=getEmployeeName(emp),dept=getEmployeeDept(emp),job=getEmployeeJob(emp);
  document.getElementById('fahd-name').textContent=name||'Employee 360°';document.getElementById('fahd-identity').textContent=[dept,job].filter(Boolean).join(' · ');document.getElementById('fahd-code').textContent='# '+code;
  const photo=document.getElementById('fahd-photo');const image=getField(emp,'photoUrl','photo','رابط الصورة','PHOTO URL');photo.src=typeof image==='string' && (/^data:image\//.test(image)||/^https:\/\//.test(image))?image:'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><rect width="120" height="120" fill="#102a46"/><circle cx="60" cy="44" r="23" fill="#5a9bc2"/><path d="M15 120c0-58 90-58 90 0" fill="#5a9bc2"/></svg>');
+ fahdTranslateUI();
  const summary=document.getElementById('fahd-summary');summary.replaceChildren();
- for(const [label,value] of [['Employee code / الكود',code],['Employee / الموظف',name],['Department / الإدارة',dept],['Job title / الوظيفة',job],['Hire date / التعيين',getHireDate(emp)],['Insurance / التأمين',getField(emp,'الحالة التأمينية ','الحالة التأمينية','insuranceStatus')]]){
+ for(const [label,value] of [[fahdLang('الكود','Employee code'),code],[fahdLang('الموظف','Employee'),name],[fahdLang('الإدارة','Department'),dept],[fahdLang('الوظيفة','Job title'),job],[fahdLang('تاريخ التعيين','Hire date'),getHireDate(emp)],[fahdLang('الحالة التأمينية','Insurance'),currentLang==='ar'?(emp['الحالة التأمينية ']??emp['الحالة التأمينية']):emp['insurance status ']]]){
   const tile=document.createElement('div');tile.className='fahd-tile';const l=document.createElement('span'),v=document.createElement('strong');l.textContent=label;v.textContent=String(value??'—')||'—';tile.append(l,v);summary.append(tile);
  }
  const fields=document.getElementById('fahd-fields');fields.replaceChildren();
@@ -1485,10 +1505,10 @@ function fahdRender(emp){
   const raw=emp[arKey]??emp[enKey]??'';input.value=type==='date'?fahdISO(raw):String(raw);input.disabled=true;
   fahdEditing.original[arKey]=input.value;wrap.append(lab,input);fields.append(wrap);
  }
- fahdRefreshFieldVisibility();
+ fahdRefreshFieldVisibility();fahdEnableDropdowns();
  const fin=document.getElementById('fahd-financial');fin.replaceChildren();const financial=emp.financial;
  if(financial&&typeof financial==='object'){for(const [k,v] of Object.entries(financial)){if(v===null||typeof v==='object')continue;const tile=document.createElement('div');tile.className='fahd-tile';const l=document.createElement('span'),strong=document.createElement('strong');l.textContent=k;strong.textContent=String(v);tile.append(l,strong);fin.append(tile);}fin.className='fahd-summary';}
- else {fin.className='fahd-empty';fin.textContent='لا توجد بيانات مالية في سجل Firebase الحالي. ستظهر بعد دمج البيانات في قاعدة البيانات.';}
+ else {fin.className='fahd-empty';fin.textContent=fahdLang('لا توجد بيانات مالية متصلة بعد.','No connected financial data yet.');}
  fahdSetEditing(false);document.getElementById('fahd-status').textContent='';
  fahdTab('overview',document.querySelector('.fahd-tabs button'));
 }
@@ -1517,10 +1537,31 @@ async function fahdSave(){
 function fahdSetEditing(on){fahdIsEditing=on;document.querySelectorAll('#fahd-fields [data-fahd-key]').forEach(el=>el.disabled=!on);fahdRefreshFieldVisibility();for(const [id,visible] of [['fahd-edit',!on],['fahd-save',on],['fahd-cancel',on]]){const el=document.getElementById(id);if(el)el.hidden=!visible;}}
 function fahdStartEdit(){fahdSetEditing(true)}
 function fahdCancelEdit(){document.querySelectorAll('#fahd-fields [data-fahd-key]').forEach(el=>el.value=fahdEditing?.original[el.dataset.fahdKey]??'');fahdSetEditing(false)}
-function fahdDialog(title,message,mode='confirm',fields=[]){return new Promise(resolve=>{const dialog=document.getElementById('fahd-dialog'),box=document.getElementById('fahd-dialog-inputs'),yes=document.getElementById('fahd-dialog-yes'),no=document.getElementById('fahd-dialog-no');document.getElementById('fahd-dialog-title').textContent=title;document.getElementById('fahd-dialog-message').textContent=message;box.replaceChildren();const inputs=fields.map(f=>{const el=document.createElement('input');el.placeholder=f;el.maxLength=1000;box.append(el);return el});no.hidden=mode==='notice';yes.textContent=mode==='notice'?'حسنًا':'تأكيد';dialog.hidden=false;const finish=ok=>{dialog.hidden=true;yes.onclick=null;no.onclick=null;document.removeEventListener('keydown',esc);resolve(ok?(inputs.length?inputs.map(x=>x.value):true):null)};const esc=e=>{if(e.key==='Escape')finish(false)};yes.onclick=()=>finish(true);no.onclick=()=>finish(false);document.addEventListener('keydown',esc);(inputs[0]||yes).focus()})}
-async function fahdAddField(){if(fahdBusy||!fahdEditing?.path)return;const answers=await fahdDialog('إضافة حقل جديد','اكتب اسم الحقل بالإنجليزية وقيمته.','confirm',['اسم الحقل (English)','قيمة الحقل']);if(!answers)return;const [key,value]=answers;
- if(!/^[A-Za-z][A-Za-z0-9_]{1,49}$/.test(key)||['password','role','permissions','authUid','code','_firebasePath','_firebaseKey'].includes(key)){await fahdDialog('اسم غير مسموح','استخدم أحرفًا إنجليزية وأرقامًا وشرطة سفلية فقط.','notice');return;}
- const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(fahdEditing.code));if(!emp||emp._firebasePath!==fahdEditing.path||Object.prototype.hasOwnProperty.call(emp,key)){await fahdDialog('تعذر الإضافة','الحقل موجود بالفعل أو السجل غير متاح.','notice');return;}
- try{await db.ref(fahdEditing.path).update({[key]:value});emp[key]=value;fahdRender(emp);await fahdDialog('تمت الإضافة','تمت إضافة الحقل بنجاح.','notice');}
- catch(err){document.getElementById('fahd-status').textContent='فشل إضافة الحقل: '+(err?.message||err);}
+function fahdDialog(title,message,mode='confirm',fields=[]){return new Promise(resolve=>{const dialog=document.getElementById('fahd-dialog'),box=document.getElementById('fahd-dialog-inputs'),yes=document.getElementById('fahd-dialog-yes'),no=document.getElementById('fahd-dialog-no');document.getElementById('fahd-dialog-title').textContent=title;document.getElementById('fahd-dialog-message').textContent=message;box.replaceChildren();const inputs=fields.map(f=>{const el=document.createElement('input');el.placeholder=f;el.maxLength=1000;box.append(el);return el});no.hidden=mode==='notice';yes.textContent=mode==='notice'?fahdLang('حسنًا','OK'):fahdLang('تأكيد','Confirm');no.textContent=fahdLang('إلغاء','Cancel');dialog.hidden=false;const finish=ok=>{dialog.hidden=true;yes.onclick=null;no.onclick=null;document.removeEventListener('keydown',esc);resolve(ok?(inputs.length?inputs.map(x=>x.value):true):null)};const esc=e=>{if(e.key==='Escape')finish(false)};yes.onclick=()=>finish(true);no.onclick=()=>finish(false);document.addEventListener('keydown',esc);(inputs[0]||yes).focus()})}
+async function fahdAddField(){
+ if(fahdBusy||!fahdEditing?.path)return;
+ const a=await fahdDialog(fahdLang('حقل مخصص','Custom field'),fahdLang('أدخل اسم المفتاح والقيمتين','Enter field key and both language values'),'confirm',[fahdLang('اسم المفتاح بالإنجليزية','English field key'),fahdLang('القيمة العربية','Arabic value'),'English value']);if(!a)return;
+ const [key,ar,en]=a;if(!/^[A-Za-z][A-Za-z0-9_]{1,49}$/.test(key)||['password','role','permissions','authUid','code','photoUrl'].includes(key))return fahdDialog(fahdLang('اسم غير مسموح','Invalid key'),fahdLang('استخدم حروفًا إنجليزية وأرقامًا فقط','Use a safe English field key'),'notice');
+ const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(fahdEditing.code));if(!emp||!fahdEditing.path||Object.hasOwn(emp,key)||Object.hasOwn(emp.hr_custom_fields||{},key))return fahdDialog(fahdLang('الحقل موجود','Field exists'),fahdLang('اختر اسمًا آخر','Choose another key'),'notice');
+ const value={labelAr:key,labelEn:key,valueAr:ar||'',valueEn:en||''};try{await db.ref(fahdEditing.path+'/hr_custom_fields/'+key).set(value);emp.hr_custom_fields??={};emp.hr_custom_fields[key]=value;fahdRender(emp);await fahdDialog(fahdLang('تمت الإضافة','Added'),fahdLang('تم حفظ الحقل','Custom field saved'),'notice');}catch(e){await fahdDialog(fahdLang('فشل الحفظ','Save failed'),String(e.message||e),'notice');}
 }
+
+// FAHD v13: desktop-only image upload, preserving existing record fields.
+async function fahdUploadPhoto(file,forNew=false){
+ if(!file)return;
+ if(!/^image\/(jpeg|png|webp)$/.test(file.type)){await fahdDialog(fahdLang('نوع ملف غير مدعوم','Unsupported image'),fahdLang('اختر JPG أو PNG أو WebP','Choose JPG, PNG or WebP'),'notice');return;}
+ const img=new Image();const url=URL.createObjectURL(file);
+ try{await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=url;});
+  const canvas=document.createElement('canvas'),scale=Math.min(1,360/Math.max(img.naturalWidth,img.naturalHeight));canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+  const data=canvas.toDataURL('image/jpeg',.72);if(data.length>160000)throw new Error('Image exceeds safe size');
+  if(forNew){window.fahdNewPhoto=data;const preview=document.getElementById('fahd-create-photo-preview');if(preview)preview.src=data;return;}
+  const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(fahdEditing?.code));if(!emp||!fahdEditing?.path)throw new Error('Employee record unavailable');
+  const confirmed=await fahdDialog(fahdLang('تغيير صورة الموظف','Change employee photo'),fahdLang('هل تريد حفظ الصورة الجديدة؟','Save the new photo?'));if(!confirmed)return;
+  const key=Object.hasOwn(emp,'photoUrl')?'photoUrl':Object.hasOwn(emp,'photo')?'photo':'photoUrl';
+  await db.ref(fahdEditing.path).update({[key]:data});emp[key]=data;fahdRender(emp);
+ }catch(e){await fahdDialog(fahdLang('تعذر حفظ الصورة','Photo not saved'),String(e.message||e),'notice');}finally{URL.revokeObjectURL(url);}
+}
+function fahdPickPhoto(forNew=false){const input=document.createElement('input');input.type='file';input.accept='image/jpeg,image/png,image/webp';input.addEventListener('change',()=>fahdUploadPhoto(input.files?.[0],forNew),{once:true});input.click();}
+function fahdNewExtraField(){const root=document.getElementById('fahd-new-custom');if(!root)return;const n=root.children.length+1;const card=document.createElement('div');card.className='fahd-entry';card.innerHTML=`<label>${fahdLang('حقل مخصص','Custom field')} ${n}</label><input data-custom-name placeholder="${fahdLang('اسم المفتاح بالإنجليزية','English field key')}" maxlength="50"><input data-custom-ar placeholder="${fahdLang('القيمة العربية','Arabic value')}" maxlength="1000"><input data-custom-en placeholder="English value" maxlength="1000">`;root.append(card);}
+function fahdSelectOptions(id,language){const values=[...new Set(allEmployees.map(e=>String(id==='department'?(language==='ar'?(e['الإدارة ']??e['الإدارة']):(e['department ']??e.department)):(language==='ar'?e['الوظيفة']:(e['job title ']??e.jobTitle))||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,language==='ar'?'ar':'en'));return values;}
+function fahdEnableDropdowns(){document.querySelectorAll('#add-employee-fields input[data-add-key],#fahd-fields input[data-fahd-key]').forEach(input=>{const key=input.dataset.addKey||input.dataset.fahdKey;const id=['الإدارة ','department '].includes(key)?'department':['الوظيفة','job title '].includes(key)?'job':null;if(!id||input.dataset.dropdownReady)return;input.dataset.dropdownReady='1';const lang=/[\u0600-\u06ff]/.test(key)?'ar':'en';const listId='fahd-options-'+id+'-'+lang;let dl=document.getElementById(listId);if(!dl){dl=document.createElement('datalist');dl.id=listId;document.body.append(dl);}dl.replaceChildren();fahdSelectOptions(id,lang).forEach(v=>{const o=document.createElement('option');o.value=v;dl.append(o)});input.setAttribute('list',listId);input.title=fahdLang('اختر من القائمة أو اكتب قيمة جديدة','Select an option or type a new value');});}
