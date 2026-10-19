@@ -508,18 +508,33 @@ function getFirebaseSchema(){
 }
 function openAddEmployeeModal(){document.getElementById('add-employee-modal')?.classList.remove('hidden');buildAddEmployeeForm();}
 function closeAddEmployeeModal(){document.getElementById('add-employee-modal')?.classList.add('hidden');}
+function fahdParseBirthDate(raw){
+ if(!raw)return null;const t=String(raw).trim();let d;
+ if(/^\d{4}-\d{2}-\d{2}$/.test(t)){const [y,m,day]=t.split('-').map(Number);d=new Date(y,m-1,day);if(d.getFullYear()!==y||d.getMonth()!==m-1||d.getDate()!==day)return null;}
+ else if(/^\d{1,2}[\/-]\d{1,2}[\/-]\d{4}$/.test(t)){const [day,m,y]=t.split(/[\/-]/).map(Number);d=new Date(y,m-1,day);if(d.getFullYear()!==y||d.getMonth()!==m-1||d.getDate()!==day)return null;}
+ else return null;
+ return d>new Date()?null:d;
+}
+function fahdAge(raw){const dob=fahdParseBirthDate(raw);if(!dob)return '';const now=new Date();let age=now.getFullYear()-dob.getFullYear();if(now.getMonth()<dob.getMonth()||(now.getMonth()===dob.getMonth()&&now.getDate()<dob.getDate()))age--;return String(age);}
+function fahdUpdateNewAge(){const birth=document.querySelector('#add-employee-fields [data-add-key="dob"],#add-employee-fields [data-add-key="تاريخ الميلاد"]');const age=fahdAge(birth?.value);document.querySelectorAll('#add-employee-fields [data-computed-age]').forEach(el=>el.value=age?age+(currentLang==='ar'?' سنة':' years'):'—');}
 function buildAddEmployeeForm(){
-    const container=document.getElementById('add-employee-fields');if(!container)return;container.innerHTML='';
-    getFirebaseSchema().filter(key=> !/password|pass|كلمة المرور/i.test(key)).forEach(key=>{
-        const wrap=document.createElement('div');wrap.className='dynamic-field-card';
-        const type=/date|dob|تاريخ/i.test(key)?'date':'text';
-        wrap.innerHTML=`<label class="text-xs text-slate-400">${escapeHtml(displayKey(key))}${key==='code'?' <span class="text-red-400">*</span>':''}</label><input data-add-key="${escapeAttr(key)}" type="${type}" class="w-full mt-1 px-3 py-2 bg-slate-950/60 border border-sky-500/20 rounded-xl text-slate-200 text-sm" ${key==='code'?'required':''}>`;
-        container.appendChild(wrap);
-    });
-    const err=document.getElementById('add-employee-error');if(err)err.innerText='';
+ const container=document.getElementById('add-employee-fields');if(!container)return;container.replaceChildren();
+ const schema=getFirebaseSchema().filter(k=> !/password|pass|كلمة المرور/i.test(k));
+ const ageKeys=new Set(['age','age to date','AGE TO DATE','السن حتى تاريخه','السن حتى تاريخه ']);
+ const dateKeys=new Set(['dob','تاريخ الميلاد','hireDate','date_of_hiring ','تاريخ التعيين','تاريخ التعيين ','qualification date']);
+ for(const key of schema){
+  const wrap=document.createElement('div');wrap.className='dynamic-field-card';const label=document.createElement('label');label.className='text-xs text-sky-200';label.textContent=displayKey(key);wrap.append(label);
+  const input=document.createElement('input');input.className='w-full mt-2 px-3 py-3 bg-slate-950/60 border border-sky-500/30 rounded-xl text-slate-100 text-sm';
+  if(ageKeys.has(key)){input.type='text';input.readOnly=true;input.dataset.computedAge='true';input.placeholder=currentLang==='ar'?'يُحسب تلقائيًا':'Calculated automatically';}
+  else {input.type=dateKeys.has(key)?'date':'text';input.dataset.addKey=key;if(key==='code'||key==='الكود')input.required=true;if(key==='dob'||key==='تاريخ الميلاد')input.addEventListener('change',fahdUpdateNewAge);}
+  wrap.append(input);container.append(wrap);
+ }
+ if(!schema.some(k=>ageKeys.has(k))){const wrap=document.createElement('div');wrap.className='dynamic-field-card';const label=document.createElement('label');label.textContent=currentLang==='ar'?'العمر (محسوب تلقائيًا)':'Age (automatically calculated)';const input=document.createElement('input');input.readOnly=true;input.dataset.computedAge='true';input.className='w-full mt-2 px-3 py-3 bg-slate-950/60 border border-sky-500/30 rounded-xl text-slate-100';wrap.append(label,input);container.append(wrap);}
+ fahdUpdateNewAge();const err=document.getElementById('add-employee-error');if(err)err.innerText='';
 }
 async function saveNewEmployee(){
     const data={};document.querySelectorAll('#add-employee-fields [data-add-key]').forEach(input=>{const key=input.getAttribute('data-add-key');if(!/password|pass|كلمة المرور/i.test(key)) data[key]=input.value.trim();});
+    const birth=data.dob||data['تاريخ الميلاد'];const age=fahdAge(birth);if(age){for(const k of ['age','age to date','AGE TO DATE','السن حتى تاريخه','السن حتى تاريخه '])if(getFirebaseSchema().includes(k))data[k]=age;}
     const codeKey=Object.keys(data).find(k=>['الكود','code','employeeCode','empCode'].includes(k)) || 'code';
     const code=data[codeKey];const err=document.getElementById('add-employee-error');
     if(!code){if(err)err.innerText=tr('required_code');return;}
@@ -1416,7 +1431,8 @@ function fahdRender(emp){
   const tile=document.createElement('div');tile.className='fahd-tile';const l=document.createElement('span'),v=document.createElement('strong');l.textContent=label;v.textContent=String(value??'—')||'—';tile.append(l,v);summary.append(tile);
  }
  const fields=document.getElementById('fahd-fields');fields.replaceChildren();
- for(const [id,label,aliases] of FAHD_FIELDS){const key=aliases.find(k=>Object.prototype.hasOwnProperty.call(emp,k))||aliases[0];const value=String(emp[key]??'');fahdEditing.keys[id]=key;fahdEditing.original[id]=value;
+ for(const [id,label,aliases] of FAHD_FIELDS){const ordered=(currentLang==='en'&&['name','department','jobTitle','directManager','qualification','insuranceStatus','pob'].includes(id))?[...aliases.filter(k=>!/[^\x00-\x7F]/.test(k)),...aliases.filter(k=>/[^\x00-\x7F]/.test(k))]:aliases;
+ const key=ordered.find(k=>Object.prototype.hasOwnProperty.call(emp,k)&&String(emp[k]??'').trim())||ordered.find(k=>Object.prototype.hasOwnProperty.call(emp,k))||ordered[0];const value=String(emp[key]??'');fahdEditing.keys[id]=key;fahdEditing.original[id]=value;
   const wrap=document.createElement('div');wrap.className='fahd-field';const lab=document.createElement('label');lab.textContent=label;const input=document.createElement('input');input.type='text';input.dataset.fahdField=id;input.value=value;input.maxLength=1000;input.disabled=true;wrap.append(lab,input);fields.append(wrap);
  }
  const fin=document.getElementById('fahd-financial');fin.replaceChildren();const financial=emp.financial;
@@ -1427,7 +1443,15 @@ function fahdRender(emp){
 }
 async function fahdSave(){if(fahdBusy||!fahdEditing)return;const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(fahdEditing.code));const status=document.getElementById('fahd-status');
  if(!emp||!fahdEditing.path||emp._firebasePath!==fahdEditing.path){status.textContent='تعذر التحقق من مسار السجل؛ لم يتم الحفظ';return;}
- const updates={};document.querySelectorAll('[data-fahd-field]').forEach(input=>{const id=input.dataset.fahdField;if(input.value!==fahdEditing.original[id])updates[fahdEditing.keys[id]]=input.value.trim()});
+ const updates={};document.querySelectorAll('[data-fahd-field]').forEach(input=>{
+ const id=input.dataset.fahdField;if(input.value===fahdEditing.original[id])return;
+ const value=input.value.trim();const aliases=FAHD_FIELDS.find(f=>f[0]===id)?.[2]||[];
+ // Dates and phone are language-independent. Update every existing alias atomically.
+ if(['hireDate','dob','phone'].includes(id)){for(const k of aliases){if(Object.prototype.hasOwnProperty.call(emp,k))updates[k]=value;}if(!aliases.some(k=>Object.prototype.hasOwnProperty.call(emp,k)))updates[fahdEditing.keys[id]]=value;}
+ else updates[fahdEditing.keys[id]]=value; // Never overwrite English text with Arabic (or vice versa).
+ });
+ if(Object.prototype.hasOwnProperty.call(updates,'dob')||Object.prototype.hasOwnProperty.call(updates,'تاريخ الميلاد')){const age=fahdAge(updates.dob||updates['تاريخ الميلاد']);if(age)for(const k of ['age','age to date','السن حتى تاريخه','السن حتى تاريخه '])if(Object.prototype.hasOwnProperty.call(emp,k))updates[k]=age;}
+
  if(!Object.keys(updates).length){status.textContent='لا توجد تغييرات للحفظ';return;}
  if(!await fahdDialog('حفظ التعديلات','هل تريد حفظ التغييرات على ملف الموظف؟'))return;
  fahdBusy=true;document.getElementById('fahd-save').disabled=true;
