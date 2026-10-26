@@ -1547,6 +1547,32 @@ function fahdTranslateUI(){
  const footer=document.querySelector('.fahd-create-footer');if(footer){const btns=footer.querySelectorAll('button');if(btns[0])btns[0].textContent=fahdLang('إلغاء','Cancel');if(btns[1])btns[1].textContent=fahdLang('حفظ الموظف','Save employee');}
 }
 function fahdTab(tab,button){document.querySelectorAll('.fahd-pane').forEach(x=>x.hidden=x.id!=='fahd-tab-'+tab);document.querySelectorAll('.fahd-tabs button').forEach(x=>x.classList.toggle('selected',x===button));}
+
+// Complete employee profile: show every available spreadsheet/database field.
+// Names are kept verbatim to preserve the live Firebase schema.
+const FAHD_ALL_PROFILE_KEYS = ["اسم الموظف ", "emp_name _en", "الإدارة ", "department ", "الوظيفة", "job title ", "المدير المباشر ", "direct manager ", "تاريخ التعيين ", "date_of_hiring ", "المؤهل", "qualification", "جهة المؤهل ", "qulification issuing authority", "تاريخ الحصول على المؤهل ", "qualification date ", "تاريخ الميلاد", "dob", "السن حتى تاريخه ", "age to date", "النوع", "gender", "الحالة الإجتماعية ", "marital status ", "الحالة التأمينية ", "insurance status ", "الرقم التأمينى", "insurance number", "الرقم القومى ", "n_id", "سنوات الخدمة ", "years of service", "الأجر الشامل", "comprehensiveSalary", "أجر الاشتراك التأميني", "insuranceContributionWage", "رصيد الاجازات ", "annual leave balance", "العنوان ", "address", "المحافظة ", "governorate", "مكان الميلاد", "pob", "phone", "qualAuth"];
+function fahdProfileKeyLabel(key){
+ const labels={'n_id':'National ID','الرقم القومى ':'الرقم القومي','الرقم التأمينى':'الرقم التأميني','insurance number':'Insurance number','comprehensiveSalary':'Comprehensive salary','insuranceContributionWage':'Insurance contribution wage','annual leave balance':'Annual leave balance','emp_name _en':'Employee name','date_of_hiring ':'Hire date','age to date':'Age','dob':'Date of birth','years of service':'Years of service','direct manager ':'Direct manager','job title ':'Job title','insurance status ':'Insurance status','qualification date ':'Qualification date','qulification issuing authority':'Qualification authority','n_id':'National ID','address':'Address','governorate':'Governorate'};
+ return labels[key]||key.trim().replace(/_/g,' ');
+}
+function fahdProfileLanguage(key){return /[\u0600-\u06FF]/.test(key)?'ar':'en';}
+function fahdActualKey(emp,key){return Object.prototype.hasOwnProperty.call(emp,key)?key:Object.keys(emp).find(k=>k.trim()===key.trim())||key;}
+function fahdRenderCompleteFields(emp,fields){
+ const shown=new Set();
+ for(const schemaKey of [...FAHD_ALL_PROFILE_KEYS,...Object.keys(emp)]){
+  if(['code','الكود','photoUrl','photo','password','authUid','hr_custom_fields','_firebasePath'].includes(schemaKey)||schemaKey.startsWith('_'))continue;
+  const key=fahdActualKey(emp,schemaKey);
+  if(shown.has(key)||typeof emp[key]==='object'&&emp[key]!==null)continue;
+  shown.add(key);
+  const lang=fahdProfileLanguage(key);
+  const card=document.createElement('div');card.className='fahd-field';card.dataset.fieldLanguage=lang;
+  const label=document.createElement('label');label.textContent=fahdProfileKeyLabel(key)+' ('+lang.toUpperCase()+')';
+  const input=document.createElement('input');input.type='text';input.dataset.fahdKey=key;
+  input.value=String(emp[key]??'');input.disabled=true;input.maxLength=2000;
+  if(/(?:^n_id$|الرقم القومى|الرقم التأمينى|insurance number)/.test(key))input.autocomplete='off';
+  card.append(label,input);fields.append(card);fahdEditing.original[key]=input.value;
+ }
+}
 function fahdRender(emp){
  const root=document.getElementById('fahd1-native');if(!root||!emp)return;
  const code=getEmployeeCode(emp);fahdEditing={code,path:emp._firebasePath,keys:{},original:{}};
@@ -1559,32 +1585,7 @@ function fahdRender(emp){
   const tile=document.createElement('div');tile.className='fahd-tile';const l=document.createElement('span'),v=document.createElement('strong');l.textContent=label;v.textContent=String(value??'—')||'—';tile.append(l,v);summary.append(tile);
  }
  const fields=document.getElementById('fahd-fields');fields.replaceChildren();
- // Read-only cards show the selected language; edit mode exposes both language columns.
- for(const [id,ar,en,arKey,enKey] of FAHD_PAIRS){
-  for(const [lang,key,label] of [['ar',arKey,ar],['en',enKey,en]]){
-   const wrap=document.createElement('div');wrap.className='fahd-field';wrap.dataset.fieldLanguage=lang;
-   const lab=document.createElement('label');lab.textContent=label+' ('+lang.toUpperCase()+')';
-   const input=document.createElement('input');input.type='text';input.dataset.fahdKey=key;input.value=String(emp[key]??'');input.disabled=true;
-   wrap.append(lab,input);fields.append(wrap);fahdEditing.original[key]=input.value;
-  }
- }
- for(const [id,ar,en,arKey,enKey,type] of FAHD_COMMON){
-  const wrap=document.createElement('div');wrap.className='fahd-field';wrap.dataset.fieldLanguage='common';
-  const lab=document.createElement('label');lab.dataset.labelAr=ar;lab.dataset.labelEn=en;lab.textContent=fahdLang(ar,en);
-  if(arKey!==enKey){
-   for(const [language,key,title] of [['ar',arKey,ar],['en',enKey,en]]){
-    const card=document.createElement('div');card.className='fahd-field';card.dataset.fieldLanguage=language;
-    const titleNode=document.createElement('label');titleNode.textContent=title+' ('+language.toUpperCase()+')';
-    const field=document.createElement('input');field.type=type==='date'?'date':'text';field.dataset.fahdKey=key;
-    const actualKey=Object.prototype.hasOwnProperty.call(emp,key)?key:Object.keys(emp).find(k=>k.trim()===key.trim())||key;field.dataset.fahdKey=actualKey;const raw=emp[actualKey]??'';field.value=type==='date'?fahdISO(raw):String(raw);field.disabled=true;
-    fahdEditing.original[actualKey]=field.value;card.append(titleNode,field);fields.append(card);
-   }
-  }else{
-   const input=document.createElement('input');input.type=type==='date'?'date':'text';input.dataset.fahdKey=arKey;
-   const raw=emp[arKey]??'';input.value=type==='date'?fahdISO(raw):String(raw);input.disabled=true;
-   fahdEditing.original[arKey]=input.value;wrap.append(lab,input);fields.append(wrap);
-  }
- }
+ fahdRenderCompleteFields(emp,fields);
  fahdRefreshFieldVisibility();fahdEnableDropdowns();
  const fin=document.getElementById('fahd-financial');fin.replaceChildren();const financial=emp.financial;
  if(financial&&typeof financial==='object'){for(const [k,v] of Object.entries(financial)){if(v===null||typeof v==='object')continue;const tile=document.createElement('div');tile.className='fahd-tile';const l=document.createElement('span'),strong=document.createElement('strong');l.textContent=k;strong.textContent=String(v);tile.append(l,strong);fin.append(tile);}fin.className='fahd-summary';}
