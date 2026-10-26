@@ -548,8 +548,8 @@ const FAHD_COMMON=[
  ['dob','تاريخ الميلاد','Date of birth','تاريخ الميلاد','dob','date'],
  ['qualificationDate','تاريخ المؤهل','Qualification date','تاريخ الحصول على المؤهل ','qualification date ','text'],
  ['phone','الهاتف','Phone','phone','phone','tel'],
- ['address','العنوان','Address','address','address','text'],
- ['governorate','المحافظة','Governorate','governorate','governorate','text']
+ ['address','العنوان','Address','العنوان ','address','text'],
+ ['governorate','المحافظة','Governorate','المحافظة ','governorate','text']
 ];
 function fahdLang(ar,en){return currentLang==='ar'?ar:en;}
 function fahdISO(value){const d=fahdParseBirthDate(value);if(!d)return '';return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');}
@@ -1576,8 +1576,8 @@ function fahdRender(emp){
     const card=document.createElement('div');card.className='fahd-field';card.dataset.fieldLanguage=language;
     const titleNode=document.createElement('label');titleNode.textContent=title+' ('+language.toUpperCase()+')';
     const field=document.createElement('input');field.type=type==='date'?'date':'text';field.dataset.fahdKey=key;
-    const raw=emp[key]??'';field.value=type==='date'?fahdISO(raw):String(raw);field.disabled=true;
-    fahdEditing.original[key]=field.value;card.append(titleNode,field);fields.append(card);
+    const actualKey=Object.prototype.hasOwnProperty.call(emp,key)?key:Object.keys(emp).find(k=>k.trim()===key.trim())||key;field.dataset.fahdKey=actualKey;const raw=emp[actualKey]??'';field.value=type==='date'?fahdISO(raw):String(raw);field.disabled=true;
+    fahdEditing.original[actualKey]=field.value;card.append(titleNode,field);fields.append(card);
    }
   }else{
    const input=document.createElement('input');input.type=type==='date'?'date':'text';input.dataset.fahdKey=arKey;
