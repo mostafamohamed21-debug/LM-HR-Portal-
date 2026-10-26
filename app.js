@@ -1700,3 +1700,60 @@ function fahdPickPhoto(forNew=false){const input=document.createElement('input')
 function fahdNewExtraField(){const root=document.getElementById('fahd-new-custom');if(!root)return;const n=root.children.length+1;const card=document.createElement('div');card.className='fahd-entry';card.innerHTML=`<label>${fahdLang('حقل مخصص','Custom field')} ${n}</label><input data-custom-name placeholder="${fahdLang('اسم المفتاح بالإنجليزية','English field key')}" maxlength="50"><input data-custom-ar placeholder="${fahdLang('القيمة العربية','Arabic value')}" maxlength="1000"><input data-custom-en placeholder="English value" maxlength="1000">`;root.append(card);}
 function fahdSelectOptions(id,language){const values=[...new Set(allEmployees.map(e=>String(id==='department'?(language==='ar'?(e['الإدارة ']??e['الإدارة']):(e['department ']??e.department)):(language==='ar'?e['الوظيفة']:(e['job title ']??e.jobTitle))||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,language==='ar'?'ar':'en'));return values;}
 function fahdEnableDropdowns(){document.querySelectorAll('#add-employee-fields input[data-add-key],#fahd-fields input[data-fahd-key]').forEach(input=>{const key=input.dataset.addKey||input.dataset.fahdKey;const id=['الإدارة ','department '].includes(key)?'department':['الوظيفة','job title '].includes(key)?'job':null;if(!id||input.dataset.dropdownReady)return;input.dataset.dropdownReady='1';const lang=/[\u0600-\u06ff]/.test(key)?'ar':'en';const listId='fahd-options-'+id+'-'+lang;let dl=document.getElementById(listId);if(!dl){dl=document.createElement('datalist');dl.id=listId;document.body.append(dl);}dl.replaceChildren();fahdSelectOptions(id,lang).forEach(v=>{const o=document.createElement('option');o.value=v;dl.append(o)});input.setAttribute('list',listId);input.title=fahdLang('اختر من القائمة أو اكتب قيمة جديدة','Select an option or type a new value');});}
+
+
+// NEON V7: approved visual composition, strictly computed from loaded employees_v2.
+const neonPreviousDashboard=renderRichDashboard;
+function renderRichDashboard(){
+  // Preserve the original map implementation, including Egypt zoom and geometry loader.
+  neonPreviousDashboard();
+  const d=document.getElementById('hr-dashboard-view');if(!d)return;
+  const originalMap=d.querySelector('#hr-map-stage')?.outerHTML||'';
+  const employees=allEmployees||[], total=employees.length;
+  const ar=currentLang==='ar', txt=(a,e)=>ar?a:e, esc=v=>escapeHtml(String(v??''));
+  const val=(e,...keys)=>String(getField(e,...keys)||'').trim();
+  const tally=fn=>{const m=new Map();employees.forEach(e=>{const v=fn(e);if(v&&v!=='--')m.set(v,(m.get(v)||0)+1)});return [...m].sort((a,b)=>b[1]-a[1])};
+  const dept=tally(getEmployeeDept),qual=tally(e=>val(e,'qualification ','qualification','المؤهل','المؤهل العلمي'));
+  const insurance=tally(e=>val(e,'insurance status ','insurance status','insuranceStatus','الحالة التأمينية'));
+  const marital=tally(e=>val(e,'marital status ','marital status','maritalStatus','الحالة الاجتماعية','الحالة الإجتماعية'));
+  const years=employees.map(e=>{const x=val(e,'years of service','years of service ','yearsService','سنوات الخدمة');const n=Number(x);return x!==''&&Number.isFinite(n)&&n>=0&&n<=80?n:null}).filter(n=>n!==null);
+  const avgYears=years.length?(years.reduce((a,b)=>a+b,0)/years.length).toFixed(1):'—';
+  const ages=employees.map(e=>{const raw=val(e,'dob','date of birth','date_of_birth','تاريخ الميلاد');const year=Number(raw.match(/(?:19|20)\d{2}/)?.[0]||0);const age=new Date().getFullYear()-year;return year&&age>=16&&age<=100?age:null}).filter(x=>x!==null);
+  const avgAge=ages.length?Math.round(ages.reduce((a,b)=>a+b,0)/ages.length):'—';
+  const g=e=>val(e,'gender','Gender','gender_en','النوع','الجنس','النوع الاجتماعي','النوع الإجتماعي').toLowerCase();
+  const male=employees.filter(e=>/^(male|m|ذكر|رجل)$/.test(g(e))).length,female=employees.filter(e=>/^(female|f|أنثى|انثى|سيدة)$/.test(g(e))).length,known=male+female;
+  const malePct=known?Math.round(male/known*100):null,femalePct=known?100-malePct:null;
+  const hires=tally(e=>String(getHireDate(e)||'').match(/(?:19|20)\d{2}/)?.[0]||'').sort((a,b)=>a[0].localeCompare(b[0]));
+  const serviceBins=[[0,5],[5,10],[10,15],[15,20],[20,25],[25,30],[30,999]].map(([a,b])=>[b===999?'30+':a+'–'+b,years.filter(x=>x>=a&&x<b).length]);
+  const top=employees.slice().sort((a,b)=>String(getHireDate(b)||'').localeCompare(String(getHireDate(a)||''))).slice(0,5);
+  const birthdays=employees.map(e=>{const raw=val(e,'dob','date of birth','date_of_birth','تاريخ الميلاد');const m=raw.match(/(?:19|20)\d{2}[-\/]([01]?\d)[-\/]([0-3]?\d)/);if(!m)return null;const now=new Date(),month=+m[1],day=+m[2];let next=new Date(now.getFullYear(),month-1,day);if(next<new Date(now.getFullYear(),now.getMonth(),now.getDate()))next=new Date(now.getFullYear()+1,month-1,day);return {e,days:Math.round((next-new Date(now.getFullYear(),now.getMonth(),now.getDate()))/86400000)}}).filter(Boolean).sort((a,b)=>a.days-b.days).slice(0,4);
+  const card=(a,e,body,cls='')=>`<section class="neon-card ${cls}"><h2>${esc(txt(a,e))}<span class="en">${esc(e)}</span></h2>${body}</section>`;
+  const kpi=(a,e,v,foot,icon)=>`<section class="neon-card neon-kpi"><div class="neon-icon">${icon}</div><h2>${esc(txt(a,e))}<span class="en">${esc(e)}</span></h2><div class="number">${esc(v)}</div><div class="sub">${esc(foot)}</div></section>`;
+  const bars=(rows,limit=12)=>{const data=rows.slice(0,limit),max=Math.max(1,...data.map(r=>r[1]));return data.length?`<div class="neon-bars">${data.map(([name,n])=>`<div class="neon-bar" title="${esc(name)}: ${n}"><b>${n}</b><i style="height:${Math.max(2,n/max*155)}px"></i><small>${esc(name)}</small></div>`).join('')}</div>`:empty()};
+  const empty=()=>`<div class="neon-empty">${txt('لا توجد بيانات كافية لهذا المؤشر','Insufficient data for this metric')}</div>`;
+  const ring=(rows)=>{const sum=rows.reduce((s,r)=>s+r[1],0),colors=['#05c8ff','#8e62f7','#fa67b1','#ffb45e','#22ddc0'];if(!sum)return empty();let p=0;const gradient=rows.slice(0,5).map(([name,n],i)=>{const a=p;p+=n/sum*100;return `${colors[i]} ${a}% ${p}%`}).join(',');return `<div class="neon-ring" style="background:conic-gradient(${gradient});--tone:#12c9ff"><div><b>${Math.round(rows[0][1]/sum*100)}%</b><small>${esc(rows[0][0])}</small></div></div><div class="neon-legend">${rows.slice(0,5).map(([name,n],i)=>`<div><span style="color:${colors[i]}">● ${esc(name)}</span><b>${n}</b></div>`).join('')}</div>`};
+  const left=dept.slice(0,6),right=dept.slice(6,12);
+  const orgSide=rows=>`<div class="neon-orgside">${rows.map(([name,n])=>`<div class="neon-orgline" title="${esc(name)}"><span>${esc(name)}</span><b>${n}</b></div>`).join('')}</div>`;
+  const gender=known?`<div class="neon-gender-row"><div class="neon-sexnum">${malePct}%<small>${txt('ذكور','Male')} · ${male}</small></div><div class="neon-sphere"><span class="neon-person">♂</span><span class="neon-person woman">♀</span></div><div class="neon-sexnum pink">${femalePct}%<small>${txt('إناث','Female')} · ${female}</small></div></div>`:empty();
+  const line=hires.slice(-12);const high=Math.max(1,...line.map(x=>x[1]));const pts=line.map((r,i)=>`${20+(line.length===1?0:i*460/(line.length-1))},${140-r[1]/high*105}`).join(' ');
+  const spark=line.length>1?`<svg class="neon-spark" viewBox="0 0 500 170" role="img" aria-label="Hiring trend"><defs><linearGradient id="neonGrad" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#8e62f7" stop-opacity=".5"/><stop offset="1" stop-color="#8e62f7" stop-opacity="0"/></linearGradient></defs><path d="M${pts.replaceAll(' ',' L')} L480 155 L20 155Z" fill="url(#neonGrad)"/><polyline points="${pts}" fill="none" stroke="#3fcfff" stroke-width="3"/>${line.map((r,i)=>`<text x="${20+i*460/(line.length-1)}" y="166" font-size="9" fill="#9fc6e4" text-anchor="middle">${esc(r[0])}</text>`).join('')}</svg>`:empty();
+  const list=(rows)=>rows.length?`<div class="neon-list">${rows.map(([a,b])=>`<div class="neon-listrow"><span>${esc(a)}</span><b>${esc(b)}</b></div>`).join('')}</div>`:empty();
+  const world=`<div class="neon-world" onclick="hrToggleEgypt(true)" title="${esc(txt('اضغط لعرض مصر','Click to show Egypt'))}"><svg viewBox="0 0 350 190" aria-label="World map"><g fill="#0a76e0" stroke="#40caff" stroke-width=".7" opacity=".9"><path d="M20 37l30-16 43 4 14 17-16 18-19 4-10 23-19-6-9-25-22-5z M81 99l24 10 18 34-10 33-15-8-11-27-15-17z M158 40l22-17 45 4 17-10 64 14 27 23-24 18-39-4-13 15-26-5-17-18-22 7-16-15z M189 90l30-5 20 18-9 43-22 26-20-29-7-32z M284 125l34-7 18 17-7 25-34-4z"/></g><circle cx="209" cy="94" r="6" fill="#fff"/><circle cx="209" cy="94" r="13" fill="none" stroke="#00edff" opacity=".6"/></svg><span class="world-note">${txt('مصر ◉ مرّر أو اضغط للخريطة التفصيلية','Egypt ◉ click for detailed map')}</span></div>`;
+  d.innerHTML=`<div class="neon-board"><div class="neon-top"><div><h1>${txt('لوحة التحكم','Dashboard')}</h1><div class="neon-muted">${txt('بيانات فعلية من قاعدة موظفي لاكتو مصر','Live metrics from Lacto Misr employee records')}</div></div><span class="neon-badge">● Firebase · employees_v2 · ${total}</span></div>
+  <div class="neon-grid">${kpi('إجمالي الموظفين','Total Employees',total,txt('موظف','Employees'),'♟')}${kpi('عدد الأقسام','Total Departments',dept.length,txt('قسم','Departments'),'▦')}${kpi('متوسط سنوات الخدمة','Average Service Years',avgYears,txt('سنة','Years'),'◷')}${kpi('متوسط العمر','Average Age',avgAge,txt('سنة','Years'),'♙')}
+  ${card('معدل الحضور العام','Attendance Rate',`<div class="neon-empty">${txt('بانتظار ربط بيانات البصمة','Awaiting biometric attendance data')}</div>`,'neon-attendance')}
+  ${card('توزيع الموظفين حسب النوع','Employees by Gender',gender,'neon-gender-top')}
+  ${card('عدد الموظفين حسب الأقسام','Employees by Department',bars(dept),'neon-deptbars')}
+  ${card('توزيع الموظفين حسب الأقسام','Employees by Departments',`<div class="neon-orgbox">${orgSide(left)}<img class="neon-orglogo" src="logo.png" alt="Lacto Misr">${orgSide(right)}</div>`,'neon-org')}
+  ${card('التوزيع الجغرافي العالمي','Employees by Country',world,'neon-map')}
+  ${card('التوزيع الجغرافي في مصر','Employees in Egypt',`<div id="neon-egypt-mount"></div>`,'neon-egypt')}
+  ${card('تطور التعيينات','Hiring Trend',spark,'neon-trend')}
+  ${card('حالة التأمين','Insurance Status',ring(insurance),'neon-donut-card')}
+  ${card('الحالة الاجتماعية','Marital Status',ring(marital),'neon-donut-card')}
+  ${card('المؤهلات العلمية','Qualifications',ring(qual),'neon-donut-card')}
+  ${card('أحدث الموظفين','Latest Employees',list(top.map(e=>[getEmployeeName(e),getHireDate(e)])),'neon-bottom')}
+  ${card('أعياد الميلاد القادمة','Upcoming Birthdays',list(birthdays.map(x=>[getEmployeeName(x.e),x.days===0?txt('اليوم','Today'):x.days+' '+txt('يوم','days')])),'neon-bottom')}
+  ${card('سنوات الخدمة','Years of Service',bars(serviceBins,7),'neon-bottom')}
+  </div><div class="neon-foot">${txt('المؤشرات غير المتاحة لا تُعرض بأرقام افتراضية. الخريطة الجغرافية توضيحية.','Unavailable metrics are never fabricated. Geographic map is illustrative.')}</div></div>`;
+  const mount=d.querySelector('#neon-egypt-mount');if(mount&&originalMap){mount.innerHTML=originalMap;try{hrRenderGeographicEgypt(hrGovernorates.map(()=>0).map((_,i)=>employees.filter(e=>hrGovIndex(hrGeoField(e))===i).length))}catch(err){console.warn('Map layer unavailable:',err)};mount.querySelectorAll('.hr-map-dot').forEach(node=>{const update=()=>{const el=mount.querySelector('#hr-geo-tooltip');if(el)el.textContent=node.dataset.geoName+' — '+node.dataset.geoCount};node.addEventListener('mouseenter',update);node.addEventListener('focus',update)})}
+}
