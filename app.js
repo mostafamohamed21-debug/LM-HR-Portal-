@@ -254,33 +254,45 @@ function hideLogin() {
     setTimeout(() => modal.style.display='none', 350);
 }
 
+// PORTAL V2 (2026-10-25): read/write canonical employee records by employee CODE.
+// Legacy numeric root records are intentionally untouched and no longer read.
+// The pilot employee 950 remains in its original path until separately migrated.
+const PORTAL_EMPLOYEE_COLLECTION = 'employees_v2';
+const PORTAL_LEGACY_PILOT_CODE = '950';
+function portalSafeRecord(data, code, path) {
+    const safeData = {...data};
+    for (const field of Object.keys(safeData)) {
+        if (/^(password|pass|passwordhash|كلمة المرور)$/i.test(field)) delete safeData[field];
+    }
+    return {...safeData, code: String(code), _firebasePath: path, _firebaseKey: String(code)};
+}
 async function readEmployeeSources() {
     if (!portalIsAdmin()) throw new Error('UNAUTHORIZED_ADMIN');
-    // Original Firebase JSON was imported as a root array: /0, /1, /2 ...
-    // These indices are NOT employee codes. Keep the original paths for edits.
-    const [rootSnap, employeesSnap] = await Promise.all([
-        db.ref('/').once('value'), db.ref('employees').once('value')
+    // Fail closed: a denied /employees_v2 read must not silently show stale records.
+    const [v2Snap, pilotSnap] = await Promise.all([
+        db.ref(PORTAL_EMPLOYEE_COLLECTION).once('value'),
+        db.ref('employees/' + PORTAL_LEGACY_PILOT_CODE).once('value')
     ]);
+    if (!v2Snap.exists()) throw new Error('EMPLOYEES_V2_MISSING');
     const records = [];
-    const byCode = new Map();
-    function collect(node, prefix) {
-        if (!node || typeof node !== 'object') return;
-        Object.entries(node).forEach(([key, data]) => {
-            if (!data || typeof data !== 'object' || Array.isArray(data)) return;
-            const rawCode = getField(data, 'الكود', 'code', 'employeeCode', 'empCode', 'EmployeeCode', 'employee_code', 'ID', 'id');
-            if (rawCode === undefined || rawCode === null || String(rawCode).trim() === '') return;
-            const code = String(rawCode).trim();
-            const safeData = {...data};
-            for (const field of Object.keys(safeData)) {
-                if (/^(password|pass|passwordhash|كلمة المرور)$/i.test(field)) delete safeData[field];
-            }
-            const record = {...safeData, code, _firebasePath: prefix + key, _firebaseKey: key};
-            if (byCode.has(code)) records[byCode.get(code)] = record;
-            else { byCode.set(code, records.length); records.push(record); }
-        });
+    const byCode = new Set();
+    Object.entries(v2Snap.val() || {}).forEach(([key, data]) => {
+        if (!data || typeof data !== 'object' || Array.isArray(data)) return;
+        const embedded = String(getField(data,'code','الكود','employeeCode') || '').trim();
+        if (!/^\d+$/.test(key) || embedded !== key) {
+            console.warn('Skipped employee record with mismatched key/code', key);
+            return;
+        }
+        if (byCode.has(key)) return;
+        byCode.add(key);
+        records.push(portalSafeRecord(data, key, PORTAL_EMPLOYEE_COLLECTION + '/' + key));
+    });
+    const pilot = pilotSnap.val();
+    if (pilot && typeof pilot === 'object' && !byCode.has(PORTAL_LEGACY_PILOT_CODE) &&
+        String(getField(pilot,'code','الكود','employeeCode')) === PORTAL_LEGACY_PILOT_CODE) {
+        records.push(portalSafeRecord(pilot, PORTAL_LEGACY_PILOT_CODE, 'employees/' + PORTAL_LEGACY_PILOT_CODE));
     }
-    collect(rootSnap.val(), '');
-    collect(employeesSnap.val(), 'employees/');
+    records.sort((a,b)=>Number(a.code)-Number(b.code));
     return records;
 }
 
@@ -291,7 +303,7 @@ async function findEmployeeRecord(code) {
     return {
         key: match._firebaseKey || String(code),
         data: match,
-        path: match._firebasePath || `employees/${match._firebaseKey || code}`
+        path: match._firebasePath || `${PORTAL_EMPLOYEE_COLLECTION}/${match._firebaseKey || code}`
     };
 }
 
@@ -488,13 +500,13 @@ async function executeSave(){
         const key=input.getAttribute('data-firebase-key'); if(isValidFirebaseKey(key) && !/password|pass|كلمة المرور/i.test(key)) updatedData[key]=input.value;
     });
     try{
-        const savePath = emp._firebasePath || `employees/${activeEmployeeCode}`;
+        const savePath = emp._firebasePath || `${PORTAL_EMPLOYEE_COLLECTION}/${activeEmployeeCode}`;
         await db.ref(savePath).update(updatedData);
         Object.assign(emp,updatedData); showToast(); setFieldsEditable(true); document.getElementById('btn-save')?.classList.add('hidden'); document.getElementById('btn-edit')?.classList.remove('hidden'); document.getElementById('btn-photo')?.classList.add('hidden'); renderTable(allEmployees);
     }catch(error){showToast(tr('login_error'),true);}
 }
 
-function uploadEmployeePhoto(event){const file=event.target.files?.[0];if(!file||activeEmployeeCode===null)return;const reader=new FileReader();reader.onload=async e=>{const base64=e.target.result;document.getElementById('profile-img').src=base64;try{const emp=allEmployees.find(x=>String(getEmployeeCode(x))===String(activeEmployeeCode));const savePath=emp?emp._firebasePath:`employees/${activeEmployeeCode}`;await db.ref(savePath).update({photoUrl:base64});if(emp)emp.photoUrl=base64;showToast();}catch(err){}};reader.readAsDataURL(file);}
+function uploadEmployeePhoto(event){const file=event.target.files?.[0];if(!file||activeEmployeeCode===null)return;const reader=new FileReader();reader.onload=async e=>{const base64=e.target.result;document.getElementById('profile-img').src=base64;try{const emp=allEmployees.find(x=>String(getEmployeeCode(x))===String(activeEmployeeCode));const savePath=emp?emp._firebasePath:`${PORTAL_EMPLOYEE_COLLECTION}/${activeEmployeeCode}`;await db.ref(savePath).update({photoUrl:base64});if(emp)emp.photoUrl=base64;showToast();}catch(err){}};reader.readAsDataURL(file);}
 
 function showToast(message=null,isError=false){const toast=document.getElementById('toast-notification');const msg=document.getElementById('toast-message');if(!toast||!msg)return;msg.innerText=message||tr('toast_success');msg.classList.toggle('text-red-300',isError);msg.classList.toggle('text-white',!isError);toast.classList.remove('translate-y-32','opacity-0');setTimeout(()=>toast.classList.add('translate-y-32','opacity-0'),3200);}
 function updateDashboardStats(){const el=document.getElementById('total-employees-count');if(el)el.innerText=allEmployees.length;}
@@ -505,7 +517,9 @@ function getFirebaseSchema(){
     if(!keys.size) ['code','name','department','jobTitle','directManager','hireDate','yearsService','qualification','qualAuth','dob','age','insuranceStatus','pob','photoUrl','email'].forEach(k=>keys.add(k));
     const codeKey=allEmployees.length ? existingKey(allEmployees[0], ['الكود','code','employeeCode','empCode'], 'code') : 'code';
     keys.delete(codeKey); keys.delete('code'); keys.delete('الكود'); keys.delete('employeeCode'); keys.delete('empCode');
-    return [codeKey,...Array.from(keys).sort()];
+    const businessOrder=['اسم الموظف ','emp_name _en','الإدارة ','department ','الوظيفة','job title ','المدير المباشر ','direct manager ','تاريخ التعيين ','date_of_hiring ','سنوات الخدمة ','years of service','المؤهل','qualification','جهة المؤهل ','qulification issuing authority','تاريخ الميلاد','dob','السن حتى تاريخه ','age to date','الحالة التأمينية ','insurance status ','مكان الميلاد','pob','phone','address','governorate','الرقم التأمينى','insurance number','الأجر الشامل','comprehensiveSalary','أجر الاشتراك التأميني','insuranceContributionWage','رصيد الاجازات ','annual leave balance'];
+    const priority = new Map(businessOrder.map((k,i)=>[k,i]));
+    return [codeKey,...Array.from(keys).sort((a,b)=>(priority.get(a)??999)-(priority.get(b)??999)||a.localeCompare(b,'ar'))];
 }
 function openAddEmployeeModal(){document.getElementById('add-employee-modal')?.classList.remove('hidden');buildAddEmployeeForm();fahdCreateTab('personal',document.querySelector('.fahd-create-tabs button'));}
 function closeAddEmployeeModal(){document.getElementById('add-employee-modal')?.classList.add('hidden');}
@@ -580,8 +594,8 @@ async function saveNewEmployee(){
  data['الكود']=code;if(window.fahdNewPhoto)data.photoUrl=window.fahdNewPhoto;
  document.querySelectorAll('#fahd-new-custom .fahd-entry').forEach(card=>{const key=card.querySelector('[data-custom-name]')?.value.trim(),ar=card.querySelector('[data-custom-ar]')?.value.trim(),en=card.querySelector('[data-custom-en]')?.value.trim();if(/^[A-Za-z][A-Za-z0-9_]{1,49}$/.test(key)&&!['password','role','permissions','authUid'].includes(key)&&!Object.hasOwn(data,key)){data.hr_custom_fields??={};data.hr_custom_fields[key]={labelAr:key,labelEn:key,valueAr:ar||'',valueEn:en||''};}});
  const saveButton=document.querySelector('#add-employee-modal [data-save-new]');if(saveButton)saveButton.disabled=true;
- try{const ref=db.ref('employees/'+code);const snapshot=await ref.once('value');if(snapshot.exists()){err.textContent=tr('employee_exists');return;}
-  await ref.set(data);allEmployees.push({...data,_firebasePath:'employees/'+code,_firebaseKey:code});closeAddEmployeeModal();window.fahdNewPhoto=null;renderTable(allEmployees);updateDashboardStats();showToast(tr('employee_saved'));
+ try{const ref=db.ref(PORTAL_EMPLOYEE_COLLECTION+'/'+code);const snapshot=await ref.once('value');if(snapshot.exists()){err.textContent=tr('employee_exists');return;}
+  await ref.set(data);allEmployees.push({...data,_firebasePath:PORTAL_EMPLOYEE_COLLECTION+'/'+code,_firebaseKey:code});closeAddEmployeeModal();window.fahdNewPhoto=null;renderTable(allEmployees);updateDashboardStats();showToast(tr('employee_saved'));
  }catch(error){err.textContent=(error?.message||tr('login_error'));}finally{if(saveButton)saveButton.disabled=false;}
 }
 
