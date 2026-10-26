@@ -192,6 +192,7 @@ function toggleLangDropdown(event) {
 }
 
 function setLanguage(lang) {
+    if(typeof fahdHasUnsavedChanges==='function' && fahdHasUnsavedChanges() && !window.fahdNavigationApproved){fahdGuardNavigation(()=>setLanguage(lang));return;}
     currentLang = lang === 'en' ? 'en' : 'ar';
     if(typeof fahdEditing!=='undefined' && fahdEditing?.code && typeof allEmployees!=='undefined'){const current=allEmployees.find(e=>String(getEmployeeCode(e))===String(fahdEditing.code));if(current && document.getElementById('fahd1-native')?.offsetParent!==null)queueMicrotask(()=>fahdRender(current));}
     localStorage.setItem('lacto_lang', currentLang);
@@ -258,7 +259,7 @@ function hideLogin() {
 // Legacy numeric root records are intentionally untouched and no longer read.
 // The pilot employee 950 remains in its original path until separately migrated.
 const PORTAL_EMPLOYEE_COLLECTION = 'employees_v2';
-const PORTAL_LEGACY_PILOT_CODE = '950';
+// employees_v2 is the sole employee data source; legacy roots are never read.
 function portalSafeRecord(data, code, path) {
     const safeData = {...data};
     for (const field of Object.keys(safeData)) {
@@ -269,10 +270,7 @@ function portalSafeRecord(data, code, path) {
 async function readEmployeeSources() {
     if (!portalIsAdmin()) throw new Error('UNAUTHORIZED_ADMIN');
     // Fail closed: a denied /employees_v2 read must not silently show stale records.
-    const [v2Snap, pilotSnap] = await Promise.all([
-        db.ref(PORTAL_EMPLOYEE_COLLECTION).once('value'),
-        db.ref('employees/' + PORTAL_LEGACY_PILOT_CODE).once('value')
-    ]);
+    const v2Snap = await db.ref(PORTAL_EMPLOYEE_COLLECTION).once('value');
     if (!v2Snap.exists()) throw new Error('EMPLOYEES_V2_MISSING');
     const records = [];
     const byCode = new Set();
@@ -287,11 +285,6 @@ async function readEmployeeSources() {
         byCode.add(key);
         records.push(portalSafeRecord(data, key, PORTAL_EMPLOYEE_COLLECTION + '/' + key));
     });
-    const pilot = pilotSnap.val();
-    if (pilot && typeof pilot === 'object' && !byCode.has(PORTAL_LEGACY_PILOT_CODE) &&
-        String(getField(pilot,'code','الكود','employeeCode')) === PORTAL_LEGACY_PILOT_CODE) {
-        records.push(portalSafeRecord(pilot, PORTAL_LEGACY_PILOT_CODE, 'employees/' + PORTAL_LEGACY_PILOT_CODE));
-    }
     records.sort((a,b)=>Number(a.code)-Number(b.code));
     return records;
 }
@@ -429,6 +422,8 @@ function escapeHtml(value){return String(value).replace(/[&<>'"]/g,c=>({'&':'&am
 function escapeAttr(value){return String(value).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
 
 function viewEmployee(code) {
+    if(fahdHasUnsavedChanges()&&!window.fahdNavigationApproved){fahdGuardNavigation(()=>viewEmployee(code));return;}
+
     if (typeof showHRPage === 'function' && hrActivePage !== 'employees') showHRPage('employees');
     activeEmployeeCode=code;
     const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(code)); if(!emp) return;
@@ -458,7 +453,7 @@ function viewEmployee(code) {
 function setFieldVal(id,val){const el=document.getElementById(id);if(el)el.value=val??'';}
 function enableEditing(){setFieldsEditable(false);document.getElementById('btn-edit')?.classList.add('hidden');document.getElementById('btn-save')?.classList.remove('hidden');document.getElementById('btn-photo')?.classList.remove('hidden');}
 function setFieldsEditable(isDisabled){['prof-name','prof-dept','prof-job','prof-manager','prof-hire','prof-service','prof-qual','prof-qual-auth','prof-dob','prof-age','prof-insurance','prof-pob'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.disabled=isDisabled;el.classList.toggle('bg-slate-900/50',isDisabled);el.classList.toggle('border-slate-700',isDisabled);el.classList.toggle('bg-slate-900/90',!isDisabled);el.classList.toggle('border-sky-500/50',!isDisabled);});}
-function backToEmployeesList(){if (typeof showHRPage === 'function' && hrActivePage !== 'employees') showHRPage('employees');activeEmployeeCode=null;const profile=document.getElementById('employee-profile-view');const list=document.getElementById('employees-list-view');if(profile){profile.classList.add('hidden');profile.style.display='none';}if(list){list.classList.remove('hidden');list.style.display='block';}}
+function backToEmployeesList(){if(fahdHasUnsavedChanges()&&!window.fahdNavigationApproved){fahdGuardNavigation(()=>backToEmployeesList());return;}if (typeof showHRPage === 'function' && hrActivePage !== 'employees') showHRPage('employees');activeEmployeeCode=null;const profile=document.getElementById('employee-profile-view');const list=document.getElementById('employees-list-view');if(profile){profile.classList.add('hidden');profile.style.display='none';}if(list){list.classList.remove('hidden');list.style.display='block';}}
 
 function renderDynamicFields(){
     const container=document.getElementById('dynamic-fields-container'); if(!container)return; container.remove(); return; // Technical fields are intentionally hidden
@@ -692,6 +687,8 @@ window.addEventListener('DOMContentLoaded',async()=>{
 let hrActivePage='dashboard';
 const hrText=(ar,en)=>currentLang==='ar'?ar:en;
 function showHRPage(page){
+    if(page!=='employees' && fahdHasUnsavedChanges()&&!window.fahdNavigationApproved){fahdGuardNavigation(()=>showHRPage(page));return;}
+
     if(!['dashboard','employees','payroll','notifications','attendance','leave-balances','permissions','bradford'].includes(page))return;
     hrActivePage=page;
     ['dashboard','payroll','notifications','attendance','leave-balances','permissions','bradford'].forEach(p=>document.getElementById('hr-'+p+'-view')?.classList.toggle('hidden',p!==page));
@@ -1557,6 +1554,32 @@ function fahdProfileKeyLabel(key){
 }
 function fahdProfileLanguage(key){return /[\u0600-\u06FF]/.test(key)?'ar':'en';}
 function fahdActualKey(emp,key){return Object.prototype.hasOwnProperty.call(emp,key)?key:Object.keys(emp).find(k=>k.trim()===key.trim())||key;}
+function fahdIsMojibake(value){
+ if(typeof value!=='string')return false;
+ return /(?:ط§|ط¨|ط±|طھ|ط®|ظ„|ظ‚|ظ…|Ø|Ù|Ã|â€)/.test(value);
+}
+function fahdHasUnsavedChanges(){
+ if(!fahdIsEditing||!fahdEditing)return false;
+ return Array.from(document.querySelectorAll('#fahd-fields [data-fahd-key]')).some(input=>input.value!==(fahdEditing.original[input.dataset.fahdKey]??''));
+}
+// Three outcomes: save / discard / stay. Only leave after save succeeds.
+async function fahdGuardNavigation(continueNavigation){
+ if(window.fahdGuardActive)return;
+ window.fahdGuardActive=true;
+ try{
+  const save=await fahdDialog(fahdLang('تعديلات غير محفوظة','Unsaved changes'),fahdLang('هل ترغب في حفظ التعديلات قبل الخروج؟','Would you like to save your changes before leaving?'));
+  if(save){const saved=await fahdSave(true);if(!saved)return;}
+  else{
+   const discard=await fahdDialog(fahdLang('تجاهل التعديلات','Discard changes'),fahdLang('هل تريد الخروج دون حفظ التعديلات؟','Leave without saving changes?'));
+   if(!discard)return;
+  }
+  window.fahdNavigationApproved=true;
+  try{continueNavigation();}finally{window.fahdNavigationApproved=false;}
+ }finally{window.fahdGuardActive=false;}
+}
+window.addEventListener('beforeunload',event=>{
+ if(fahdHasUnsavedChanges()){event.preventDefault();event.returnValue='';}
+});
 function fahdRenderCompleteFields(emp,fields){
  const shown=new Set();
  for(const schemaKey of [...FAHD_ALL_PROFILE_KEYS,...Object.keys(emp)]){
@@ -1568,7 +1591,7 @@ function fahdRenderCompleteFields(emp,fields){
   const card=document.createElement('div');card.className='fahd-field';card.dataset.fieldLanguage=lang;
   const label=document.createElement('label');label.textContent=fahdProfileKeyLabel(key)+' ('+lang.toUpperCase()+')';
   const input=document.createElement('input');input.type='text';input.dataset.fahdKey=key;
-  input.value=String(emp[key]??'');input.disabled=true;input.maxLength=2000;
+  input.value=fahdIsMojibake(emp[key])?'':String(emp[key]??'');input.disabled=true;input.maxLength=2000;
   if(/(?:^n_id$|الرقم القومى|الرقم التأمينى|insurance number)/.test(key))input.autocomplete='off';
   card.append(label,input);fields.append(card);fahdEditing.original[key]=input.value;
  }
@@ -1599,20 +1622,20 @@ function fahdRefreshFieldVisibility(){
   const label=w.querySelector('label[data-label-ar]');if(label)label.textContent=fahdLang(label.dataset.labelAr,label.dataset.labelEn);
  });
 }
-async function fahdSave(){
+async function fahdSave(skipConfirm=false){
  if(fahdBusy||!fahdEditing)return;const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(fahdEditing.code));const status=document.getElementById('fahd-status');
- if(!emp||!fahdEditing.path||emp._firebasePath!==fahdEditing.path){status.textContent=fahdLang('تعذر تحديد السجل','Employee record unavailable');return;}
+ if(!emp||!fahdEditing.path||emp._firebasePath!==fahdEditing.path||!fahdEditing.path.startsWith('employees_v2/')){status.textContent=fahdLang('تعذر تحديد السجل','Employee record unavailable');return false;}
  const updates={};document.querySelectorAll('#fahd-fields [data-fahd-key]').forEach(input=>{
   const key=input.dataset.fahdKey;if(input.value===fahdEditing.original[key])return;
   const value=input.type==='date'?fahdStoredDate(input.value):input.value.trim();updates[key]=value;
   // Each translated field is independent; never overwrite its counterpart.
  });
  const dob=updates['تاريخ الميلاد'];if(dob){const age=fahdAge(dob);if(age){updates['السن حتى تاريخه ']=age;updates['age to date']=age;}}
- if(!Object.keys(updates).length){status.textContent=fahdLang('لا توجد تغييرات للحفظ','No changes to save');return;}
- if(!await fahdDialog(fahdLang('حفظ التعديلات','Save changes'),fahdLang('هل تريد حفظ التغييرات؟','Save these changes?')))return;
+ if(!Object.keys(updates).length){status.textContent=fahdLang('لا توجد تغييرات للحفظ','No changes to save');return true;}
+ if(!skipConfirm && !await fahdDialog(fahdLang('حفظ التعديلات','Save changes'),fahdLang('هل تريد حفظ التغييرات؟','Save these changes?')))return false;
  fahdBusy=true;document.getElementById('fahd-save').disabled=true;
- try{await db.ref(fahdEditing.path).update(updates);Object.assign(emp,updates);renderTable(allEmployees);fahdRender(emp);status.textContent=fahdLang('✓ تم الحفظ','✓ Changes saved');await fahdDialog(fahdLang('تم الحفظ','Saved'),fahdLang('تم حفظ التعديلات بنجاح','Changes saved successfully'),'notice');}
- catch(err){status.textContent=fahdLang('فشل الحفظ: ','Save failed: ')+(err?.message||'Permission denied');}
+ try{await db.ref(fahdEditing.path).update(updates);Object.assign(emp,updates);renderTable(allEmployees);fahdRender(emp);status.textContent=fahdLang('✓ تم الحفظ','✓ Changes saved');if(!skipConfirm)await fahdDialog(fahdLang('تم الحفظ','Saved'),fahdLang('تم حفظ التعديلات بنجاح','Changes saved successfully'),'notice');return true;}
+ catch(err){status.textContent=fahdLang('فشل الحفظ: ','Save failed: ')+(err?.message||'Permission denied');return false;}
  finally{fahdBusy=false;document.getElementById('fahd-save').disabled=false;}
 }
 function fahdSetEditing(on){fahdIsEditing=on;document.querySelectorAll('#fahd-fields [data-fahd-key]').forEach(el=>el.disabled=!on);fahdRefreshFieldVisibility();for(const [id,visible] of [['fahd-edit',!on],['fahd-save',on],['fahd-cancel',on]]){const el=document.getElementById(id);if(el)el.hidden=!visible;}}
