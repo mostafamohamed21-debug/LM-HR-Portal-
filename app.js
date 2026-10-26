@@ -1562,17 +1562,41 @@ function fahdHasUnsavedChanges(){
  if(!fahdIsEditing||!fahdEditing)return false;
  return Array.from(document.querySelectorAll('#fahd-fields [data-fahd-key]')).some(input=>input.value!==(fahdEditing.original[input.dataset.fahdKey]??''));
 }
-// Three outcomes: save / discard / stay. Only leave after save succeeds.
+// Styled three-choice dialog, created in JS so no HTML changes are needed.
+function fahdUnsavedDialog(){
+ return new Promise(resolve=>{
+  const old=document.getElementById('fahd-unsaved-overlay');if(old)old.remove();
+  const overlay=document.createElement('div');overlay.id='fahd-unsaved-overlay';
+  overlay.setAttribute('role','presentation');
+  overlay.style.cssText='position:fixed;inset:0;z-index:2147483000;background:rgba(2,10,23,.72);backdrop-filter:blur(7px);display:flex;align-items:center;justify-content:center;padding:18px;';
+  const card=document.createElement('section');card.setAttribute('role','dialog');card.setAttribute('aria-modal','true');card.setAttribute('aria-labelledby','fahd-unsaved-title');
+  card.dir=currentLang==='ar'?'rtl':'ltr';
+  card.style.cssText='width:min(100%,470px);border-radius:20px;padding:28px;background:var(--card-bg,var(--surface,#15243a));color:var(--text-primary,#f8fafc);border:1px solid rgba(125,165,205,.35);box-shadow:0 24px 70px rgba(0,0,0,.45);font-family:inherit;';
+  // Detect light theme from the page rather than hard-coding a dark dialog.
+  const bg=getComputedStyle(document.body).backgroundColor;const rgb=bg.match(/\d+/g);const light=rgb&&rgb.length>=3&&(+rgb[0]*.299 + +rgb[1]*.587 + +rgb[2]*.114)>165;
+  if(light){card.style.background='#ffffff';card.style.color='#17243a';card.style.borderColor='#dbe5ef';}
+  const icon=document.createElement('div');icon.textContent='✎';icon.style.cssText='width:44px;height:44px;display:grid;place-items:center;border-radius:12px;background:rgba(14,165,233,.14);color:#38bdf8;font-size:25px;margin-bottom:16px;';
+  const title=document.createElement('h2');title.id='fahd-unsaved-title';title.textContent=fahdLang('تعديلات غير محفوظة','Unsaved changes');title.style.cssText='font-size:21px;font-weight:750;margin:0 0 10px;';
+  const msg=document.createElement('p');msg.textContent=fahdLang('لقد عدّلت بيانات الموظف. ماذا تريد أن تفعل قبل الخروج؟','You have edited employee details. What would you like to do before leaving?');msg.style.cssText='font-size:14px;line-height:1.9;opacity:.85;margin:0 0 24px;';
+  const buttons=document.createElement('div');buttons.style.cssText='display:flex;flex-wrap:wrap;gap:9px;';
+  let done=false;const finish=value=>{if(done)return;done=true;document.removeEventListener('keydown',onKey,true);overlay.remove();resolve(value);};
+  const make=(label,value,css)=>{const btn=document.createElement('button');btn.type='button';btn.textContent=label;btn.style.cssText='border-radius:11px;padding:11px 15px;font:600 14px inherit;cursor:pointer;flex:1 1 125px;'+css;btn.onclick=()=>finish(value);buttons.append(btn);return btn;};
+  const save=make(fahdLang('حفظ وخروج','Save & leave'),'save','background:#0284c7;color:white;border:1px solid #0284c7;');
+  make(fahdLang('خروج دون حفظ','Discard & leave'),'discard','background:transparent;color:inherit;border:1px solid #d97706;');
+  make(fahdLang('متابعة التعديل','Keep editing'),'stay','background:transparent;color:inherit;border:1px solid rgba(130,150,175,.55);');
+  card.append(icon,title,msg,buttons);overlay.append(card);document.body.append(overlay);
+  const onKey=e=>{if(e.key==='Escape'){e.preventDefault();finish('stay');}};document.addEventListener('keydown',onKey,true);save.focus();
+ });
+}
 async function fahdGuardNavigation(continueNavigation){
  if(window.fahdGuardActive)return;
+ if(!fahdHasUnsavedChanges()){continueNavigation();return;}
  window.fahdGuardActive=true;
  try{
-  const save=await fahdDialog(fahdLang('تعديلات غير محفوظة','Unsaved changes'),fahdLang('هل ترغب في حفظ التعديلات قبل الخروج؟','Would you like to save your changes before leaving?'));
-  if(save){const saved=await fahdSave(true);if(!saved)return;}
-  else{
-   const discard=await fahdDialog(fahdLang('تجاهل التعديلات','Discard changes'),fahdLang('هل تريد الخروج دون حفظ التعديلات؟','Leave without saving changes?'));
-   if(!discard)return;
-  }
+  const choice=await fahdUnsavedDialog();
+  if(choice==='stay')return;
+  if(choice==='save'){const saved=await fahdSave(true);if(!saved)return;}
+  if(choice==='discard'){fahdIsEditing=false;}
   window.fahdNavigationApproved=true;
   try{continueNavigation();}finally{window.fahdNavigationApproved=false;}
  }finally{window.fahdGuardActive=false;}
@@ -1640,7 +1664,14 @@ async function fahdSave(skipConfirm=false){
 }
 function fahdSetEditing(on){fahdIsEditing=on;document.querySelectorAll('#fahd-fields [data-fahd-key]').forEach(el=>el.disabled=!on);fahdRefreshFieldVisibility();for(const [id,visible] of [['fahd-edit',!on],['fahd-save',on],['fahd-cancel',on]]){const el=document.getElementById(id);if(el)el.hidden=!visible;}}
 function fahdStartEdit(){fahdSetEditing(true)}
-function fahdCancelEdit(){document.querySelectorAll('#fahd-fields [data-fahd-key]').forEach(el=>el.value=fahdEditing?.original[el.dataset.fahdKey]??'');fahdSetEditing(false)}
+async function fahdCancelEdit(){
+ if(fahdHasUnsavedChanges()){
+  const choice=await fahdUnsavedDialog();
+  if(choice==='stay')return;
+  if(choice==='save'){await fahdSave(true);return;}
+ }
+ document.querySelectorAll('#fahd-fields [data-fahd-key]').forEach(el=>el.value=fahdEditing?.original[el.dataset.fahdKey]??'');fahdSetEditing(false);
+}
 function fahdDialog(title,message,mode='confirm',fields=[]){return new Promise(resolve=>{const dialog=document.getElementById('fahd-dialog'),box=document.getElementById('fahd-dialog-inputs'),yes=document.getElementById('fahd-dialog-yes'),no=document.getElementById('fahd-dialog-no');document.getElementById('fahd-dialog-title').textContent=title;document.getElementById('fahd-dialog-message').textContent=message;box.replaceChildren();const inputs=fields.map(f=>{const el=document.createElement('input');el.placeholder=f;el.maxLength=1000;box.append(el);return el});no.hidden=mode==='notice';yes.textContent=mode==='notice'?fahdLang('حسنًا','OK'):fahdLang('تأكيد','Confirm');no.textContent=fahdLang('إلغاء','Cancel');dialog.hidden=false;const finish=ok=>{dialog.hidden=true;yes.onclick=null;no.onclick=null;document.removeEventListener('keydown',esc);resolve(ok?(inputs.length?inputs.map(x=>x.value):true):null)};const esc=e=>{if(e.key==='Escape')finish(false)};yes.onclick=()=>finish(true);no.onclick=()=>finish(false);document.addEventListener('keydown',esc);(inputs[0]||yes).focus()})}
 async function fahdAddField(){
  if(fahdBusy||!fahdEditing?.path)return;
