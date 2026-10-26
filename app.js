@@ -573,7 +573,7 @@ function buildAddEmployeeForm(){
   if(arKey===enKey)details.append(fahdInput(fahdLang(ar,en),arKey,'',type,type==='date'?{onchange:fahdUpdateNewAge}:{}));
   else if(type==='date'){
    const dateInput=fahdInput(fahdLang(ar,en),arKey,'','date',{onchange:fahdUpdateNewAge});dateInput.querySelector('input').dataset.mirrorKey=enKey;details.append(dateInput);
-  }else{details.append(fahdInput(fahdLang(ar,en),arKey));details.lastChild.querySelector('input').dataset.mirrorKey=enKey;}
+  }else{details.append(fahdInput(ar+' (AR)',arKey));details.append(fahdInput(en+' (EN)',enKey));}
  }
  details.append(fahdInput(fahdLang('العمر — تلقائي','Age — calculated'),'','', 'text',{readonly:true}));
  const extra=fahdAddSection(fahdLang('بيانات إضافية','Additional fields'),fahdLang('بيانات اختيارية','Optional information'));
@@ -1571,9 +1571,19 @@ function fahdRender(emp){
  for(const [id,ar,en,arKey,enKey,type] of FAHD_COMMON){
   const wrap=document.createElement('div');wrap.className='fahd-field';wrap.dataset.fieldLanguage='common';
   const lab=document.createElement('label');lab.dataset.labelAr=ar;lab.dataset.labelEn=en;lab.textContent=fahdLang(ar,en);
-  const input=document.createElement('input');input.type=type==='date'?'date':'text';input.dataset.fahdKey=arKey;input.dataset.mirrorKey=enKey;
-  const raw=emp[arKey]??emp[enKey]??'';input.value=type==='date'?fahdISO(raw):String(raw);input.disabled=true;
-  fahdEditing.original[arKey]=input.value;wrap.append(lab,input);fields.append(wrap);
+  if(arKey!==enKey){
+   for(const [language,key,title] of [['ar',arKey,ar],['en',enKey,en]]){
+    const card=document.createElement('div');card.className='fahd-field';card.dataset.fieldLanguage=language;
+    const titleNode=document.createElement('label');titleNode.textContent=title+' ('+language.toUpperCase()+')';
+    const field=document.createElement('input');field.type=type==='date'?'date':'text';field.dataset.fahdKey=key;
+    const raw=emp[key]??'';field.value=type==='date'?fahdISO(raw):String(raw);field.disabled=true;
+    fahdEditing.original[key]=field.value;card.append(titleNode,field);fields.append(card);
+   }
+  }else{
+   const input=document.createElement('input');input.type=type==='date'?'date':'text';input.dataset.fahdKey=arKey;
+   const raw=emp[arKey]??'';input.value=type==='date'?fahdISO(raw):String(raw);input.disabled=true;
+   fahdEditing.original[arKey]=input.value;wrap.append(lab,input);fields.append(wrap);
+  }
  }
  fahdRefreshFieldVisibility();fahdEnableDropdowns();
  const fin=document.getElementById('fahd-financial');fin.replaceChildren();const financial=emp.financial;
@@ -1594,7 +1604,7 @@ async function fahdSave(){
  const updates={};document.querySelectorAll('#fahd-fields [data-fahd-key]').forEach(input=>{
   const key=input.dataset.fahdKey;if(input.value===fahdEditing.original[key])return;
   const value=input.type==='date'?fahdStoredDate(input.value):input.value.trim();updates[key]=value;
-  if(input.dataset.mirrorKey&&input.dataset.mirrorKey!==key)updates[input.dataset.mirrorKey]=value;
+  // Each translated field is independent; never overwrite its counterpart.
  });
  const dob=updates['تاريخ الميلاد'];if(dob){const age=fahdAge(dob);if(age){updates['السن حتى تاريخه ']=age;updates['age to date']=age;}}
  if(!Object.keys(updates).length){status.textContent=fahdLang('لا توجد تغييرات للحفظ','No changes to save');return;}
