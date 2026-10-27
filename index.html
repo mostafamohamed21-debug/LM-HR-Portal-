@@ -423,7 +423,20 @@ html[data-theme="light"] #hr-dashboard-view .neon-card,body.light #hr-dashboard-
 #hr-dashboard-view .neon-geo-unified .hr-map-stage.is-zoomed .hr-world{transform:scale(1.08)!important}
 #hr-dashboard-view .neon-geo-unified .hr-map-stage.is-zoomed .hr-egypt-zoom{transform:scale(1)!important}
 #hr-dashboard-view .neon-icon{font-size:31px!important;line-height:1.2;min-width:40px;text-align:center}
-.portal-identity-admin::before{content:'●';color:#fb4b5b;margin-inline-end:7px;text-shadow:0 0 9px #ef4444}
+/* Permission FLAG: real flag icon, not a dot. Visual only; does not grant access. */
+.portal-identity-admin::before{content:none!important}
+.portal-identity-wrap{display:flex;align-items:center;gap:9px;min-width:0}
+.portal-identity-avatar{width:37px;height:37px;border-radius:50%;object-fit:cover;border:1px solid #6abfff;background:#102442}
+.portal-identity-text{display:flex;flex-direction:column;line-height:1.4;max-width:190px;overflow:hidden}
+.portal-identity-name{font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.portal-identity-job{font-size:10px;color:#a5c8e8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.portal-permission-flag{width:27px;height:27px;flex:none;display:inline-flex;align-items:center;justify-content:center;filter:drop-shadow(0 0 5px currentColor)}
+.portal-permission-flag svg{width:25px;height:25px;fill:currentColor}
+.portal-permission-flag[data-tier=highest]{color:#ff435d}
+.portal-permission-flag[data-tier=hr]{color:#a873ff}
+.portal-permission-flag[data-tier=supervisor]{color:#29b6ff}
+.portal-permission-flag[data-tier=standard]{color:#21d99d}
+
 /* Hide navigation during authentication without changing its authenticated behavior. */
 body:has(#login-modal:not([style*="display: none"])) .sidebar-collapsed{visibility:hidden!important;pointer-events:none!important}
 
