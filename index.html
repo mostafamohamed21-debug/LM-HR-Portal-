@@ -410,6 +410,23 @@ body > div.flex.flex-1.overflow-hidden > main { box-sizing:border-box; overflow-
 @media(max-width:520px){#hr-dashboard-view .neon-grid>*{grid-column:span 12!important}#hr-dashboard-view .neon-kpi{min-height:105px}}
 html[data-theme="light"] #hr-dashboard-view .neon-card,body.light #hr-dashboard-view .neon-card{background:linear-gradient(145deg,#e8f5ff,#dceafa);color:#102e50;border-color:#aac8e5}html[data-theme="light"] #hr-dashboard-view .neon-card h2,body.light #hr-dashboard-view .neon-card h2{color:#102e50}
 
+
+/* Dashboard revision: one square responsive map; preserve SVG aspect ratio. */
+#hr-dashboard-view .neon-geo-unified{min-width:0;overflow:hidden}
+#hr-dashboard-view .neon-geo-unified #neon-egypt-mount{width:100%;aspect-ratio:1/1;max-height:none}
+#hr-dashboard-view .neon-geo-unified .hr-map-stage,#hr-map-stage,#hr-dashboard-view .neon-map .hr-map-stage,#hr-map-stage.is-zoomed{width:100%!important;height:100%!important;min-height:0!important;aspect-ratio:1/1!important;overflow:hidden!important}
+#hr-dashboard-view .neon-geo-unified .hr-world,#hr-dashboard-view .neon-geo-unified .hr-egypt-zoom{box-sizing:border-box;inset:0!important;padding:8px!important}
+#hr-dashboard-view .neon-geo-unified .hr-world>svg{width:100%!important;height:100%!important;max-height:100%!important;object-fit:contain!important;flex:1 1 auto!important}
+#hr-dashboard-view .neon-geo-unified .hr-egypt-layout{height:calc(100% - 55px)!important;display:flex!important;flex-direction:column!important;align-items:center}
+#hr-dashboard-view .neon-geo-unified .hr-egypt-svg{height:100%!important;min-height:0!important;width:100%!important;object-fit:contain!important}
+#hr-dashboard-view .neon-geo-unified .hr-geo-list,#hr-dashboard-view .neon-geo-unified .hr-map-tooltip,#hr-dashboard-view .neon-geo-unified .cc-transport-panel{display:none!important}
+#hr-dashboard-view .neon-geo-unified .hr-map-stage.is-zoomed .hr-world{transform:scale(1.08)!important}
+#hr-dashboard-view .neon-geo-unified .hr-map-stage.is-zoomed .hr-egypt-zoom{transform:scale(1)!important}
+#hr-dashboard-view .neon-icon{font-size:31px!important;line-height:1.2;min-width:40px;text-align:center}
+.portal-identity-admin::before{content:'●';color:#fb4b5b;margin-inline-end:7px;text-shadow:0 0 9px #ef4444}
+/* Hide navigation during authentication without changing its authenticated behavior. */
+body:has(#login-modal:not([style*="display: none"])) .sidebar-collapsed{visibility:hidden!important;pointer-events:none!important}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style id="fahd-v7-dashboard-depth">
@@ -1037,7 +1054,7 @@ html[data-theme="light"] #hr-dashboard-view .neon-card,body.light #hr-dashboard-
 
     <!-- ربط ملف الـ JS -->
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
-    <script src="app.js?v=20261026-neon-v7"></script>
+    <script src="app.js?v=20261027-dashboard-revision"></script>
     
 <div id="fahd-dialog" class="fahd-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="fahd-dialog-title"><div class="fahd-dialog-card"><h3 id="fahd-dialog-title"></h3><p id="fahd-dialog-message"></p><div id="fahd-dialog-inputs"></div><div class="fahd-dialog-actions"><button type="button" id="fahd-dialog-no">إلغاء</button><button type="button" id="fahd-dialog-yes">تأكيد</button></div></div></div></body>
 </html>
