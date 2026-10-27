@@ -411,34 +411,22 @@ body > div.flex.flex-1.overflow-hidden > main { box-sizing:border-box; overflow-
 html[data-theme="light"] #hr-dashboard-view .neon-card,body.light #hr-dashboard-view .neon-card{background:linear-gradient(145deg,#e8f5ff,#dceafa);color:#102e50;border-color:#aac8e5}html[data-theme="light"] #hr-dashboard-view .neon-card h2,body.light #hr-dashboard-view .neon-card h2{color:#102e50}
 
 
-/* Dashboard revision: one square responsive map; preserve SVG aspect ratio. */
-#hr-dashboard-view .neon-geo-unified{min-width:0;overflow:hidden}
-#hr-dashboard-view .neon-geo-unified #neon-egypt-mount{width:100%;aspect-ratio:1/1;max-height:none}
-#hr-dashboard-view .neon-geo-unified .hr-map-stage,#hr-map-stage,#hr-dashboard-view .neon-map .hr-map-stage,#hr-map-stage.is-zoomed{width:100%!important;height:100%!important;min-height:0!important;aspect-ratio:1/1!important;overflow:hidden!important}
-#hr-dashboard-view .neon-geo-unified .hr-world,#hr-dashboard-view .neon-geo-unified .hr-egypt-zoom{box-sizing:border-box;inset:0!important;padding:8px!important}
-#hr-dashboard-view .neon-geo-unified .hr-world>svg{width:100%!important;height:100%!important;max-height:100%!important;object-fit:contain!important;flex:1 1 auto!important}
-#hr-dashboard-view .neon-geo-unified .hr-egypt-layout{height:calc(100% - 55px)!important;display:flex!important;flex-direction:column!important;align-items:center}
-#hr-dashboard-view .neon-geo-unified .hr-egypt-svg{height:100%!important;min-height:0!important;width:100%!important;object-fit:contain!important}
-#hr-dashboard-view .neon-geo-unified .hr-geo-list,#hr-dashboard-view .neon-geo-unified .hr-map-tooltip,#hr-dashboard-view .neon-geo-unified .cc-transport-panel{display:none!important}
-#hr-dashboard-view .neon-geo-unified .hr-map-stage.is-zoomed .hr-world{transform:scale(1.08)!important}
-#hr-dashboard-view .neon-geo-unified .hr-map-stage.is-zoomed .hr-egypt-zoom{transform:scale(1)!important}
-#hr-dashboard-view .neon-icon{font-size:31px!important;line-height:1.2;min-width:40px;text-align:center}
-/* Permission FLAG: real flag icon, not a dot. Visual only; does not grant access. */
-.portal-identity-admin::before{content:none!important}
-.portal-identity-wrap{display:flex;align-items:center;gap:9px;min-width:0}
-.portal-identity-avatar{width:37px;height:37px;border-radius:50%;object-fit:cover;border:1px solid #6abfff;background:#102442}
-.portal-identity-text{display:flex;flex-direction:column;line-height:1.4;max-width:190px;overflow:hidden}
-.portal-identity-name{font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.portal-identity-job{font-size:10px;color:#a5c8e8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.portal-permission-flag{width:27px;height:27px;flex:none;display:inline-flex;align-items:center;justify-content:center;filter:drop-shadow(0 0 5px currentColor)}
-.portal-permission-flag svg{width:25px;height:25px;fill:currentColor}
-.portal-permission-flag[data-tier=highest]{color:#ff435d}
-.portal-permission-flag[data-tier=hr]{color:#a873ff}
-.portal-permission-flag[data-tier=supervisor]{color:#29b6ff}
-.portal-permission-flag[data-tier=standard]{color:#21d99d}
-
-/* Hide navigation during authentication without changing its authenticated behavior. */
-body:has(#login-modal:not([style*="display: none"])) .sidebar-collapsed{visibility:hidden!important;pointer-events:none!important}
+/* V8 surgical dashboard layout: single square geographic card */
+#hr-dashboard-view .neon-map{grid-column:span 3!important;aspect-ratio:1/1;min-height:350px!important;overflow:hidden}
+#hr-dashboard-view .neon-geo-switch{position:relative;width:100%;height:calc(100% - 42px);min-height:280px;cursor:zoom-in;overflow:hidden}
+#hr-dashboard-view .neon-geo-switch .neon-world{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transition:opacity .25s ease}
+#hr-dashboard-view .neon-geo-switch .neon-world svg{width:100%!important;height:100%!important;object-fit:contain}
+#hr-dashboard-view #neon-egypt-mount{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .3s ease;background:#091a32;overflow:hidden}
+#hr-dashboard-view .neon-geo-switch:hover #neon-egypt-mount,#hr-dashboard-view .neon-geo-switch:focus-within #neon-egypt-mount{opacity:1;pointer-events:auto}
+#hr-dashboard-view .neon-geo-switch:hover .neon-world{opacity:0}
+#hr-dashboard-view #neon-egypt-mount .hr-map-stage{height:100%!important;min-height:100%!important;width:100%!important;max-width:100%!important}
+#hr-dashboard-view #neon-egypt-mount svg{max-width:100%;max-height:100%;object-fit:contain}
+#hr-dashboard-view .neon-orgcenter{position:relative;display:grid;place-items:center;height:240px}
+#hr-dashboard-view .neon-orglinks{position:absolute;inset:0;width:100%;height:100%;filter:drop-shadow(0 0 5px #0af)}
+#hr-dashboard-view .neon-orgcenter img{position:relative;z-index:2;border-radius:50%;background:#08234b;border:2px solid #25c6ff;box-shadow:0 0 22px #0989ed}
+#hr-dashboard-view .neon-notify-btn{padding:15px;border-radius:12px;background:linear-gradient(110deg,#0678d7,#02c4e5);color:white;font-weight:800;width:100%;margin:16px 0;cursor:pointer}
+#hr-dashboard-view .neon-icon{font-size:28px!important;line-height:1.3!important}
+@media(max-width:950px){#hr-dashboard-view .neon-map{grid-column:span 6!important;aspect-ratio:1/1}}
 
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -1067,7 +1055,7 @@ html[data-theme="light"] #hr-dashboard-view .neon-card,body.light #hr-dashboard-
 
     <!-- ربط ملف الـ JS -->
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
-    <script src="app.js?v=20261027-dashboard-revision"></script>
+    <script src="app.js?v=20261026-neon-v7"></script>
     
 <div id="fahd-dialog" class="fahd-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="fahd-dialog-title"><div class="fahd-dialog-card"><h3 id="fahd-dialog-title"></h3><p id="fahd-dialog-message"></p><div id="fahd-dialog-inputs"></div><div class="fahd-dialog-actions"><button type="button" id="fahd-dialog-no">إلغاء</button><button type="button" id="fahd-dialog-yes">تأكيد</button></div></div></div></body>
 </html>
