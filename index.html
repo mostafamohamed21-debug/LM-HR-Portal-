@@ -410,6 +410,7 @@ body > div.flex.flex-1.overflow-hidden > main { box-sizing:border-box; overflow-
 @media(max-width:520px){#hr-dashboard-view .neon-grid>*{grid-column:span 12!important}#hr-dashboard-view .neon-kpi{min-height:105px}}
 html[data-theme="light"] #hr-dashboard-view .neon-card,body.light #hr-dashboard-view .neon-card{background:linear-gradient(145deg,#e8f5ff,#dceafa);color:#102e50;border-color:#aac8e5}html[data-theme="light"] #hr-dashboard-view .neon-card h2,body.light #hr-dashboard-view .neon-card h2{color:#102e50}
 
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style id="fahd-v7-dashboard-depth">
@@ -640,8 +641,84 @@ html[data-theme="light"] #hr-dashboard-view .neon-card,body.light #hr-dashboard-
 
 </style>
 
+<style id="v8-final-overrides">
+/* V8 visual alignment with the approved reference — dashboard and navigation only */
+body.v8-portal{background:#061225!important;background-image:none!important}
+body.v8-portal>header{height:72px!important;background:#071a34!important;border-bottom:1px solid #1b3a62!important;margin-left:242px!important;padding-left:20px!important;padding-right:20px!important}
+body.v8-portal>div.flex.flex-1.overflow-hidden>main{margin-left:242px!important;margin-right:0!important;padding:12px 16px!important;background:#061225!important;min-width:0}
+body.v8-portal .sidebar-collapsed{position:fixed!important;top:0!important;left:0!important;right:auto!important;width:242px!important;height:100dvh!important;overflow-y:auto!important;overflow-x:hidden!important;z-index:70!important;background:linear-gradient(165deg,#0a1e3b,#07162c)!important;border:1px solid #1a3555!important;border-radius:0 18px 18px 0!important;transition:none!important}
+body.v8-portal .sidebar-collapsed:hover,body.v8-portal .sidebar-collapsed:focus-within{width:242px!important}
+body.v8-portal .sidebar-collapsed .nav-text,body.v8-portal .sidebar-collapsed .sidebar-title{opacity:1!important;display:inline!important}
+body.v8-portal .sidebar-collapsed .sidebar-item{min-height:50px!important;padding:10px 12px!important;gap:12px!important;white-space:normal!important;font-size:13px!important}
+body.v8-portal .sidebar-collapsed .sidebar-item[data-page="dashboard"]{background:linear-gradient(100deg,#0874e7,#004db9);color:white}
+body.v8-portal .sidebar-collapsed nav{padding-top:0!important}
+body.v8-portal .sidebar-collapsed .hr-side-icon{width:25px;height:25px}
+body.v8-portal .v8-sidebar-brand{display:flex;align-items:center;gap:9px;direction:ltr;min-height:88px;padding-bottom:8px;border-bottom:1px solid #21446c}
+body.v8-portal .v8-sidebar-brand img{width:85px;height:70px;object-fit:contain}
+body.v8-portal .v8-sidebar-brand div{display:flex;flex-direction:column;text-align:center;color:#fff;line-height:1.5}
+body.v8-portal .v8-sidebar-brand strong{font-size:16px}body.v8-portal .v8-sidebar-brand span{font-size:12px}body.v8-portal .v8-sidebar-brand small{font-size:11px;color:#c2d9f2}
+body.v8-portal .v8-sidebar-footer{margin-top:24px;color:#c2d8f0;font-size:12px!important;white-space:normal}
+body.v8-portal .v8-factory{width:100%;max-height:150px;object-fit:contain;display:block;margin:0 auto 8px;mix-blend-mode:screen}
+body.v8-portal .sidebar-collapsed>.p-4{padding:10px!important}
+body.v8-portal .sidebar-collapsed .sidebar-title{font-size:12px}
+body.v8-portal #hr-dashboard-view{background:transparent!important}
+#hr-dashboard-view .v8-board{max-width:none!important}
+#hr-dashboard-view .v8-board .neon-top{margin-bottom:10px}
+#hr-dashboard-view .v8-board .neon-top h1{font-size:21px}
+#hr-dashboard-view .v8-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:10px!important}
+#hr-dashboard-view .v8-grid>.neon-card{background:linear-gradient(135deg,#0c2344,#09162f 85%)!important;border:1px solid #1b3c6d!important;border-radius:9px!important;padding:13px!important;min-width:0;box-shadow:inset 0 1px #ffffff0c,0 4px 12px #0004}
+#hr-dashboard-view .v8-grid>.neon-card h2{font-size:13px;line-height:1.4;min-height:37px}
+#hr-dashboard-view .v8-grid>.neon-card .en{font-size:11px;margin-top:2px}
+#hr-dashboard-view .v8-grid>.v8-kpi{grid-column:span 2!important;min-height:166px!important}
+#hr-dashboard-view .v8-kpihead{display:flex;align-items:center;gap:9px}
+#hr-dashboard-view .v8-kpiicon{font-size:31px;color:#42baff;flex:none}
+#hr-dashboard-view .v8-kpi .number{font-size:36px;margin-top:13px}
+#hr-dashboard-view .v8-attendance-card{grid-column:span 4!important;min-height:166px!important}
+#hr-dashboard-view .v8-attendance{display:flex;justify-content:space-around;align-items:center;gap:14px;margin:4px auto}
+#hr-dashboard-view .v8-meter{width:85px;height:85px;border-radius:50%;background:conic-gradient(#00dec5,#157bff,#9b35e8,#00dec5);padding:9px;box-shadow:0 0 18px #008fff30}
+#hr-dashboard-view .v8-meterinner{width:100%;height:100%;border-radius:50%;background:#0b1d39;display:grid;place-items:center;text-align:center;font-size:10px;color:#c6dafa}
+#hr-dashboard-view .v8-pending{text-align:center;font-size:10px;color:#8bb1d6;margin:3px}
+#hr-dashboard-view .v8-gender-card{grid-column:span 3!important;min-height:310px!important}
+#hr-dashboard-view .v8-org-card{grid-column:span 5!important;min-height:310px!important}
+#hr-dashboard-view .v8-world-card,#hr-dashboard-view .v8-egypt-card{grid-column:span 2!important;min-height:310px!important}
+#hr-dashboard-view .v8-gender{display:flex;align-items:center;gap:4px;height:230px}
+#hr-dashboard-view .v8-people-ball{position:relative;flex:1;min-width:0;aspect-ratio:1/1;max-height:210px;border-radius:50%;background:radial-gradient(circle at center,#112f58 0,transparent 68%)}
+#hr-dashboard-view .v8-people-ball span{position:absolute;transform:translate(-50%,-50%);display:block;filter:drop-shadow(0 0 3px currentColor);line-height:0}
+#hr-dashboard-view .v8-people-ball svg{width:12px;height:19px}
+#hr-dashboard-view .v8-gender-stats{display:flex;flex-direction:column;gap:25px;flex:0 0 67px;text-align:center}
+#hr-dashboard-view .v8-gender-stats strong{font-size:26px;line-height:1.15}#hr-dashboard-view .v8-gender-stats small{display:block;font-size:11px;color:#c8dafa;font-weight:400;margin-top:7px}
+#hr-dashboard-view .v8-pink{color:#ff62d0}#hr-dashboard-view .v8-blue{color:#10c1ff}
+#hr-dashboard-view .v8-orgbox{display:grid;grid-template-columns:minmax(0,1fr) 95px minmax(0,1fr);gap:6px;align-items:center;min-height:228px;direction:ltr}
+#hr-dashboard-view .v8-orgcenter{position:relative;display:grid;place-items:center}
+#hr-dashboard-view .v8-orgcenter:before{content:"";position:absolute;inset:-16px;border-radius:50%;background:radial-gradient(circle,#004fff55,transparent 75%);border:1px solid #128bff66}
+#hr-dashboard-view .v8-orgcenter img{width:95px;height:95px;object-fit:contain;border-radius:50%;padding:5px;background:#061a35;box-shadow:0 0 15px #0f7fff;z-index:1}
+#hr-dashboard-view .v8-orgside{display:flex;flex-direction:column;gap:9px;min-width:0}
+#hr-dashboard-view .v8-orgline{display:flex;align-items:center;justify-content:space-between;gap:5px;position:relative;border-bottom:1px solid #1965a780;padding-bottom:3px}
+#hr-dashboard-view .v8-orgline:after{content:"";position:absolute;top:50%;height:1px;width:15px;background:#20b6ff;right:-15px}
+#hr-dashboard-view .v8-orgside:last-child .v8-orgline:after{left:-15px;right:auto;background:#b852e9}
+#hr-dashboard-view .v8-orgline span{font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#d5e9ff}
+#hr-dashboard-view .v8-orgline b{border-radius:50%;background:#0d75d9;color:#fff;min-width:24px;height:24px;display:grid;place-items:center;font-size:10px}
+#hr-dashboard-view .v8-orgside:last-child .v8-orgline b{background:#8a3ec0}
+#hr-dashboard-view .v8-world-card .neon-world{height:230px}#hr-dashboard-view .v8-world-card .neon-world svg{max-height:205px}
+#hr-dashboard-view .v8-egypt-card #neon-egypt-mount{min-height:218px;max-height:242px;overflow:hidden}
+#hr-dashboard-view .v8-egypt-card .hr-map-stage{height:225px!important;min-height:225px!important}
+#hr-dashboard-view .v8-highlight{border-color:#11dfff!important;box-shadow:0 0 16px #05bfff70!important}
+#hr-dashboard-view .v8-dept-card{grid-column:span 5!important;min-height:235px!important}
+#hr-dashboard-view .v8-trend-card{grid-column:span 4!important;min-height:235px!important}
+#hr-dashboard-view .v8-qual-card{grid-column:span 3!important;min-height:235px!important}
+#hr-dashboard-view .v8-insurance-card,#hr-dashboard-view .v8-marital-card,#hr-dashboard-view .v8-service-card,#hr-dashboard-view .v8-latest-card{grid-column:span 3!important;min-height:218px!important}
+#hr-dashboard-view .v8-grid .neon-bars{height:170px;margin-top:6px}
+#hr-dashboard-view .v8-grid .neon-spark{height:165px}
+#hr-dashboard-view .v8-grid .neon-ring{width:106px;height:106px}
+#hr-dashboard-view .v8-grid .neon-legend{max-height:78px}
+@media(max-width:1250px){#hr-dashboard-view .v8-grid>.v8-kpi{grid-column:span 3!important}#hr-dashboard-view .v8-attendance-card{grid-column:span 12!important}#hr-dashboard-view .v8-gender-card{grid-column:span 5!important}#hr-dashboard-view .v8-org-card{grid-column:span 7!important}#hr-dashboard-view .v8-world-card,#hr-dashboard-view .v8-egypt-card{grid-column:span 6!important}#hr-dashboard-view .v8-dept-card,#hr-dashboard-view .v8-trend-card{grid-column:span 6!important}#hr-dashboard-view .v8-qual-card,#hr-dashboard-view .v8-insurance-card,#hr-dashboard-view .v8-marital-card,#hr-dashboard-view .v8-service-card,#hr-dashboard-view .v8-latest-card{grid-column:span 4!important}}
+@media(max-width:900px){body.v8-portal>header{margin-left:72px!important}body.v8-portal>div.flex.flex-1.overflow-hidden>main{margin-left:72px!important}body.v8-portal .sidebar-collapsed{width:68px!important}body.v8-portal .sidebar-collapsed:hover{width:242px!important}body.v8-portal .sidebar-collapsed .nav-text,body.v8-portal .sidebar-collapsed .sidebar-title,body.v8-portal .v8-sidebar-brand div,body.v8-portal .v8-sidebar-footer{display:none!important}body.v8-portal .sidebar-collapsed:hover .nav-text,body.v8-portal .sidebar-collapsed:hover .sidebar-title,body.v8-portal .sidebar-collapsed:hover .v8-sidebar-brand div,body.v8-portal .sidebar-collapsed:hover .v8-sidebar-footer{display:block!important}body.v8-portal .v8-sidebar-brand img{width:50px}#hr-dashboard-view .v8-grid>.neon-card{grid-column:span 6!important}}
+@media(max-width:590px){#hr-dashboard-view .v8-grid>.neon-card{grid-column:span 12!important}}
+
+
+</style>
 </head>
-<body class="min-h-screen flex flex-col">
+<body class="v8-portal min-h-screen flex flex-col">
 
     <!-- ESS-style Intro -->
     <div id="intro-screen">
@@ -742,6 +819,7 @@ html[data-theme="light"] #hr-dashboard-view .neon-card,body.light #hr-dashboard-
         <!-- Sidebar -->
         <aside class="sidebar-collapsed glass-card flex flex-col justify-between border-l z-20 overflow-hidden shadow-2xl">
             <div class="p-4 space-y-6">
+                <div class="v8-sidebar-brand"><img src="logo.png" alt="Lacto Misr"><div><strong data-ar="لاكتو مصر" data-en="Lacto Misr">لاكتو مصر</strong><span data-ar="شؤون العاملين" data-en="Human Resources">شؤون العاملين</span><small>Lacto Misr HR</small></div></div>
                 <div class="text-sm font-bold text-sky-300 text-center border-b border-sky-500/20 pb-3 truncate">
                     <span class="sidebar-title" data-translate="control_panel">غرفة التحكم</span>
                 </div>
@@ -756,8 +834,7 @@ html[data-theme="light"] #hr-dashboard-view .neon-card,body.light #hr-dashboard-
 <button type="button" onclick="showHRPage('bradford')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="bradford"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l6-6 4 3 8-9"/><path d="M3 21h18"/></svg><span class="nav-text" data-ar="Bradford Factor" data-en="Bradford Factor">Bradford Factor</span></button>
                 </nav>
             </div>
-            <div class="p-4 border-t border-sky-500/20 text-[10px] text-slate-400 text-center truncate">
-                <span class="nav-text">Portal v5.2 - Pro Edition</span>
+            <div class="v8-sidebar-footer p-4 border-t border-sky-500/20 text-[10px] text-slate-400 text-center"><img src="factory.jpg" alt="Lacto Misr Factory" class="v8-factory"><div>لاكتو مصر · Lacto Misr</div><span>Portal v8.0 · Pro Edition</span>
             </div>
         </aside>
 
@@ -1037,7 +1114,7 @@ html[data-theme="light"] #hr-dashboard-view .neon-card,body.light #hr-dashboard-
 
     <!-- ربط ملف الـ JS -->
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
-    <script src="app.js?v=20261026-neon-v7"></script>
+    <script src="app.js?v=20261027-neon-v8"></script>
     
 <div id="fahd-dialog" class="fahd-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="fahd-dialog-title"><div class="fahd-dialog-card"><h3 id="fahd-dialog-title"></h3><p id="fahd-dialog-message"></p><div id="fahd-dialog-inputs"></div><div class="fahd-dialog-actions"><button type="button" id="fahd-dialog-no">إلغاء</button><button type="button" id="fahd-dialog-yes">تأكيد</button></div></div></div></body>
 </html>
