@@ -734,7 +734,7 @@ function hrBars(rows,total,maxItems=9){const top=rows.slice(0,maxItems);return t
 function hrToggleEgypt(open){const stage=document.getElementById('hr-map-stage');if(stage)stage.classList.toggle('is-zoomed',!!open)}
 function hrDonut(rows,total){const palette=['#38bdf8','#a78bfa','#34d399','#fbbf24','#fb7185','#22d3ee'];let offset=0;const top=rows.slice(0,5);const segments=top.map(([name,n],i)=>{const p=total?n/total*100:0;const a=offset;offset+=p;return `${palette[i]} ${a}% ${offset}%`});if(offset<100)segments.push(`#243650 ${offset}% 100%`);return `<div class="hr-donut-layout"><div class="hr-donut" style="background:conic-gradient(${segments.join(',')||'#243650 0 100%'})"><div><b>${total}</b><small>${hrText('موظف','employees')}</small></div></div><div class="hr-donut-legend">${top.map(([name,n],i)=>`<div><i style="background:${palette[i]}"></i><span>${escapeHtml(name)}</span><b>${n}</b></div>`).join('')}</div></div>`}
 function hrHorizontalBars(rows,total,limit=8){const max=Math.max(1,...rows.map(r=>r[1]));return rows.slice(0,limit).map(([name,n],i)=>`<div class="hr-hbar-row"><span title="${escapeHtml(name)}">${escapeHtml(name)}</span><div><i style="width:${Math.max(3,n/max*100)}%;background:${['#38bdf8','#a78bfa','#34d399','#fbbf24'][i%4]}"></i></div><b>${n}</b></div>`).join('')||hrText('لا توجد بيانات','No data')}
-function renderRichDashboard(){
+function renderRichDashboardBase(){
  const d=document.getElementById('hr-dashboard-view');if(!d)return;
  hrStatIconCounter=0;
  const total=allEmployees.length;
@@ -1703,10 +1703,10 @@ function fahdEnableDropdowns(){document.querySelectorAll('#add-employee-fields i
 
 
 // NEON V7: approved visual composition, strictly computed from loaded employees_v2.
-const neonPreviousDashboard=renderRichDashboard;
+// Base dashboard is explicitly named to prevent recursive function hoisting.
 function renderRichDashboard(){
   // Preserve the original map implementation, including Egypt zoom and geometry loader.
-  neonPreviousDashboard();
+  renderRichDashboardBase();
   const d=document.getElementById('hr-dashboard-view');if(!d)return;
   const originalMap=d.querySelector('#hr-map-stage')?.outerHTML||'';
   const employees=allEmployees||[], total=employees.length;
