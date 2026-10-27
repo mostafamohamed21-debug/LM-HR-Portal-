@@ -1748,7 +1748,7 @@ function renderRichDashboard(){
   ${card('عدد الموظفين حسب الأقسام','Employees by Department',bars(dept),'neon-deptbars')}
   ${card('توزيع الموظفين حسب الأقسام','Employees by Departments',`<div class="neon-orgbox">${orgSide(left)}<img class="neon-orglogo" src="logo.png" alt="Lacto Misr">${orgSide(right)}</div>`,'neon-org')}
   ${card('التوزيع الجغرافي','Geographic Distribution',`<div id="neon-egypt-mount"></div>`,'neon-map neon-geo-unified')}
-  ${card('الطلبات والإشعارات','Requests & Notifications',`<div class="neon-empty">${txt('بانتظار تفعيل وربط طلبات الموظفين','Awaiting employee requests integration')}</div>`,'neon-requests')}
+  ${card('الطلبات والإشعارات','Requests & Notifications',`<button type="button" class="portal-action-btn" style="padding:14px;border-radius:12px;width:100%;margin-top:12px" onclick="showHRPage('notifications')">${txt('فتح مركز الطلبات والإشعارات الفعّال','Open live requests & notifications center')} ↗</button>`,'neon-requests')}
   ${card('تطور التعيينات','Hiring Trend',spark,'neon-trend')}
   ${card('حالة التأمين','Insurance Status',ring(insurance),'neon-donut-card')}
   ${card('الحالة الاجتماعية','Marital Status',ring(marital),'neon-donut-card')}
@@ -1762,11 +1762,19 @@ function renderRichDashboard(){
 
 // Dashboard-only identity display. Never changes Firebase roles or access rights.
 function updatePortalIdentity(){
- const label=document.getElementById('current-user-label');if(!label||!portalIsAdmin())return;
+ const label=document.getElementById('current-user-label');if(!label)return;
  const emp=allEmployees.find(e=>getEmployeeCode(e)===String(currentUserData?.code||PORTAL_ADMIN_CODE));
  const name=emp?getEmployeeName(emp):String(currentUserData?.code||PORTAL_ADMIN_CODE);
  const job=emp?getEmployeeJob(emp):'';
- label.textContent=[name,job&&job!=='--'?job:''].filter(Boolean).join(' · ');
- label.title=currentLang==='ar'?'صلاحية إدارة عليا':'High-level administrator';
- label.classList.add('portal-identity-admin');
+ // Authorization remains exclusively in existing Firebase authentication and rules.
+ const tier=portalIsAdmin()?'highest':'standard';
+ const tierLabel=tier==='highest'?(currentLang==='ar'?'إدارة عليا':'High-level administrator'):(currentLang==='ar'?'مستخدم':'User');
+ const safe=s=>escapeHtml(String(s??''));
+ const photo=emp?getField(emp,'photoUrl','photo','photoURL','الصورة الشخصية','الصورة'):'';
+ const photoSrc=typeof photo==='string'&&/^(https?:\/\/|data:image\/)/i.test(photo)?photo:'logo.png';
+ label.removeAttribute('data-translate');label.classList.remove('portal-identity-admin');
+ label.classList.remove('hidden');label.classList.add('portal-identity-wrap');
+ label.innerHTML=`<img class="portal-identity-avatar" src="${safe(photoSrc)}" alt="" onerror="this.src='logo.png'">`+
+ `<span class="portal-identity-text"><span class="portal-identity-name">${safe(name)}</span><span class="portal-identity-job">${safe(job&&job!=='--'?job:tierLabel)}</span></span>`+
+ `<span class="portal-permission-flag" data-tier="${tier}" title="${safe(tierLabel)}" aria-label="${safe(tierLabel)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 2.5a1 1 0 0 1 1 1v1.1c3.6-2.3 6.4 2.3 12.5-.2a.9.9 0 0 1 1.3.8v11a.9.9 0 0 1-.6.85C13.2 19.5 9.6 14.4 6 17V22H4V3.5a1 1 0 0 1 1-1Z"/></svg></span>`;
 }
