@@ -192,7 +192,6 @@ function toggleLangDropdown(event) {
 }
 
 function setLanguage(lang) {
-    if(typeof fahdHasUnsavedChanges==='function' && fahdHasUnsavedChanges() && !window.fahdNavigationApproved){fahdGuardNavigation(()=>setLanguage(lang));return;}
     currentLang = lang === 'en' ? 'en' : 'ar';
     if(typeof fahdEditing!=='undefined' && fahdEditing?.code && typeof allEmployees!=='undefined'){const current=allEmployees.find(e=>String(getEmployeeCode(e))===String(fahdEditing.code));if(current && document.getElementById('fahd1-native')?.offsetParent!==null)queueMicrotask(()=>fahdRender(current));}
     localStorage.setItem('lacto_lang', currentLang);
@@ -259,7 +258,7 @@ function hideLogin() {
 // Legacy numeric root records are intentionally untouched and no longer read.
 // The pilot employee 950 remains in its original path until separately migrated.
 const PORTAL_EMPLOYEE_COLLECTION = 'employees_v2';
-// employees_v2 is the sole employee data source; legacy roots are never read.
+const PORTAL_LEGACY_PILOT_CODE = '950';
 function portalSafeRecord(data, code, path) {
     const safeData = {...data};
     for (const field of Object.keys(safeData)) {
@@ -270,7 +269,10 @@ function portalSafeRecord(data, code, path) {
 async function readEmployeeSources() {
     if (!portalIsAdmin()) throw new Error('UNAUTHORIZED_ADMIN');
     // Fail closed: a denied /employees_v2 read must not silently show stale records.
-    const v2Snap = await db.ref(PORTAL_EMPLOYEE_COLLECTION).once('value');
+    const [v2Snap, pilotSnap] = await Promise.all([
+        db.ref(PORTAL_EMPLOYEE_COLLECTION).once('value'),
+        db.ref('employees/' + PORTAL_LEGACY_PILOT_CODE).once('value')
+    ]);
     if (!v2Snap.exists()) throw new Error('EMPLOYEES_V2_MISSING');
     const records = [];
     const byCode = new Set();
@@ -285,6 +287,11 @@ async function readEmployeeSources() {
         byCode.add(key);
         records.push(portalSafeRecord(data, key, PORTAL_EMPLOYEE_COLLECTION + '/' + key));
     });
+    const pilot = pilotSnap.val();
+    if (pilot && typeof pilot === 'object' && !byCode.has(PORTAL_LEGACY_PILOT_CODE) &&
+        String(getField(pilot,'code','الكود','employeeCode')) === PORTAL_LEGACY_PILOT_CODE) {
+        records.push(portalSafeRecord(pilot, PORTAL_LEGACY_PILOT_CODE, 'employees/' + PORTAL_LEGACY_PILOT_CODE));
+    }
     records.sort((a,b)=>Number(a.code)-Number(b.code));
     return records;
 }
@@ -422,8 +429,6 @@ function escapeHtml(value){return String(value).replace(/[&<>'"]/g,c=>({'&':'&am
 function escapeAttr(value){return String(value).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
 
 function viewEmployee(code) {
-    if(fahdHasUnsavedChanges()&&!window.fahdNavigationApproved){fahdGuardNavigation(()=>viewEmployee(code));return;}
-
     if (typeof showHRPage === 'function' && hrActivePage !== 'employees') showHRPage('employees');
     activeEmployeeCode=code;
     const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(code)); if(!emp) return;
@@ -453,7 +458,7 @@ function viewEmployee(code) {
 function setFieldVal(id,val){const el=document.getElementById(id);if(el)el.value=val??'';}
 function enableEditing(){setFieldsEditable(false);document.getElementById('btn-edit')?.classList.add('hidden');document.getElementById('btn-save')?.classList.remove('hidden');document.getElementById('btn-photo')?.classList.remove('hidden');}
 function setFieldsEditable(isDisabled){['prof-name','prof-dept','prof-job','prof-manager','prof-hire','prof-service','prof-qual','prof-qual-auth','prof-dob','prof-age','prof-insurance','prof-pob'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.disabled=isDisabled;el.classList.toggle('bg-slate-900/50',isDisabled);el.classList.toggle('border-slate-700',isDisabled);el.classList.toggle('bg-slate-900/90',!isDisabled);el.classList.toggle('border-sky-500/50',!isDisabled);});}
-function backToEmployeesList(){if(fahdHasUnsavedChanges()&&!window.fahdNavigationApproved){fahdGuardNavigation(()=>backToEmployeesList());return;}if (typeof showHRPage === 'function' && hrActivePage !== 'employees') showHRPage('employees');activeEmployeeCode=null;const profile=document.getElementById('employee-profile-view');const list=document.getElementById('employees-list-view');if(profile){profile.classList.add('hidden');profile.style.display='none';}if(list){list.classList.remove('hidden');list.style.display='block';}}
+function backToEmployeesList(){if (typeof showHRPage === 'function' && hrActivePage !== 'employees') showHRPage('employees');activeEmployeeCode=null;const profile=document.getElementById('employee-profile-view');const list=document.getElementById('employees-list-view');if(profile){profile.classList.add('hidden');profile.style.display='none';}if(list){list.classList.remove('hidden');list.style.display='block';}}
 
 function renderDynamicFields(){
     const container=document.getElementById('dynamic-fields-container'); if(!container)return; container.remove(); return; // Technical fields are intentionally hidden
@@ -687,8 +692,6 @@ window.addEventListener('DOMContentLoaded',async()=>{
 let hrActivePage='dashboard';
 const hrText=(ar,en)=>currentLang==='ar'?ar:en;
 function showHRPage(page){
-    if(page!=='employees' && fahdHasUnsavedChanges()&&!window.fahdNavigationApproved){fahdGuardNavigation(()=>showHRPage(page));return;}
-
     if(!['dashboard','employees','payroll','notifications','attendance','leave-balances','permissions','bradford'].includes(page))return;
     hrActivePage=page;
     ['dashboard','payroll','notifications','attendance','leave-balances','permissions','bradford'].forEach(p=>document.getElementById('hr-'+p+'-view')?.classList.toggle('hidden',p!==page));
@@ -734,7 +737,7 @@ function hrBars(rows,total,maxItems=9){const top=rows.slice(0,maxItems);return t
 function hrToggleEgypt(open){const stage=document.getElementById('hr-map-stage');if(stage)stage.classList.toggle('is-zoomed',!!open)}
 function hrDonut(rows,total){const palette=['#38bdf8','#a78bfa','#34d399','#fbbf24','#fb7185','#22d3ee'];let offset=0;const top=rows.slice(0,5);const segments=top.map(([name,n],i)=>{const p=total?n/total*100:0;const a=offset;offset+=p;return `${palette[i]} ${a}% ${offset}%`});if(offset<100)segments.push(`#243650 ${offset}% 100%`);return `<div class="hr-donut-layout"><div class="hr-donut" style="background:conic-gradient(${segments.join(',')||'#243650 0 100%'})"><div><b>${total}</b><small>${hrText('موظف','employees')}</small></div></div><div class="hr-donut-legend">${top.map(([name,n],i)=>`<div><i style="background:${palette[i]}"></i><span>${escapeHtml(name)}</span><b>${n}</b></div>`).join('')}</div></div>`}
 function hrHorizontalBars(rows,total,limit=8){const max=Math.max(1,...rows.map(r=>r[1]));return rows.slice(0,limit).map(([name,n],i)=>`<div class="hr-hbar-row"><span title="${escapeHtml(name)}">${escapeHtml(name)}</span><div><i style="width:${Math.max(3,n/max*100)}%;background:${['#38bdf8','#a78bfa','#34d399','#fbbf24'][i%4]}"></i></div><b>${n}</b></div>`).join('')||hrText('لا توجد بيانات','No data')}
-function renderRichDashboardBase(){
+function renderRichDashboard(){
  const d=document.getElementById('hr-dashboard-view');if(!d)return;
  hrStatIconCounter=0;
  const total=allEmployees.length;
@@ -1544,82 +1547,6 @@ function fahdTranslateUI(){
  const footer=document.querySelector('.fahd-create-footer');if(footer){const btns=footer.querySelectorAll('button');if(btns[0])btns[0].textContent=fahdLang('إلغاء','Cancel');if(btns[1])btns[1].textContent=fahdLang('حفظ الموظف','Save employee');}
 }
 function fahdTab(tab,button){document.querySelectorAll('.fahd-pane').forEach(x=>x.hidden=x.id!=='fahd-tab-'+tab);document.querySelectorAll('.fahd-tabs button').forEach(x=>x.classList.toggle('selected',x===button));}
-
-// Complete employee profile: show every available spreadsheet/database field.
-// Names are kept verbatim to preserve the live Firebase schema.
-const FAHD_ALL_PROFILE_KEYS = ["اسم الموظف ", "emp_name _en", "الإدارة ", "department ", "الوظيفة", "job title ", "المدير المباشر ", "direct manager ", "تاريخ التعيين ", "date_of_hiring ", "المؤهل", "qualification", "جهة المؤهل ", "qulification issuing authority", "تاريخ الحصول على المؤهل ", "qualification date ", "تاريخ الميلاد", "dob", "السن حتى تاريخه ", "age to date", "النوع", "gender", "الحالة الإجتماعية ", "marital status ", "الحالة التأمينية ", "insurance status ", "الرقم التأمينى", "insurance number", "الرقم القومى ", "n_id", "سنوات الخدمة ", "years of service", "الأجر الشامل", "comprehensiveSalary", "أجر الاشتراك التأميني", "insuranceContributionWage", "رصيد الاجازات ", "annual leave balance", "العنوان ", "address", "المحافظة ", "governorate", "مكان الميلاد", "pob", "phone", "qualAuth"];
-function fahdProfileKeyLabel(key){
- const labels={'n_id':'National ID','الرقم القومى ':'الرقم القومي','الرقم التأمينى':'الرقم التأميني','insurance number':'Insurance number','comprehensiveSalary':'Comprehensive salary','insuranceContributionWage':'Insurance contribution wage','annual leave balance':'Annual leave balance','emp_name _en':'Employee name','date_of_hiring ':'Hire date','age to date':'Age','dob':'Date of birth','years of service':'Years of service','direct manager ':'Direct manager','job title ':'Job title','insurance status ':'Insurance status','qualification date ':'Qualification date','qulification issuing authority':'Qualification authority','n_id':'National ID','address':'Address','governorate':'Governorate'};
- return labels[key]||key.trim().replace(/_/g,' ');
-}
-function fahdProfileLanguage(key){return /[\u0600-\u06FF]/.test(key)?'ar':'en';}
-function fahdActualKey(emp,key){return Object.prototype.hasOwnProperty.call(emp,key)?key:Object.keys(emp).find(k=>k.trim()===key.trim())||key;}
-function fahdIsMojibake(value){
- if(typeof value!=='string')return false;
- return /(?:ط§|ط¨|ط±|طھ|ط®|ظ„|ظ‚|ظ…|Ø|Ù|Ã|â€)/.test(value);
-}
-function fahdHasUnsavedChanges(){
- if(!fahdIsEditing||!fahdEditing)return false;
- return Array.from(document.querySelectorAll('#fahd-fields [data-fahd-key]')).some(input=>input.value!==(fahdEditing.original[input.dataset.fahdKey]??''));
-}
-// Styled three-choice dialog, created in JS so no HTML changes are needed.
-function fahdUnsavedDialog(){
- return new Promise(resolve=>{
-  const old=document.getElementById('fahd-unsaved-overlay');if(old)old.remove();
-  const overlay=document.createElement('div');overlay.id='fahd-unsaved-overlay';
-  overlay.setAttribute('role','presentation');
-  overlay.style.cssText='position:fixed;inset:0;z-index:2147483000;background:rgba(2,10,23,.72);backdrop-filter:blur(7px);display:flex;align-items:center;justify-content:center;padding:18px;';
-  const card=document.createElement('section');card.setAttribute('role','dialog');card.setAttribute('aria-modal','true');card.setAttribute('aria-labelledby','fahd-unsaved-title');
-  card.dir=currentLang==='ar'?'rtl':'ltr';
-  card.style.cssText='width:min(100%,470px);border-radius:20px;padding:28px;background:var(--card-bg,var(--surface,#15243a));color:var(--text-primary,#f8fafc);border:1px solid rgba(125,165,205,.35);box-shadow:0 24px 70px rgba(0,0,0,.45);font-family:inherit;';
-  // Detect light theme from the page rather than hard-coding a dark dialog.
-  const bg=getComputedStyle(document.body).backgroundColor;const rgb=bg.match(/\d+/g);const light=rgb&&rgb.length>=3&&(+rgb[0]*.299 + +rgb[1]*.587 + +rgb[2]*.114)>165;
-  if(light){card.style.background='#ffffff';card.style.color='#17243a';card.style.borderColor='#dbe5ef';}
-  const icon=document.createElement('div');icon.textContent='✎';icon.style.cssText='width:44px;height:44px;display:grid;place-items:center;border-radius:12px;background:rgba(14,165,233,.14);color:#38bdf8;font-size:25px;margin-bottom:16px;';
-  const title=document.createElement('h2');title.id='fahd-unsaved-title';title.textContent=fahdLang('تعديلات غير محفوظة','Unsaved changes');title.style.cssText='font-size:21px;font-weight:750;margin:0 0 10px;';
-  const msg=document.createElement('p');msg.textContent=fahdLang('لقد عدّلت بيانات الموظف. ماذا تريد أن تفعل قبل الخروج؟','You have edited employee details. What would you like to do before leaving?');msg.style.cssText='font-size:14px;line-height:1.9;opacity:.85;margin:0 0 24px;';
-  const buttons=document.createElement('div');buttons.style.cssText='display:flex;flex-wrap:wrap;gap:9px;';
-  let done=false;const finish=value=>{if(done)return;done=true;document.removeEventListener('keydown',onKey,true);overlay.remove();resolve(value);};
-  const make=(label,value,css)=>{const btn=document.createElement('button');btn.type='button';btn.textContent=label;btn.style.cssText='border-radius:11px;padding:11px 15px;font:600 14px inherit;cursor:pointer;flex:1 1 125px;'+css;btn.onclick=()=>finish(value);buttons.append(btn);return btn;};
-  const save=make(fahdLang('حفظ وخروج','Save & leave'),'save','background:#0284c7;color:white;border:1px solid #0284c7;');
-  make(fahdLang('خروج دون حفظ','Discard & leave'),'discard','background:transparent;color:inherit;border:1px solid #d97706;');
-  make(fahdLang('متابعة التعديل','Keep editing'),'stay','background:transparent;color:inherit;border:1px solid rgba(130,150,175,.55);');
-  card.append(icon,title,msg,buttons);overlay.append(card);document.body.append(overlay);
-  const onKey=e=>{if(e.key==='Escape'){e.preventDefault();finish('stay');}};document.addEventListener('keydown',onKey,true);save.focus();
- });
-}
-async function fahdGuardNavigation(continueNavigation){
- if(window.fahdGuardActive)return;
- if(!fahdHasUnsavedChanges()){continueNavigation();return;}
- window.fahdGuardActive=true;
- try{
-  const choice=await fahdUnsavedDialog();
-  if(choice==='stay')return;
-  if(choice==='save'){const saved=await fahdSave(true);if(!saved)return;}
-  if(choice==='discard'){fahdIsEditing=false;}
-  window.fahdNavigationApproved=true;
-  try{continueNavigation();}finally{window.fahdNavigationApproved=false;}
- }finally{window.fahdGuardActive=false;}
-}
-window.addEventListener('beforeunload',event=>{
- if(fahdHasUnsavedChanges()){event.preventDefault();event.returnValue='';}
-});
-function fahdRenderCompleteFields(emp,fields){
- const shown=new Set();
- for(const schemaKey of [...FAHD_ALL_PROFILE_KEYS,...Object.keys(emp)]){
-  if(['code','الكود','photoUrl','photo','password','authUid','hr_custom_fields','_firebasePath'].includes(schemaKey)||schemaKey.startsWith('_'))continue;
-  const key=fahdActualKey(emp,schemaKey);
-  if(shown.has(key)||typeof emp[key]==='object'&&emp[key]!==null)continue;
-  shown.add(key);
-  const lang=fahdProfileLanguage(key);
-  const card=document.createElement('div');card.className='fahd-field';card.dataset.fieldLanguage=lang;
-  const label=document.createElement('label');label.textContent=fahdProfileKeyLabel(key)+' ('+lang.toUpperCase()+')';
-  const input=document.createElement('input');input.type='text';input.dataset.fahdKey=key;
-  input.value=fahdIsMojibake(emp[key])?'':String(emp[key]??'');input.disabled=true;input.maxLength=2000;
-  if(/(?:^n_id$|الرقم القومى|الرقم التأمينى|insurance number)/.test(key))input.autocomplete='off';
-  card.append(label,input);fields.append(card);fahdEditing.original[key]=input.value;
- }
-}
 function fahdRender(emp){
  const root=document.getElementById('fahd1-native');if(!root||!emp)return;
  const code=getEmployeeCode(emp);fahdEditing={code,path:emp._firebasePath,keys:{},original:{}};
@@ -1632,7 +1559,32 @@ function fahdRender(emp){
   const tile=document.createElement('div');tile.className='fahd-tile';const l=document.createElement('span'),v=document.createElement('strong');l.textContent=label;v.textContent=String(value??'—')||'—';tile.append(l,v);summary.append(tile);
  }
  const fields=document.getElementById('fahd-fields');fields.replaceChildren();
- fahdRenderCompleteFields(emp,fields);
+ // Read-only cards show the selected language; edit mode exposes both language columns.
+ for(const [id,ar,en,arKey,enKey] of FAHD_PAIRS){
+  for(const [lang,key,label] of [['ar',arKey,ar],['en',enKey,en]]){
+   const wrap=document.createElement('div');wrap.className='fahd-field';wrap.dataset.fieldLanguage=lang;
+   const lab=document.createElement('label');lab.textContent=label+' ('+lang.toUpperCase()+')';
+   const input=document.createElement('input');input.type='text';input.dataset.fahdKey=key;input.value=String(emp[key]??'');input.disabled=true;
+   wrap.append(lab,input);fields.append(wrap);fahdEditing.original[key]=input.value;
+  }
+ }
+ for(const [id,ar,en,arKey,enKey,type] of FAHD_COMMON){
+  const wrap=document.createElement('div');wrap.className='fahd-field';wrap.dataset.fieldLanguage='common';
+  const lab=document.createElement('label');lab.dataset.labelAr=ar;lab.dataset.labelEn=en;lab.textContent=fahdLang(ar,en);
+  if(arKey!==enKey){
+   for(const [language,key,title] of [['ar',arKey,ar],['en',enKey,en]]){
+    const card=document.createElement('div');card.className='fahd-field';card.dataset.fieldLanguage=language;
+    const titleNode=document.createElement('label');titleNode.textContent=title+' ('+language.toUpperCase()+')';
+    const field=document.createElement('input');field.type=type==='date'?'date':'text';field.dataset.fahdKey=key;
+    const actualKey=Object.prototype.hasOwnProperty.call(emp,key)?key:Object.keys(emp).find(k=>k.trim()===key.trim())||key;field.dataset.fahdKey=actualKey;const raw=emp[actualKey]??'';field.value=type==='date'?fahdISO(raw):String(raw);field.disabled=true;
+    fahdEditing.original[actualKey]=field.value;card.append(titleNode,field);fields.append(card);
+   }
+  }else{
+   const input=document.createElement('input');input.type=type==='date'?'date':'text';input.dataset.fahdKey=arKey;
+   const raw=emp[arKey]??'';input.value=type==='date'?fahdISO(raw):String(raw);input.disabled=true;
+   fahdEditing.original[arKey]=input.value;wrap.append(lab,input);fields.append(wrap);
+  }
+ }
  fahdRefreshFieldVisibility();fahdEnableDropdowns();
  const fin=document.getElementById('fahd-financial');fin.replaceChildren();const financial=emp.financial;
  if(financial&&typeof financial==='object'){for(const [k,v] of Object.entries(financial)){if(v===null||typeof v==='object')continue;const tile=document.createElement('div');tile.className='fahd-tile';const l=document.createElement('span'),strong=document.createElement('strong');l.textContent=k;strong.textContent=String(v);tile.append(l,strong);fin.append(tile);}fin.className='fahd-summary';}
@@ -1646,32 +1598,25 @@ function fahdRefreshFieldVisibility(){
   const label=w.querySelector('label[data-label-ar]');if(label)label.textContent=fahdLang(label.dataset.labelAr,label.dataset.labelEn);
  });
 }
-async function fahdSave(skipConfirm=false){
+async function fahdSave(){
  if(fahdBusy||!fahdEditing)return;const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(fahdEditing.code));const status=document.getElementById('fahd-status');
- if(!emp||!fahdEditing.path||emp._firebasePath!==fahdEditing.path||!fahdEditing.path.startsWith('employees_v2/')){status.textContent=fahdLang('تعذر تحديد السجل','Employee record unavailable');return false;}
+ if(!emp||!fahdEditing.path||emp._firebasePath!==fahdEditing.path){status.textContent=fahdLang('تعذر تحديد السجل','Employee record unavailable');return;}
  const updates={};document.querySelectorAll('#fahd-fields [data-fahd-key]').forEach(input=>{
   const key=input.dataset.fahdKey;if(input.value===fahdEditing.original[key])return;
   const value=input.type==='date'?fahdStoredDate(input.value):input.value.trim();updates[key]=value;
   // Each translated field is independent; never overwrite its counterpart.
  });
  const dob=updates['تاريخ الميلاد'];if(dob){const age=fahdAge(dob);if(age){updates['السن حتى تاريخه ']=age;updates['age to date']=age;}}
- if(!Object.keys(updates).length){status.textContent=fahdLang('لا توجد تغييرات للحفظ','No changes to save');return true;}
- if(!skipConfirm && !await fahdDialog(fahdLang('حفظ التعديلات','Save changes'),fahdLang('هل تريد حفظ التغييرات؟','Save these changes?')))return false;
+ if(!Object.keys(updates).length){status.textContent=fahdLang('لا توجد تغييرات للحفظ','No changes to save');return;}
+ if(!await fahdDialog(fahdLang('حفظ التعديلات','Save changes'),fahdLang('هل تريد حفظ التغييرات؟','Save these changes?')))return;
  fahdBusy=true;document.getElementById('fahd-save').disabled=true;
- try{await db.ref(fahdEditing.path).update(updates);Object.assign(emp,updates);renderTable(allEmployees);fahdRender(emp);status.textContent=fahdLang('✓ تم الحفظ','✓ Changes saved');if(!skipConfirm)await fahdDialog(fahdLang('تم الحفظ','Saved'),fahdLang('تم حفظ التعديلات بنجاح','Changes saved successfully'),'notice');return true;}
- catch(err){status.textContent=fahdLang('فشل الحفظ: ','Save failed: ')+(err?.message||'Permission denied');return false;}
+ try{await db.ref(fahdEditing.path).update(updates);Object.assign(emp,updates);renderTable(allEmployees);fahdRender(emp);status.textContent=fahdLang('✓ تم الحفظ','✓ Changes saved');await fahdDialog(fahdLang('تم الحفظ','Saved'),fahdLang('تم حفظ التعديلات بنجاح','Changes saved successfully'),'notice');}
+ catch(err){status.textContent=fahdLang('فشل الحفظ: ','Save failed: ')+(err?.message||'Permission denied');}
  finally{fahdBusy=false;document.getElementById('fahd-save').disabled=false;}
 }
 function fahdSetEditing(on){fahdIsEditing=on;document.querySelectorAll('#fahd-fields [data-fahd-key]').forEach(el=>el.disabled=!on);fahdRefreshFieldVisibility();for(const [id,visible] of [['fahd-edit',!on],['fahd-save',on],['fahd-cancel',on]]){const el=document.getElementById(id);if(el)el.hidden=!visible;}}
 function fahdStartEdit(){fahdSetEditing(true)}
-async function fahdCancelEdit(){
- if(fahdHasUnsavedChanges()){
-  const choice=await fahdUnsavedDialog();
-  if(choice==='stay')return;
-  if(choice==='save'){await fahdSave(true);return;}
- }
- document.querySelectorAll('#fahd-fields [data-fahd-key]').forEach(el=>el.value=fahdEditing?.original[el.dataset.fahdKey]??'');fahdSetEditing(false);
-}
+function fahdCancelEdit(){document.querySelectorAll('#fahd-fields [data-fahd-key]').forEach(el=>el.value=fahdEditing?.original[el.dataset.fahdKey]??'');fahdSetEditing(false)}
 function fahdDialog(title,message,mode='confirm',fields=[]){return new Promise(resolve=>{const dialog=document.getElementById('fahd-dialog'),box=document.getElementById('fahd-dialog-inputs'),yes=document.getElementById('fahd-dialog-yes'),no=document.getElementById('fahd-dialog-no');document.getElementById('fahd-dialog-title').textContent=title;document.getElementById('fahd-dialog-message').textContent=message;box.replaceChildren();const inputs=fields.map(f=>{const el=document.createElement('input');el.placeholder=f;el.maxLength=1000;box.append(el);return el});no.hidden=mode==='notice';yes.textContent=mode==='notice'?fahdLang('حسنًا','OK'):fahdLang('تأكيد','Confirm');no.textContent=fahdLang('إلغاء','Cancel');dialog.hidden=false;const finish=ok=>{dialog.hidden=true;yes.onclick=null;no.onclick=null;document.removeEventListener('keydown',esc);resolve(ok?(inputs.length?inputs.map(x=>x.value):true):null)};const esc=e=>{if(e.key==='Escape')finish(false)};yes.onclick=()=>finish(true);no.onclick=()=>finish(false);document.addEventListener('keydown',esc);(inputs[0]||yes).focus()})}
 async function fahdAddField(){
  if(fahdBusy||!fahdEditing?.path)return;
@@ -1700,77 +1645,3 @@ function fahdPickPhoto(forNew=false){const input=document.createElement('input')
 function fahdNewExtraField(){const root=document.getElementById('fahd-new-custom');if(!root)return;const n=root.children.length+1;const card=document.createElement('div');card.className='fahd-entry';card.innerHTML=`<label>${fahdLang('حقل مخصص','Custom field')} ${n}</label><input data-custom-name placeholder="${fahdLang('اسم المفتاح بالإنجليزية','English field key')}" maxlength="50"><input data-custom-ar placeholder="${fahdLang('القيمة العربية','Arabic value')}" maxlength="1000"><input data-custom-en placeholder="English value" maxlength="1000">`;root.append(card);}
 function fahdSelectOptions(id,language){const values=[...new Set(allEmployees.map(e=>String(id==='department'?(language==='ar'?(e['الإدارة ']??e['الإدارة']):(e['department ']??e.department)):(language==='ar'?e['الوظيفة']:(e['job title ']??e.jobTitle))||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,language==='ar'?'ar':'en'));return values;}
 function fahdEnableDropdowns(){document.querySelectorAll('#add-employee-fields input[data-add-key],#fahd-fields input[data-fahd-key]').forEach(input=>{const key=input.dataset.addKey||input.dataset.fahdKey;const id=['الإدارة ','department '].includes(key)?'department':['الوظيفة','job title '].includes(key)?'job':null;if(!id||input.dataset.dropdownReady)return;input.dataset.dropdownReady='1';const lang=/[\u0600-\u06ff]/.test(key)?'ar':'en';const listId='fahd-options-'+id+'-'+lang;let dl=document.getElementById(listId);if(!dl){dl=document.createElement('datalist');dl.id=listId;document.body.append(dl);}dl.replaceChildren();fahdSelectOptions(id,lang).forEach(v=>{const o=document.createElement('option');o.value=v;dl.append(o)});input.setAttribute('list',listId);input.title=fahdLang('اختر من القائمة أو اكتب قيمة جديدة','Select an option or type a new value');});}
-
-
-// NEON V7: approved visual composition, strictly computed from loaded employees_v2.
-// Base dashboard is explicitly named to prevent recursive function hoisting.
-function renderRichDashboard(){
-  // Preserve the original map implementation, including Egypt zoom and geometry loader.
-  renderRichDashboardBase();
-  const d=document.getElementById('hr-dashboard-view');if(!d)return;
-  const originalMap=d.querySelector('#hr-map-stage')?.outerHTML||'';
-  const employees=allEmployees||[], total=employees.length;
-  const ar=currentLang==='ar', txt=(a,e)=>ar?a:e, esc=v=>escapeHtml(String(v??''));
-  const val=(e,...keys)=>String(getField(e,...keys)||'').trim();
-  const tally=fn=>{const m=new Map();employees.forEach(e=>{const v=fn(e);if(v&&v!=='--')m.set(v,(m.get(v)||0)+1)});return [...m].sort((a,b)=>b[1]-a[1])};
-  const dept=tally(getEmployeeDept),qual=tally(e=>val(e,'qualification ','qualification','المؤهل','المؤهل العلمي'));
-  const insurance=tally(e=>val(e,'insurance status ','insurance status','insuranceStatus','الحالة التأمينية'));
-  const marital=tally(e=>val(e,'marital status ','marital status','maritalStatus','الحالة الاجتماعية','الحالة الإجتماعية'));
-  const years=employees.map(e=>{const x=val(e,'years of service','years of service ','yearsService','سنوات الخدمة');const n=Number(x);return x!==''&&Number.isFinite(n)&&n>=0&&n<=80?n:null}).filter(n=>n!==null);
-  const avgYears=years.length?(years.reduce((a,b)=>a+b,0)/years.length).toFixed(1):'—';
-  const ages=employees.map(e=>{const raw=val(e,'dob','date of birth','date_of_birth','تاريخ الميلاد');const year=Number(raw.match(/(?:19|20)\d{2}/)?.[0]||0);const age=new Date().getFullYear()-year;return year&&age>=16&&age<=100?age:null}).filter(x=>x!==null);
-  const avgAge=ages.length?Math.round(ages.reduce((a,b)=>a+b,0)/ages.length):'—';
-  const g=e=>val(e,'gender','Gender','gender_en','النوع','الجنس','النوع الاجتماعي','النوع الإجتماعي').toLowerCase();
-  const male=employees.filter(e=>/^(male|m|ذكر|رجل)$/.test(g(e))).length,female=employees.filter(e=>/^(female|f|أنثى|انثى|سيدة)$/.test(g(e))).length,known=male+female;
-  const malePct=known?Math.round(male/known*100):null,femalePct=known?100-malePct:null;
-  const hires=tally(e=>String(getHireDate(e)||'').match(/(?:19|20)\d{2}/)?.[0]||'').sort((a,b)=>a[0].localeCompare(b[0]));
-  const serviceBins=[[0,5],[5,10],[10,15],[15,20],[20,25],[25,30],[30,999]].map(([a,b])=>[b===999?'30+':a+'–'+b,years.filter(x=>x>=a&&x<b).length]);
-  const top=employees.slice().sort((a,b)=>String(getHireDate(b)||'').localeCompare(String(getHireDate(a)||''))).slice(0,5);
-  const birthdays=employees.map(e=>{const raw=val(e,'dob','date of birth','date_of_birth','تاريخ الميلاد');const m=raw.match(/(?:19|20)\d{2}[-\/]([01]?\d)[-\/]([0-3]?\d)/);if(!m)return null;const now=new Date(),month=+m[1],day=+m[2];let next=new Date(now.getFullYear(),month-1,day);if(next<new Date(now.getFullYear(),now.getMonth(),now.getDate()))next=new Date(now.getFullYear()+1,month-1,day);return {e,days:Math.round((next-new Date(now.getFullYear(),now.getMonth(),now.getDate()))/86400000)}}).filter(Boolean).sort((a,b)=>a.days-b.days).slice(0,4);
-  const card=(a,e,body,cls='')=>`<section class="neon-card ${cls}"><h2>${esc(txt(a,e))}<span class="en">${esc(e)}</span></h2>${body}</section>`;
-  const kpi=(a,e,v,foot,icon)=>`<section class="neon-card neon-kpi"><div class="neon-icon">${icon}</div><h2>${esc(txt(a,e))}<span class="en">${esc(e)}</span></h2><div class="number">${esc(v)}</div><div class="sub">${esc(foot)}</div></section>`;
-  const bars=(rows,limit=12)=>{const data=rows.slice(0,limit),max=Math.max(1,...data.map(r=>r[1]));return data.length?`<div class="neon-bars">${data.map(([name,n])=>`<div class="neon-bar" title="${esc(name)}: ${n}"><b>${n}</b><i style="height:${Math.max(2,n/max*155)}px"></i><small>${esc(name)}</small></div>`).join('')}</div>`:empty()};
-  const empty=()=>`<div class="neon-empty">${txt('لا توجد بيانات كافية لهذا المؤشر','Insufficient data for this metric')}</div>`;
-  const ring=(rows)=>{const sum=rows.reduce((s,r)=>s+r[1],0),colors=['#05c8ff','#8e62f7','#fa67b1','#ffb45e','#22ddc0'];if(!sum)return empty();let p=0;const gradient=rows.slice(0,5).map(([name,n],i)=>{const a=p;p+=n/sum*100;return `${colors[i]} ${a}% ${p}%`}).join(',');return `<div class="neon-ring" style="background:conic-gradient(${gradient});--tone:#12c9ff"><div><b>${Math.round(rows[0][1]/sum*100)}%</b><small>${esc(rows[0][0])}</small></div></div><div class="neon-legend">${rows.slice(0,5).map(([name,n],i)=>`<div><span style="color:${colors[i]}">● ${esc(name)}</span><b>${n}</b></div>`).join('')}</div>`};
-  const left=dept.slice(0,6),right=dept.slice(6,12);
-  const personSvg=(female=false)=>`<svg viewBox="0 0 18 30" width="13" height="23" aria-hidden="true"><circle cx="9" cy="4" r="3" fill="currentColor"/><path fill="currentColor" d="${female?'M6 8h6l4 12H2L6 8z M5 19h3v10H5z M10 19h3v10h-3z':'M5 8h8l2 11h-3l-1-7v17H8V18H7v11H4V12l-1 7H0L2 8z'}"/></svg>`;
-  const gender=known?`<div class="v8-gender"><div class="v8-people-ball" aria-label="${esc(txt('توزيع النوع','Gender distribution'))}">${Array.from({length:108},(_,i)=>{const theta=i*2.3999632297,r=Math.sqrt((i+.5)/108)*46,x=50+Math.cos(theta)*r,y=50+Math.sin(theta)*r;const woman=i<Math.round(femalePct*1.08);return `<span style="left:${x}%;top:${y}%;color:${woman?'#ff65cf':'#12baff'}">${personSvg(woman)}</span>`}).join('')}</div><div class="v8-gender-stats"><strong class="v8-pink">${femalePct}%<small>${txt('إناث','Female')} · ${female}</small></strong><strong class="v8-blue">${malePct}%<small>${txt('ذكور','Male')} · ${male}</small></strong></div></div>`:empty();
-  const orgSide=rows=>`<div class="v8-orgside">${rows.map(([name,n],i)=>`<div class="v8-orgline" title="${esc(name)}"><span>${esc(name)}</span><b>${n}</b></div>`).join('')}</div>`;
-
-  const line=hires.slice(-12);const high=Math.max(1,...line.map(x=>x[1]));const pts=line.map((r,i)=>`${20+(line.length===1?0:i*460/(line.length-1))},${140-r[1]/high*105}`).join(' ');
-  const spark=line.length>1?`<svg class="neon-spark" viewBox="0 0 500 170" role="img" aria-label="Hiring trend"><defs><linearGradient id="neonGrad" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#8e62f7" stop-opacity=".5"/><stop offset="1" stop-color="#8e62f7" stop-opacity="0"/></linearGradient></defs><path d="M${pts.replaceAll(' ',' L')} L480 155 L20 155Z" fill="url(#neonGrad)"/><polyline points="${pts}" fill="none" stroke="#3fcfff" stroke-width="3"/>${line.map((r,i)=>`<text x="${20+i*460/(line.length-1)}" y="166" font-size="9" fill="#9fc6e4" text-anchor="middle">${esc(r[0])}</text>`).join('')}</svg>`:empty();
-  const list=(rows)=>rows.length?`<div class="neon-list">${rows.map(([a,b])=>`<div class="neon-listrow"><span>${esc(a)}</span><b>${esc(b)}</b></div>`).join('')}</div>`:empty();
-  const world=`<div class="neon-world" onclick="hrToggleEgypt(true)" title="${esc(txt('اضغط لعرض مصر','Click to show Egypt'))}"><svg viewBox="0 0 350 190" aria-label="World map"><g fill="#0a76e0" stroke="#40caff" stroke-width=".7" opacity=".9"><path d="M20 37l30-16 43 4 14 17-16 18-19 4-10 23-19-6-9-25-22-5z M81 99l24 10 18 34-10 33-15-8-11-27-15-17z M158 40l22-17 45 4 17-10 64 14 27 23-24 18-39-4-13 15-26-5-17-18-22 7-16-15z M189 90l30-5 20 18-9 43-22 26-20-29-7-32z M284 125l34-7 18 17-7 25-34-4z"/></g><circle cx="209" cy="94" r="6" fill="#fff"/><circle cx="209" cy="94" r="13" fill="none" stroke="#00edff" opacity=".6"/></svg><span class="world-note">${txt('مصر ◉ مرّر أو اضغط للخريطة التفصيلية','Egypt ◉ click for detailed map')}</span></div>`;
-  const kpi8=(a,e,v,foot,icon)=>`<section class="neon-card v8-kpi"><div class="v8-kpihead"><span class="v8-kpiicon">${icon}</span><h2>${esc(txt(a,e))}<span class="en">${esc(e)}</span></h2></div><div class="number">${esc(v)}</div><div class="sub">${esc(foot)}</div></section>`;
-  const attendance=`<div class="v8-attendance"><div class="v8-meter"><div class="v8-meterinner">${txt('بانتظار الربط','Pending')}</div></div><div class="v8-meter"><div class="v8-meterinner">${txt('لا توجد بيانات','No data')}</div></div></div><p class="v8-pending">${txt('تُعرض النسبة بعد ربط بيانات البصمة','Rates available after attendance integration')}</p>`;
-  const orgRays=`<svg class="v8-org-rays" viewBox="0 0 600 255" preserveAspectRatio="none" aria-hidden="true"><defs><filter id="v8-ray-glow"><feGaussianBlur stdDeviation="2.4"/></filter></defs>${[...left.map((_,i)=>({x:185,y:19+i*40,c:'#18baff'})),...right.map((_,i)=>({x:415,y:19+i*40,c:'#c455ff'}))].map(p=>`<g><path d="M300 127 Q${(300+p.x)/2} ${p.y} ${p.x} ${p.y}" fill="none" stroke="${p.c}" stroke-width="4" opacity=".35" filter="url(#v8-ray-glow)"/><path d="M300 127 Q${(300+p.x)/2} ${p.y} ${p.x} ${p.y}" fill="none" stroke="${p.c}" stroke-width="1.5" opacity=".85"/><circle cx="${p.x}" cy="${p.y}" r="3" fill="${p.c}"/></g>`).join('')}</svg>`;
-  const org=`<div class="v8-orgbox">${orgRays}${orgSide(left)}<div class="v8-orgcenter"><img src="logo.png" alt="Lacto Misr"></div>${orgSide(right)}</div>`;
-  const qualRing=ring(qual),insRing=ring(insurance),marRing=ring(marital);
-  d.innerHTML=`<div class="neon-board v8-board"><div class="neon-top"><div><h1>${txt('لوحة التحكم','Dashboard')}</h1><div class="neon-muted">${txt('إحصائيات لاكتو مصر — من قاعدة البيانات الفعلية','Lacto Misr — live employee statistics')}</div></div><span class="neon-badge">● Firebase · employees_v2 · ${total}</span></div>
-  <div class="neon-grid v8-grid">
-  ${kpi8('إجمالي الموظفين','Total Employees',total,txt('موظف','Employees'),'♟')}
-  ${kpi8('عدد الأقسام','Total Departments',dept.length,txt('قسم','Departments'),'▦')}
-  ${kpi8('متوسط سنوات الخدمة','Average Service Years',avgYears,txt('سنة','Years'),'◷')}
-  ${kpi8('متوسط العمر','Average Age',avgAge,txt('سنة','Years'),'♙')}
-  ${card('معدل الحضور العام','Attendance Rate',attendance,'v8-attendance-card')}
-  ${card('توزيع الموظفين حسب النوع','Employees by Gender',gender,'v8-gender-card')}
-  ${card('توزيع الموظفين حسب الأقسام','Employees by Departments',org,'v8-org-card')}
-  ${card('التوزيع الجغرافي العالمي','Employees by Country',world,'v8-world-card')}
-  ${card('التوزيع الجغرافي في مصر','Employees in Egypt',`<div id="neon-egypt-mount"></div>`,'v8-egypt-card')}
-  ${card('عدد الموظفين حسب الأقسام','Employees by Department',bars(dept),'v8-dept-card')}
-  ${card('تطور التعيينات','Hiring Trend',spark,'v8-trend-card')}
-  ${card('المؤهلات العلمية','Qualifications',qualRing,'v8-qual-card')}
-  ${card('حالة التأمين','Insurance Status',insRing,'v8-insurance-card')}
-  ${card('الحالة الاجتماعية','Marital Status',marRing,'v8-marital-card')}
-  ${card('سنوات الخدمة','Years of Service',bars(serviceBins,7),'v8-service-card')}
-  ${card('أحدث الموظفين','Latest Employees',list(top.map(e=>[getEmployeeName(e),getHireDate(e)])),'v8-latest-card')}
-  </div><div class="neon-foot">${txt('المؤشرات غير المتاحة لا تُعرض بأرقام افتراضية؛ الخرائط توضيحية.','Unavailable metrics are not fabricated; maps are illustrative.')}</div></div>`;
-  const worldCard=d.querySelector('.v8-world-card'),egyptCard=d.querySelector('.v8-egypt-card');
-  if(worldCard&&egyptCard){worldCard.addEventListener('mouseenter',()=>{egyptCard.classList.add('v8-highlight')});worldCard.addEventListener('mouseleave',()=>egyptCard.classList.remove('v8-highlight'));}
-  const mount=d.querySelector('#neon-egypt-mount');if(mount){
-   if(originalMap)mount.innerHTML=originalMap;
-   else mount.innerHTML='<div class="hr-map-stage" style="min-height:310px"><svg id="hr-real-egypt-map" viewBox="0 0 540 500" role="img" aria-label="Egypt governorates map"></svg><div id="hr-geo-tooltip" class="hr-map-tooltip"></div></div>';
-   if(!mount.querySelector('#hr-real-egypt-map'))mount.innerHTML='<div class="hr-map-stage" style="min-height:310px"><svg id="hr-real-egypt-map" viewBox="0 0 540 500" role="img" aria-label="Egypt governorates map"></svg><div id="hr-geo-tooltip" class="hr-map-tooltip"></div></div>';
-   try{hrRenderGeographicEgypt(hrGovernorates.map((_,i)=>employees.filter(e=>hrGovIndex(hrGeoField(e))===i).length))}catch(err){console.warn('Map layer unavailable:',err)}
- }
-}
