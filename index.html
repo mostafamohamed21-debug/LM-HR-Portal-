@@ -455,6 +455,18 @@ body > div.flex.flex-1.overflow-hidden > main { box-sizing:border-box; overflow-
 #hr-dashboard-view .lm-qual-foot{font-size:9px;color:#8ebcda;margin-top:0}
 #hr-dashboard-view .lm-spark text{paint-order:stroke;stroke:#07162e;stroke-width:2px}
 
+/* RPM SVG gauge and legible organization connectors; dashboard grid unchanged */
+#hr-dashboard-view .lm-qual-gauge{height:auto;min-height:155px}
+#hr-dashboard-view .lm-speedometer{width:min(100%,240px);height:137px;margin:3px auto 0;overflow:visible;position:relative}
+#hr-dashboard-view .lm-speedometer svg{display:block;width:100%;height:137px;overflow:visible}
+#hr-dashboard-view .lm-speed-center{top:75px;left:0;right:0;pointer-events:none}
+#hr-dashboard-view .lm-speed-center strong{font-size:21px;line-height:1.1}
+#hr-dashboard-view .lm-speed-center small{font-size:10px;line-height:1.3}
+#hr-dashboard-view .lm-qual-foot{margin-top:0;line-height:1.3}
+#hr-dashboard-view .lm-orgsvg{opacity:1!important;z-index:2!important}
+#hr-dashboard-view .lm-orgsvg path{stroke-width:1.18!important;opacity:.95!important;filter:drop-shadow(0 0 1.5px #12bfff)!important}
+#hr-dashboard-view .lm-orgsvg path.r{filter:drop-shadow(0 0 1.5px #c070ff)!important}
+#hr-dashboard-view .lm-orgcenter,#hr-dashboard-view .lm-orgside{z-index:3}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style id="fahd-native-style">.fahd-native{color:#e3f3ff;font-family:inherit}.fahd-top,.fahd-content{border:1px solid #17476c;border-radius:20px;background:linear-gradient(135deg,#0b1a33,#071427);padding:24px;margin-bottom:14px}.fahd-top{display:flex;align-items:center;gap:24px;justify-content:space-between}.fahd-top h2{font-size:29px;font-weight:800;color:#62d4ff}.fahd-top small{color:#60a5fa}.fahd-top p{color:#9dbbd0}.fahd-top button,.fahd-actions button{background:#123b64;border:1px solid #2972a5;padding:11px 16px;border-radius:12px;color:#e2f4ff}.fahd-tabs{display:flex;gap:9px;overflow-x:auto;padding:10px 0 18px}.fahd-tabs button{white-space:nowrap;border:1px solid #24527d;border-radius:13px;padding:13px 15px;color:#c1dcef;background:#0c1c36}.fahd-tabs button.selected{background:#125e99;border-color:#47c6ff;color:white}.fahd-summary,.fahd-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}.fahd-tile,.fahd-field{background:linear-gradient(145deg,#112849,#0a1930);border:1px solid #24517a;border-radius:15px;padding:18px;min-width:0;box-shadow:0 10px 30px #0002}.fahd-tile span,.fahd-field label{display:block;color:#9bb9d1;font-size:13px;margin-bottom:9px}.fahd-tile strong{font-size:19px;color:#6fd4ff;overflow-wrap:anywhere}.fahd-field input{width:100%;padding:11px;background:#071427;border:1px solid #31638a;border-radius:9px;color:white}.fahd-actions{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap}.fahd-empty{padding:36px;text-align:center;color:#8fb4d3;border:1px dashed #285477;border-radius:16px}.fahd-pane[hidden]{display:none!important}#fahd-status{color:#7dd3fc;margin-top:14px}@media(max-width:900px){.fahd-summary,.fahd-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.fahd-summary,.fahd-fields{grid-template-columns:1fr}.fahd-top{flex-wrap:wrap}}
@@ -600,7 +612,28 @@ body.portal-signed-in:has(#portal-main-sidebar:hover)>header{padding-inline-star
 #hr-dashboard-view .lm-ring b{max-width:72px;text-align:center;font-size:20px!important}
 #hr-dashboard-view .lm-ring b small{display:block;font-size:8px;font-weight:normal;line-height:1.1;max-height:28px;overflow:hidden}
 </style>
-</head>
+<style id="lm-three-fixes">
+/* Three targeted fixes: dock reserves actual space in either writing direction. */
+@media (min-width:768px){
+ body.portal-signed-in:has(#portal-main-sidebar:hover) > div.flex.flex-1.overflow-hidden > main{
+   margin-left:326px!important;margin-right:0!important;max-width:calc(100% - 326px)!important;
+ }
+ html[dir="rtl"] body.portal-signed-in:has(#portal-main-sidebar:hover) > div.flex.flex-1.overflow-hidden > main{
+   margin-right:326px!important;margin-left:0!important;max-width:calc(100% - 326px)!important;
+ }
+ html[dir="ltr"] body.portal-signed-in:has(#portal-main-sidebar:hover) > div.flex.flex-1.overflow-hidden > main{
+   margin-left:326px!important;margin-right:0!important;
+ }
+}
+#portal-main-sidebar{display:flex!important;flex-direction:column!important;height:100dvh!important;min-height:0!important;overflow:hidden!important}
+#portal-main-sidebar>div:first-child{flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;overflow-x:hidden!important;scrollbar-width:thin}
+#portal-main-sidebar .lm-sidebar-art{flex:0 0 clamp(110px,21dvh,175px)!important;height:clamp(110px,21dvh,175px)!important;min-height:110px!important;overflow:hidden!important;position:relative!important}
+#portal-main-sidebar .lm-factory-illustration{width:100%!important;height:100%!important;object-fit:contain!important;object-position:center bottom!important}
+#portal-main-sidebar>div:last-child{flex:0 0 auto!important;padding:6px!important}
+#portal-main-sidebar:after{height:75px!important;bottom:22px!important}
+@media (max-width:767px){#portal-main-sidebar .lm-sidebar-art{flex-basis:100px!important;height:100px!important}}
+#hr-dashboard-view .lm-speedometer #lm-speed-needle{transform-box:view-box;transform-origin:120px 116px}
+</style></head>
 <body class="min-h-screen flex flex-col">
 
     <!-- ESS-style Intro -->
