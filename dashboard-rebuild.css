@@ -73,16 +73,64 @@
 #hr-dashboard-view .cr-list{display:flex;flex-direction:column;gap:7px;font-size:11px}.cr-list>div{display:flex;justify-content:space-between;border-bottom:1px solid #254360;padding:5px 0;gap:12px}.cr-list b{color:#60d3ff;white-space:nowrap}
 #hr-dashboard-view .cr-empty{color:#86a9c9;text-align:center;font-size:12px;padding:32px 4px}
 #hr-dashboard-view .cr-open{background:#0a65a3;border:1px solid #28c7ff;color:#fff;border-radius:7px;padding:9px 16px;display:block;margin:0 auto;cursor:pointer}
-/* Overlay sidebar: no layout shift on hover, including legacy RTL selectors. */
-html[dir="rtl"] body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden>main,
-html[dir="rtl"] body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden>main,
-body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden>main{margin-inline-start:76px!important;margin-inline-end:0!important}
-html[dir="rtl"] body:has(.sidebar-collapsed:hover)>header,body:has(.sidebar-collapsed:hover)>header{padding-inline-start:88px!important;padding-inline-end:24px!important}
-.sidebar-collapsed{z-index:60!important;box-shadow:0 0 25px #0006!important}
-.sidebar-collapsed::after{background-image:linear-gradient(to bottom,#08183100 0%,#08183144 80%),url('factory-sidebar-reference.png')!important;background-size:cover!important;background-position:center bottom!important;mask-image:linear-gradient(to bottom,transparent,#000 30%,#000 95%)}
-@media(max-width:1200px){#hr-dashboard-view .cr-gender-card,#hr-dashboard-view .cr-org-card,#hr-dashboard-view .cr-world-card{grid-column:span 12}#hr-dashboard-view .cr-org-card{grid-column:span 12}#hr-dashboard-view .cr-deptbars,#hr-dashboard-view .cr-trend-card{grid-column:span 12}#hr-dashboard-view .cr-qual{grid-column:span 12}}
-@media(max-width:760px){#hr-dashboard-view .cr-grid>.cr-card{grid-column:span 24}#hr-dashboard-view .cr-grid>.cr-kpi{grid-column:span 12}#hr-dashboard-view .cr-org{grid-template-columns:1fr 90px 1fr}#hr-dashboard-view .cr-logocircle{width:82px;height:82px}}
-#hr-dashboard-view .cr-logocircle img{width:90%;height:90%;object-fit:contain;border-radius:50%}
-/* Sidebar overlay stays fixed without shifting content in either direction. */
-html[dir="ltr"] body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden>main{margin-inline-start:76px!important;margin-inline-end:0!important}
-html[dir="ltr"] body:has(.sidebar-collapsed:hover)>header{padding-inline-start:88px!important;padding-inline-end:24px!important}
+
+/* Reference composition at 1536x1024: 24-column dashboard with fixed visual rows */
+#hr-dashboard-view{direction:rtl}
+#hr-dashboard-view .cr-board{max-width:none;padding:0;margin:0 auto}
+#hr-dashboard-view .cr-heading{display:none}
+#hr-dashboard-view .cr-grid{gap:10px;grid-template-columns:repeat(24,minmax(0,1fr));direction:rtl}
+#hr-dashboard-view .cr-card{padding:12px 13px;border-color:#234a80;border-radius:9px;background:linear-gradient(135deg,#0d2344,#091830 90%)}
+#hr-dashboard-view .cr-head{min-height:42px;text-align:start;gap:1px}
+#hr-dashboard-view .cr-head b{font-size:clamp(11px,.88vw,15px);line-height:1.25}
+#hr-dashboard-view .cr-head small{font-size:10px;text-align:start;color:#9ac7e8}
+#hr-dashboard-view .cr-kpi{grid-column:span 4;height:174px}
+#hr-dashboard-view .cr-attend{grid-column:span 8;height:174px}
+#hr-dashboard-view .cr-kpi strong{font-size:38px;margin-top:15px}
+#hr-dashboard-view .cr-kicon{left:14px;top:13px;font-size:29px;opacity:.8}
+#hr-dashboard-view .cr-gender-card{grid-column:span 7;height:300px;min-height:0}
+#hr-dashboard-view .cr-org-card{grid-column:span 8;height:300px;min-height:0}
+#hr-dashboard-view .cr-world-card{grid-column:span 4;height:300px;min-height:0}
+#hr-dashboard-view .cr-egypt-card{grid-column:span 5;height:300px;min-height:0}
+#hr-dashboard-view .cr-deptbars{grid-column:span 10;height:220px;min-height:0}
+#hr-dashboard-view .cr-trend-card{grid-column:span 9;height:220px;min-height:0}
+#hr-dashboard-view .cr-qual{grid-column:span 5;height:220px;min-height:0}
+#hr-dashboard-view .cr-ins{grid-column:span 5;height:210px;min-height:0}
+#hr-dashboard-view .cr-marital{grid-column:span 5;height:210px;min-height:0}
+#hr-dashboard-view .cr-service{grid-column:span 7;height:210px;min-height:0}
+#hr-dashboard-view .cr-latest{grid-column:span 7;height:210px;min-height:0}
+#hr-dashboard-view .cr-gender{height:225px;justify-content:space-between;gap:4px}
+#hr-dashboard-view .cr-people{position:relative;display:block;flex:1;min-width:0;width:auto;height:218px;aspect-ratio:auto;border-radius:0;overflow:visible;filter:none}
+#hr-dashboard-view .cr-people span{position:absolute;width:12px;height:18px;transform:translate(-50%,-50%)}
+#hr-dashboard-view .cr-people svg{width:100%;height:100%;max-height:none;filter:drop-shadow(0 0 2px #06baff)}
+#hr-dashboard-view .cr-gstats{width:88px;flex-shrink:0}
+#hr-dashboard-view .cr-org{height:222px;grid-template-columns:minmax(0,1fr) 94px minmax(0,1fr)}
+#hr-dashboard-view .cr-orgpaths{display:none}
+#hr-dashboard-view .cr-orgitem{position:relative;min-height:30px;overflow:visible;gap:4px}
+#hr-dashboard-view .cr-orgitem::after{content:'';position:absolute;top:50%;width:35px;height:13px;border-top:1.5px solid #10caff;filter:drop-shadow(0 0 4px #04c8ff);pointer-events:none}
+#hr-dashboard-view .cr-orgleft .cr-orgitem::after{right:-35px;border-radius:0 18px 0 0}
+#hr-dashboard-view .cr-orgright .cr-orgitem::after{left:-35px;border-radius:18px 0 0 0}
+#hr-dashboard-view .cr-orgitem span{font-size:9px}
+#hr-dashboard-view .cr-logocircle{width:92px;height:92px}
+#hr-dashboard-view .cr-map-holder{height:206px;display:grid;place-items:center}
+#hr-dashboard-view .cr-world-asset{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 0 9px #006dff88)}
+#hr-dashboard-view .cr-egypt-copy{height:206px;display:grid;place-items:center}
+#hr-dashboard-view .cr-egypt-map{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 0 8px #0af7ff55)}
+#hr-dashboard-view .cr-mapnote{font-size:9px}
+#hr-dashboard-view .cr-bars{height:145px}
+#hr-dashboard-view .cr-trend{height:150px}
+#hr-dashboard-view .cr-ringwrap{height:148px}
+#hr-dashboard-view .cr-ring{width:108px;height:108px}
+#hr-dashboard-view .cr-ring>div{width:75px;height:75px}
+/* Sidebar is a fixed overlay: no hover-driven page reflow. */
+.sidebar-collapsed{z-index:45!important}
+body>div.flex.flex-1.overflow-hidden>main{margin-inline-start:76px!important;transition:none!important}
+body>header{padding-inline-start:88px!important;transition:none!important}
+body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden>main,
+body:has(.sidebar-collapsed:focus-within)>div.flex.flex-1.overflow-hidden>main{margin-inline-start:76px!important}
+body:has(.sidebar-collapsed:hover)>header,body:has(.sidebar-collapsed:focus-within)>header{padding-inline-start:88px!important}
+.sidebar-collapsed::after{content:'';display:block;position:absolute;left:4px;right:4px;bottom:35px;height:160px;background:url('factory-sidebar-reference.png') center bottom / contain no-repeat;pointer-events:none;opacity:0;transition:opacity .2s}
+.sidebar-collapsed:hover::after{opacity:.95}
+/* Login uses opacity then display:none; never expose the sidebar while visible. */
+body:has(#login-modal:not([style*="display: none"]):not([style*="opacity: 0"])) .sidebar-collapsed{visibility:hidden!important;pointer-events:none!important}
+@media(max-width:1200px){#hr-dashboard-view .cr-gender-card{grid-column:span 9}#hr-dashboard-view .cr-org-card{grid-column:span 15}#hr-dashboard-view .cr-world-card,#hr-dashboard-view .cr-egypt-card{grid-column:span 12}#hr-dashboard-view .cr-deptbars,#hr-dashboard-view .cr-trend-card{grid-column:span 12}#hr-dashboard-view .cr-qual{grid-column:span 12}}
+@media(max-width:760px){#hr-dashboard-view .cr-grid>.cr-card{grid-column:span 24}#hr-dashboard-view .cr-grid>.cr-kpi{grid-column:span 12}#hr-dashboard-view .cr-card{height:auto;min-height:190px}#hr-dashboard-view .cr-org-card,#hr-dashboard-view .cr-gender-card{min-height:300px}body>div.flex.flex-1.overflow-hidden>main{margin-inline-start:60px!important}}
