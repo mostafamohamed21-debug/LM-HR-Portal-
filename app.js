@@ -396,6 +396,7 @@ async function loadEmployeesFromFirebase() {
 let lmLastFilteredEmployees=[];
 let lmAppliedSearchQuery='';
 function lmCommitEmployeeSearch(){lmAppliedSearchQuery=String(document.getElementById('search-input')?.value||'').trim();filterEmployees();}
+function lmEmployeeSearchInputChanged(input){if(!String(input?.value||'').trim()){lmAppliedSearchQuery='';filterEmployees();}}
 
 const lmFilterSpecs=[
  ['dept',e=>getEmployeeDept(e),'الإدارة','Department'],
@@ -403,7 +404,7 @@ const lmFilterSpecs=[
  ['qual',e=>currentLang==='ar'?getField(e,'المؤهل','المؤهل ','qualification'):getField(e,'qualification','المؤهل','المؤهل '),'المؤهل','Qualification'],
  ['gender',e=>currentLang==='ar'?getField(e,'النوع','الجنس','gender','Gender'):getField(e,'gender','Gender','النوع','الجنس'),'النوع','Gender'],
  ['gov',e=>currentLang==='ar'?getField(e,'المحافظة ','المحافظة','محافظة','governorate','governorate '):getField(e,'governorate','governorate ','المحافظة ','المحافظة','محافظة'),'المحافظة','Governorate'],
- ['marital',e=>currentLang==='ar'?getField(e,'الحالة الاجتماعية','marital status','maritalStatus'):getField(e,'marital status','maritalStatus','الحالة الاجتماعية'),'الحالة الاجتماعية','Marital status']
+ ['marital',e=>currentLang==='ar'?getField(e,'الحالة الإجتماعية ','الحالة الإجتماعية','الحالة الاجتماعية ','الحالة الاجتماعية','marital status ','marital status','maritalStatus'):getField(e,'marital status ','marital status','maritalStatus','الحالة الإجتماعية ','الحالة الإجتماعية','الحالة الاجتماعية ','الحالة الاجتماعية'),'الحالة الاجتماعية','Marital status']
 ];
 function lmFilterValue(e,fn){const v=fn(e);return String(v??'').trim().replace(/\s+/g,' ');}
 function lmPopulateEmployeeFilters(){
@@ -1453,7 +1454,7 @@ document.addEventListener('keydown',event=>{
  }
  if(target.matches?.('#search-input')){
   event.preventDefault();
-  if(typeof filterEmployees==='function')filterEmployees();
+  if(typeof lmCommitEmployeeSearch==='function')lmCommitEmployeeSearch();
   return;
  }
  // For custom clickable elements only; do not double-fire native button/link behavior.
