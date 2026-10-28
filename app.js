@@ -406,33 +406,55 @@ function lmFilterValue(e,fn){const v=fn(e);return String(v??'').trim().replace(/
 function lmPopulateEmployeeFilters(){
  for(const [id,fn,ar,en] of lmFilterSpecs){
   const select=document.getElementById('lm-filter-'+id);if(!select)continue;
-  const prior=select.value;
-  const values=[...new Set(allEmployees.map(e=>lmFilterValue(e,fn)).filter(v=>v&&v!=='--'))].sort((a,b)=>a.localeCompare(b,currentLang==='ar'?'ar':'en',{numeric:true}));
-  select.replaceChildren();const first=document.createElement('option');first.value='';first.textContent=currentLang==='ar'?'كل '+ar:'All '+en;select.append(first);
-  for(const value of values){const o=document.createElement('option');o.value=value;o.textContent=value;select.append(o)}
-  if(values.includes(prior))select.value=prior;
+  const prior=[...select.selectedOptions].map(o=>o.value);
+  // Jobs reflect the chosen departments; other choices remain available.
+  const departments=[...document.getElementById('lm-filter-dept')?.selectedOptions||[]].map(o=>o.value);
+  const source=id==='job'&&departments.length?allEmployees.filter(e=>departments.includes(lmFilterValue(e,lmFilterSpecs[0][1]))):allEmployees;
+  const values=[...new Set(source.map(e=>lmFilterValue(e,fn)).filter(v=>v&&v!=='--'))].sort((a,b)=>a.localeCompare(b,currentLang==='ar'?'ar':'en',{numeric:true}));
+  select.replaceChildren();
+  for(const value of values){const o=document.createElement('option');o.value=value;o.textContent=value;o.selected=prior.includes(value);select.append(o)}
  }
  document.querySelectorAll('#lm-employee-filters [data-ar][data-en]').forEach(el=>el.textContent=el.dataset[currentLang]);
 }
 function lmHireISO(emp){const raw=getHireDate(emp);if(/^\d{4}-\d{2}-\d{2}$/.test(String(raw)))return raw;const m=String(raw).match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);return m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:''}
 function filterEmployees(){
  const input=document.getElementById('search-input');const query=String(input?.value||'').trim().toLocaleLowerCase();
- const selected=lmFilterSpecs.map(([id,fn])=>({value:document.getElementById('lm-filter-'+id)?.value||'',fn}));
+ // A selected job matches ANY selected job; other filter dimensions combine with AND.
+ const selected=lmFilterSpecs.map(([id,fn])=>({values:[...document.getElementById('lm-filter-'+id)?.selectedOptions||[]].map(o=>o.value),fn}));
  const from=document.getElementById('lm-filter-hire-from')?.value||'',to=document.getElementById('lm-filter-hire-to')?.value||'';
  lmLastFilteredEmployees=allEmployees.filter(emp=>{
   if(query){const text=[getEmployeeCode(emp),getEmployeeName(emp),getField(emp,'اسم الموظف ','اسم الموظف'),getField(emp,'emp_name _en','employee_name_en')].join(' ').toLocaleLowerCase();if(!text.includes(query))return false;}
-  if(selected.some(s=>s.value && lmFilterValue(emp,s.fn)!==s.value))return false;
+  if(selected.some(s=>s.values.length && !s.values.includes(lmFilterValue(emp,s.fn))))return false;
   if(from||to){const hire=lmHireISO(emp);if(!hire||(from&&hire<from)||(to&&hire>to))return false;}
   return true;
  });
  renderTable(lmLastFilteredEmployees);
  const count=document.getElementById('lm-filter-count');if(count)count.textContent=currentLang==='ar'?`${lmLastFilteredEmployees.length} من ${allEmployees.length} موظف`:`${lmLastFilteredEmployees.length} of ${allEmployees.length} employees`;
 }
-function lmClearEmployeeFilters(){const q=document.getElementById('search-input');if(q)q.value='';document.querySelectorAll('#lm-employee-filters select,#lm-employee-filters input').forEach(el=>el.value='');filterEmployees()}
+function lmClearEmployeeFilters(){const q=document.getElementById('search-input');if(q)q.value='';document.querySelectorAll('#lm-employee-filters select,#lm-employee-filters input').forEach(el=>{if(el.multiple)[...el.options].forEach(o=>o.selected=false);else el.value='';});lmPopulateEmployeeFilters();filterEmployees()}
+// Full employee export: union of actual database columns, not just visible table columns.
+// Never export credentials, auth tokens, internal metadata, or unbounded image payloads.
+function lmExportSafeField(key){
+ const k=String(key).trim().toLowerCase().replace(/[\s_-]+/g,'');
+ return !String(key).startsWith('_') && !/(password|passwd|pwd|passhash|passwordhash|authtoken|refreshtoken|accesstoken|idtoken|secret|apikey|privatekey|credential|sessiontoken|كلمةالمرور|كلمهالمرور|الرقمالسري)/i.test(k)
+  && !/(selfiedata|photo(base64|data)|imagedata|faceembedding|biometrictemplate)/i.test(k);
+}
+function lmExportCell(value){
+ if(value===null||value===undefined)return '';
+ const str=typeof value==='object'?JSON.stringify(value):String(value);
+ // Prevent Excel interpreting untrusted cell text as a formula.
+ return /^[\s\u0000-\u001f]*[=+@-]/.test(str)?"'"+str:str;
+}
 function lmExportFilteredEmployees(){
- const rows=[['Code','Employee Name','Department','Job Title','Qualification','Hire Date'],...lmLastFilteredEmployees.map(e=>[getEmployeeCode(e),getEmployeeName(e),getEmployeeDept(e),getEmployeeJob(e),lmFilterValue(e,lmFilterSpecs[2][1]),getHireDate(e)])];
+ const employees=lmLastFilteredEmployees;
+ if(!employees.length){showToast(currentLang==='ar'?'لا توجد نتائج للتصدير':'No matching employees to export',true);return;}
+ const keys=[...new Set(employees.flatMap(e=>Object.keys(e||{}).filter(lmExportSafeField)))];
+ keys.sort((a,b)=>a.localeCompare(b,currentLang==='ar'?'ar':'en',{numeric:true}));
+ const codeKey='Employee Code';
+ const rows=[[codeKey,...keys],...employees.map(e=>[getEmployeeCode(e),...keys.map(k=>lmExportCell(e[k]))])];
  const csv='\uFEFF'+rows.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
- const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='LactoMisr_Employees_Filtered_'+new Date().toISOString().slice(0,10)+'.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+ const a=document.createElement('a');a.href=url;a.download='LactoMisr_Employees_FullData_'+new Date().toISOString().slice(0,10)+'.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
 }
 
 function renderTable(dataList) {
