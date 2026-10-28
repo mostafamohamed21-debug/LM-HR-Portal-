@@ -232,7 +232,8 @@ function setLanguage(lang) {
     if (setupNote) setupNote.innerText = tr('setup_password_title');
     const createBtn = document.getElementById('create-password-btn');
     if (createBtn) createBtn.innerText = tr('create_password_btn');
-    renderTable(allEmployees);
+    lmPopulateEmployeeFilters();
+    filterEmployees();
     if (typeof renderHRWorkspace === 'function') renderHRWorkspace();
     if (activeEmployeeCode !== null) viewEmployee(activeEmployeeCode);
     document.querySelectorAll("[data-ar][data-en]:not(.hr-nav [data-ar])").forEach(el=>{el.textContent=el.getAttribute("data-"+currentLang);});
@@ -376,7 +377,8 @@ async function loadEmployeesFromFirebase() {
     try {
         allEmployees = await readEmployeeSources();
         queueMicrotask(lmUpdateHeaderIdentity);
-        renderTable(allEmployees);
+        lmPopulateEmployeeFilters();
+        filterEmployees();
         updateDashboardStats();
         if(hrActivePage==='dashboard') renderHRWorkspace();
         if (typeof renderHRWorkspace === 'function') renderHRWorkspace();
@@ -390,19 +392,47 @@ async function loadEmployeesFromFirebase() {
     }
 }
 
-function filterEmployees() {
-    const input = document.getElementById('search-input');
-    if (!input) return;
-    const query = input.value.trim();
-    if (!query) { renderTable(allEmployees); return; }
-    const numericQuery = /^[0-9]+$/.test(query);
-    const normalizedQuery = query.toLocaleLowerCase();
-    renderTable(allEmployees.filter(emp => {
-        if (numericQuery) {
-            return String(getEmployeeCode(emp) ?? '').trim() === query;
-        }
-        return String(getEmployeeName(emp) ?? '').toLocaleLowerCase().includes(normalizedQuery);
-    }));
+// Employee filtering uses the current Firebase employee snapshot; never modifies records.
+let lmLastFilteredEmployees=[];
+const lmFilterSpecs=[
+ ['dept',e=>getEmployeeDept(e),'الإدارة','Department'],
+ ['job',e=>getEmployeeJob(e),'الوظيفة','Job title'],
+ ['qual',e=>currentLang==='ar'?getField(e,'المؤهل','المؤهل ','qualification'):getField(e,'qualification','المؤهل','المؤهل '),'المؤهل','Qualification'],
+ ['gender',e=>currentLang==='ar'?getField(e,'النوع','الجنس','gender','Gender'):getField(e,'gender','Gender','النوع','الجنس'),'النوع','Gender'],
+ ['gov',e=>currentLang==='ar'?getField(e,'المحافظة','محافظة','governorate','governorate '):getField(e,'governorate','governorate ','المحافظة','محافظة'),'المحافظة','Governorate'],
+ ['marital',e=>currentLang==='ar'?getField(e,'الحالة الاجتماعية','marital status','maritalStatus'):getField(e,'marital status','maritalStatus','الحالة الاجتماعية'),'الحالة الاجتماعية','Marital status']
+];
+function lmFilterValue(e,fn){const v=fn(e);return String(v??'').trim().replace(/\s+/g,' ');}
+function lmPopulateEmployeeFilters(){
+ for(const [id,fn,ar,en] of lmFilterSpecs){
+  const select=document.getElementById('lm-filter-'+id);if(!select)continue;
+  const prior=select.value;
+  const values=[...new Set(allEmployees.map(e=>lmFilterValue(e,fn)).filter(v=>v&&v!=='--'))].sort((a,b)=>a.localeCompare(b,currentLang==='ar'?'ar':'en',{numeric:true}));
+  select.replaceChildren();const first=document.createElement('option');first.value='';first.textContent=currentLang==='ar'?'كل '+ar:'All '+en;select.append(first);
+  for(const value of values){const o=document.createElement('option');o.value=value;o.textContent=value;select.append(o)}
+  if(values.includes(prior))select.value=prior;
+ }
+ document.querySelectorAll('#lm-employee-filters [data-ar][data-en]').forEach(el=>el.textContent=el.dataset[currentLang]);
+}
+function lmHireISO(emp){const raw=getHireDate(emp);if(/^\d{4}-\d{2}-\d{2}$/.test(String(raw)))return raw;const m=String(raw).match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);return m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:''}
+function filterEmployees(){
+ const input=document.getElementById('search-input');const query=String(input?.value||'').trim().toLocaleLowerCase();
+ const selected=lmFilterSpecs.map(([id,fn])=>({value:document.getElementById('lm-filter-'+id)?.value||'',fn}));
+ const from=document.getElementById('lm-filter-hire-from')?.value||'',to=document.getElementById('lm-filter-hire-to')?.value||'';
+ lmLastFilteredEmployees=allEmployees.filter(emp=>{
+  if(query){const text=[getEmployeeCode(emp),getEmployeeName(emp),getField(emp,'اسم الموظف ','اسم الموظف'),getField(emp,'emp_name _en','employee_name_en')].join(' ').toLocaleLowerCase();if(!text.includes(query))return false;}
+  if(selected.some(s=>s.value && lmFilterValue(emp,s.fn)!==s.value))return false;
+  if(from||to){const hire=lmHireISO(emp);if(!hire||(from&&hire<from)||(to&&hire>to))return false;}
+  return true;
+ });
+ renderTable(lmLastFilteredEmployees);
+ const count=document.getElementById('lm-filter-count');if(count)count.textContent=currentLang==='ar'?`${lmLastFilteredEmployees.length} من ${allEmployees.length} موظف`:`${lmLastFilteredEmployees.length} of ${allEmployees.length} employees`;
+}
+function lmClearEmployeeFilters(){const q=document.getElementById('search-input');if(q)q.value='';document.querySelectorAll('#lm-employee-filters select,#lm-employee-filters input').forEach(el=>el.value='');filterEmployees()}
+function lmExportFilteredEmployees(){
+ const rows=[['Code','Employee Name','Department','Job Title','Qualification','Hire Date'],...lmLastFilteredEmployees.map(e=>[getEmployeeCode(e),getEmployeeName(e),getEmployeeDept(e),getEmployeeJob(e),lmFilterValue(e,lmFilterSpecs[2][1]),getHireDate(e)])];
+ const csv='\uFEFF'+rows.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
+ const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='LactoMisr_Employees_Filtered_'+new Date().toISOString().slice(0,10)+'.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
 function renderTable(dataList) {
