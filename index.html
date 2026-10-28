@@ -658,6 +658,38 @@ html[data-theme="light"] #hr-dashboard-view .neon-card,body.light #hr-dashboard-
 
 </style>
 
+
+<style id="v9-dashboard-fix">
+/* Layout anchored to approved dashboard image; 12-column responsive grid. */
+#hr-dashboard-view .neon-grid{gap:12px}
+#hr-dashboard-view .neon-gender-top{grid-column:span 3;min-height:290px}
+#hr-dashboard-view .neon-org{grid-column:span 5;min-height:290px}
+#hr-dashboard-view .neon-map{grid-column:span 4;min-height:290px}
+#hr-dashboard-view .neon-deptbars{grid-column:span 5}
+#hr-dashboard-view .neon-trend{grid-column:span 4}
+#hr-dashboard-view .neon-map .v9-map-stage{height:232px!important;min-height:232px!important;position:relative;overflow:hidden}
+#hr-dashboard-view .neon-map .v9-map-stage .hr-world{height:100%!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important;cursor:zoom-in}
+#hr-dashboard-view .neon-map .v9-map-stage .hr-world>svg{width:100%!important;height:100%!important;max-height:none!important;object-fit:contain!important;preserveAspectRatio:xMidYMid meet}
+#hr-dashboard-view .neon-map .v9-map-stage .hr-egypt-zoom{height:100%!important;padding:2px!important;overflow:auto}
+#hr-dashboard-view .neon-map .v9-map-stage .hr-egypt-layout{height:100%!important;display:flex!important;flex-direction:column!important}
+#hr-dashboard-view .neon-map .v9-map-stage .hr-egypt-layout svg{height:165px!important;max-width:100%!important}
+#hr-dashboard-view .neon-map .v9-map-stage .hr-geo-list{display:none!important}
+#hr-dashboard-view .neon-map .v9-map-stage.is-zoomed{height:232px!important;min-height:232px!important}
+#hr-dashboard-view .v9-gender{display:flex;gap:12px;align-items:center;min-height:205px}
+#hr-dashboard-view .v9-people{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;flex:1;min-width:0}
+#hr-dashboard-view .v9-person{font-size:16px;color:#10c9ff;text-shadow:0 0 7px #00bfff;line-height:1.2;text-align:center}
+#hr-dashboard-view .v9-person.female{color:#ff6bdc;text-shadow:0 0 7px #f05bd8}
+#hr-dashboard-view .v9-sexlabels{display:flex;flex-direction:column;justify-content:space-around;gap:24px;min-width:78px}
+#hr-dashboard-view .v9-sexlabels b{font-size:27px;line-height:1.1}#hr-dashboard-view .v9-sexlabels small{font-size:11px;display:block;margin-top:8px;color:#d8e8ff}
+#hr-dashboard-view .v9-pink{color:#f86bd9}#hr-dashboard-view .v9-cyan{color:#10c9ff}
+#hr-dashboard-view .neon-orgbox{grid-template-columns:minmax(0,1fr) 94px minmax(0,1fr);gap:4px}
+#hr-dashboard-view .neon-orgline{position:relative;overflow:visible}
+#hr-dashboard-view .v9-org-curve{position:absolute;pointer-events:none;z-index:0;width:38px;height:30px;top:8px;inset-inline-end:-35px;opacity:.85}
+#hr-dashboard-view .neon-orgside:last-child .v9-org-curve{inset-inline-end:auto;inset-inline-start:-35px;transform:scaleX(-1)}
+#hr-dashboard-view .v9-org-curve svg{width:100%;height:100%;filter:drop-shadow(0 0 4px #13bfff)}
+#hr-dashboard-view .v9-open-requests{margin-top:12px;border:1px solid #39c5f7;background:#074b77;border-radius:8px;color:#fff;padding:8px 12px}
+@media(max-width:1150px){#hr-dashboard-view .neon-gender-top,#hr-dashboard-view .neon-org,#hr-dashboard-view .neon-map{grid-column:span 12!important}}
+</style>
 </head>
 <body class="min-h-screen flex flex-col">
 
