@@ -488,7 +488,7 @@ body > div.flex.flex-1.overflow-hidden > main { box-sizing:border-box; overflow-
 .lm-filter-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.lm-filter-grid label{display:flex;flex-direction:column;gap:6px;color:#cbd5e1;font-size:12px;font-weight:700;min-width:0}
 .lm-filter-grid select,.lm-filter-grid input{width:100%;min-width:0;height:40px;padding:0 10px;border:1px solid rgba(56,189,248,.35);border-radius:10px;background:#0b1930;color:#e2e8f0;outline:none;color-scheme:dark}
 .lm-filter-grid select:focus,.lm-filter-grid input:focus{border-color:#67e8f9;box-shadow:0 0 0 2px rgba(56,189,248,.12)}
-.lm-filter-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:14px}.lm-filter-actions button{border:1px solid rgba(56,189,248,.4);border-radius:10px;padding:9px 15px;background:rgba(14,116,144,.22);color:#e0f2fe;font-weight:800;font-size:12px}.lm-filter-actions button:hover{background:rgba(14,116,144,.46)}
+.lm-filter-grid select[multiple]{height:132px;min-height:132px;padding:5px 7px;overflow-y:auto}.lm-filter-grid select[multiple] option{padding:6px 8px;border-radius:6px}.lm-filter-grid select[multiple] option:checked{background:#0369a1 linear-gradient(#0369a1,#0369a1);color:white}.lm-filter-grid label small{color:#93c5fd;font-size:10px;line-height:1.5}.lm-filter-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:14px}.lm-filter-actions button{border:1px solid rgba(56,189,248,.4);border-radius:10px;padding:9px 15px;background:rgba(14,116,144,.22);color:#e0f2fe;font-weight:800;font-size:12px}.lm-filter-actions button:hover{background:rgba(14,116,144,.46)}
 @media(max-width:1000px){.lm-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.lm-filter-grid{grid-template-columns:1fr}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -849,16 +849,16 @@ body.portal-signed-in:has(#portal-main-sidebar:hover)>header{padding-inline-star
                     <section id="lm-employee-filters" class="lm-filter-panel" aria-label="Employee filters">
                       <div class="lm-filter-heading"><strong data-ar="البحث المتقدم عن الموظفين" data-en="Advanced employee search">البحث المتقدم عن الموظفين</strong><span id="lm-filter-count" aria-live="polite"></span></div>
                       <div class="lm-filter-grid">
-                        <label><span data-ar="الإدارة" data-en="Department">الإدارة</span><select id="lm-filter-dept" onchange="filterEmployees()"></select></label>
-                        <label><span data-ar="الوظيفة" data-en="Job title">الوظيفة</span><select id="lm-filter-job" onchange="filterEmployees()"></select></label>
-                        <label><span data-ar="المؤهل" data-en="Qualification">المؤهل</span><select id="lm-filter-qual" onchange="filterEmployees()"></select></label>
-                        <label><span data-ar="النوع" data-en="Gender">النوع</span><select id="lm-filter-gender" onchange="filterEmployees()"></select></label>
-                        <label><span data-ar="المحافظة" data-en="Governorate">المحافظة</span><select id="lm-filter-gov" onchange="filterEmployees()"></select></label>
-                        <label><span data-ar="الحالة الاجتماعية" data-en="Marital status">الحالة الاجتماعية</span><select id="lm-filter-marital" onchange="filterEmployees()"></select></label>
+                        <label><span data-ar="الإدارة" data-en="Department">الإدارة</span><select id="lm-filter-dept" multiple size="4" onchange="lmPopulateEmployeeFilters();filterEmployees()"></select></label>
+                        <label><span data-ar="الوظائف (اختيار متعدد)" data-en="Job titles (multiple)">الوظائف (اختيار متعدد)</span><select id="lm-filter-job" multiple size="5" onchange="filterEmployees()" aria-describedby="lm-job-multi-hint"></select><small id="lm-job-multi-hint" data-ar="Ctrl + نقر لاختيار أكثر من قيمة، وShift لتحديد نطاق" data-en="Ctrl + click for multiple choices; Shift for a range">Ctrl + نقر لاختيار أكثر من قيمة، وShift لتحديد نطاق</small></label>
+                        <label><span data-ar="المؤهل" data-en="Qualification">المؤهل</span><select id="lm-filter-qual" multiple size="4" onchange="filterEmployees()"></select></label>
+                        <label><span data-ar="النوع" data-en="Gender">النوع</span><select id="lm-filter-gender" multiple size="4" onchange="filterEmployees()"></select></label>
+                        <label><span data-ar="المحافظة" data-en="Governorate">المحافظة</span><select id="lm-filter-gov" multiple size="4" onchange="filterEmployees()"></select></label>
+                        <label><span data-ar="الحالة الاجتماعية" data-en="Marital status">الحالة الاجتماعية</span><select id="lm-filter-marital" multiple size="4" onchange="filterEmployees()"></select></label>
                         <label><span data-ar="تعيين من" data-en="Hired from">تعيين من</span><input type="date" id="lm-filter-hire-from" onchange="filterEmployees()"></label>
                         <label><span data-ar="تعيين حتى" data-en="Hired to">تعيين حتى</span><input type="date" id="lm-filter-hire-to" onchange="filterEmployees()"></label>
                       </div>
-                      <div class="lm-filter-actions"><button type="button" onclick="lmClearEmployeeFilters()" data-ar="مسح الفلاتر" data-en="Clear filters">مسح الفلاتر</button><button type="button" onclick="lmExportFilteredEmployees()" data-ar="تصدير النتائج CSV (Excel)" data-en="Export CSV (Excel)">تصدير النتائج CSV (Excel)</button></div>
+                      <div class="lm-filter-actions"><button type="button" onclick="lmClearEmployeeFilters()" data-ar="مسح الفلاتر" data-en="Clear filters">مسح الفلاتر</button><button type="button" onclick="lmExportFilteredEmployees()" data-ar="تصدير جميع بيانات النتائج (Excel CSV)" data-en="Export all matching fields (Excel CSV)">تصدير جميع بيانات النتائج (Excel CSV)</button></div>
                     </section>
                     <div class="overflow-x-auto">
                         <table id="main-employees-table" class="w-full border-collapse glass-table">
