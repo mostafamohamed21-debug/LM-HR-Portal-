@@ -567,6 +567,22 @@ body.portal-signed-in:has(#portal-main-sidebar:hover)>header{padding-inline-star
 @media(max-width:1280px){#hr-dashboard-view .lm-top{grid-template-columns:repeat(4,minmax(0,1fr))}#hr-dashboard-view .lm-top .lm-attendance{grid-column:span 4;height:150px}#hr-dashboard-view .lm-middle{grid-template-columns:1.5fr 1.5fr 1fr 1fr}}
 @media(max-width:1050px){#hr-dashboard-view .lm-middle{grid-template-columns:1fr 1fr}#hr-dashboard-view .lm-charts{grid-template-columns:1fr 1fr}#hr-dashboard-view .lm-bottom{grid-template-columns:1fr 1fr}}
 @media(max-width:690px){#hr-dashboard-view .lm-top,#hr-dashboard-view .lm-middle,#hr-dashboard-view .lm-charts,#hr-dashboard-view .lm-bottom{grid-template-columns:1fr}#hr-dashboard-view .lm-top .lm-attendance{grid-column:auto}#hr-dashboard-view .lm-middle .lm-card{height:auto;min-height:300px}}
+
+/* Focused visual polish: no changes to card grid, navigation or Firebase */
+.lm-header-avatar.has-photo .lm-avatar-fallback{display:none!important}
+#hr-dashboard-view .lm-gender-orb{filter:none!important;overflow:visible}
+#hr-dashboard-view .lm-gender-body{justify-content:center;gap:18px}
+#hr-dashboard-view .lm-orgsvg path{stroke-width:.24!important;opacity:.45!important;filter:none!important}
+#hr-dashboard-view .lm-orglogo{width:76px!important;height:76px!important;padding:3px!important;box-shadow:0 0 9px #008fff66!important;border-width:1px!important}
+#hr-dashboard-view .lm-orgitem b{width:22px!important;height:22px!important;font-size:9px!important}
+#hr-dashboard-view .lm-orgitem span{font-size:8.5px!important}
+#hr-dashboard-view .lm-world-real img{width:100%!important;height:100%!important;max-height:none!important;object-fit:fill!important}
+#hr-dashboard-view .lm-world-real{overflow:hidden}
+#hr-dashboard-view .lm-trend-axis{display:flex;justify-content:space-between;gap:2px;font-size:8px;line-height:1.25;color:#b9dcff;margin-top:-4px}
+#hr-dashboard-view .lm-trend-axis span{min-width:0;text-align:center;flex:1}
+#hr-dashboard-view .lm-trend-axis b,#hr-dashboard-view .lm-trend-axis small{display:block;font-size:8px;font-weight:normal}
+#hr-dashboard-view .lm-ring b{max-width:72px;text-align:center;font-size:20px!important}
+#hr-dashboard-view .lm-ring b small{display:block;font-size:8px;font-weight:normal;line-height:1.1;max-height:28px;overflow:hidden}
 </style>
 </head>
 <body class="min-h-screen flex flex-col">
