@@ -1681,7 +1681,7 @@ function renderRichDashboard(){
  const trend=hire.length>1?`<svg class="lm-spark" viewBox="0 0 600 175" preserveAspectRatio="none"><defs><linearGradient id="lmGrad" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#8c4bff" stop-opacity=".4"/><stop offset="1" stop-color="#004ad5" stop-opacity="0"/></linearGradient></defs><path d="M ${pts.map(p=>p.join(' ')).join(' L ')} L 578 165 L 18 165 Z" fill="url(#lmGrad)"/><polyline points="${line}" fill="none" stroke="#13d8ff" stroke-width="3"/>${pts.map((p,i)=>`<g><title>${E(hire[i][0])}: ${hire[i][1]} ${T('تعيين','hires')}</title><circle cx="${p[0]}" cy="${p[1]}" r="4" fill="#fff"/><text x="${p[0]}" y="${Math.max(13,p[1]-10)}" text-anchor="middle" fill="#d7f6ff" font-size="13" font-weight="bold">${hire[i][1]}</text></g>`).join('')}</svg><div class="lm-trend-axis">${hire.map(([year,n])=>`<span title="${year}: ${n}"><b>${year}</b><small>${n}</small></span>`).join('')}</div><div class="lm-note">${T('عدد التعيينات حسب سنة التعيين (وليس إجمالي الموظفين التاريخي)','Hires by hiring year (not historical headcount)')}</div>`:`<div class="lm-blank">${T('بيانات التعيين غير كافية','Insufficient hiring data')}</div>`;
  const egypt=`<div class="lm-geo-controls"><label for="lm-gov-slicer">${T('المحافظة','Governorate')}</label><select id="lm-gov-slicer" onchange="lmFilterGovernorate(this.value)"><option value="">${T('كل المحافظات','All governorates')}</option>${governorates.map(g=>`<option value="${g.i}">${E(g.name)} (${g.n})</option>`).join('')}</select></div><div class="lm-mapbody lm-egypt-real"><svg id="hr-real-egypt-map" viewBox="0 0 540 500" role="img" aria-label="${T('خريطة محافظات مصر','Egypt governorates map')}"><text x="270" y="245" text-anchor="middle" fill="#8fdcff" font-size="17">${T('جار تحميل المحافظات','Loading governorates')}</text></svg><div class="lm-geo-tooltip" id="hr-geo-tooltip">${T('مرر المؤشر على المحافظة لمعرفة عدد الموظفين','Hover over a governorate to see employee count')} · ${mapped}/${total}</div></div>`;
  const world=`<div class="lm-mapbody lm-world-real"><img src="world-map.svg" alt="${T('خريطة العالم','World map')}" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><p class="lm-map-missing" hidden>${T('ملف world-map.svg غير موجود بجانب البورتال — ضعه بجانب index.html','world-map.svg is missing — place it beside index.html')}</p><div class="lm-geo-tooltip">${T('جميع الموظفين المسجلين في مصر؛ لا توجد بيانات توزيع دولي','Recorded employees are in Egypt; no international distribution available')}</div></div>`;
- const notifications=`<div class="lm-notifications"><div class="lm-notify-count" id="lm-notification-count">—</div><div class="lm-notify-label" id="lm-notification-label">${T('يلزم اتصال إدارة ESS لقراءة الطلبات المعلقة','Connect ESS admin to read pending requests')}</div><button type="button" onclick="showHRPage('notifications')">${T('فتح الإشعارات والطلبات','Open notifications and requests')} ↗</button></div>`;
+ const notifications=`<div class="lm-notifications"><div class="lm-notify-head"><strong id="lm-notification-count">—</strong><span id="lm-notification-label">${T('يلزم اتصال إدارة ESS لقراءة الطلبات المعلقة','Connect ESS admin to read pending requests')}</span></div><div class="lm-notify-list" id="lm-notification-list" aria-live="polite"></div><button type="button" onclick="showHRPage('notifications')">${T('عرض جميع الطلبات','View all requests')} ↗</button></div>`;
  root.innerHTML=`<div class="lm-board"><div class="lm-row lm-top">${stat('إجمالي الموظفين','Total Employees',total,T('موظف','Employees'),'users')}${stat('عدد الإدارات','Total Departments',departments.length,T('إدارة','Departments'),'building')}${stat('متوسط سنوات الخدمة','Average Service Years',avgTenure,T('سنة','Years'),'clock')}${stat('متوسط العمر','Average Age',avgAge,T('سنة','Years'),'users')}<section class="lm-card lm-attendance"><div class="lm-heading">${T('معدل الحضور العام','Attendance Rate')}<small>Attendance Rate</small></div><div class="lm-blank">${T('بانتظار ربط بيانات الحضور الفعلية','Awaiting verified attendance data')}</div></section></div><div class="lm-row lm-middle">${card('توزيع الموظفين حسب النوع','Employees by Gender',gender)}${card('توزيع الموظفين حسب الإدارات','Employees by Departments',org)}${card('التوزيع الجغرافي (العالم)','Employees by Country',world)}${card('التوزيع الجغرافي في مصر','Employees in Egypt',egypt)}</div><div class="lm-row lm-charts">${card('عدد الموظفين حسب الإدارات','Employees by Department',bar(departments))}${card('تطور عدد الموظفين','Employees Trend',trend)}${card('المؤهلات العلمية','Qualifications',qualificationGauge)}</div><div class="lm-row lm-bottom">${card('حالة التأمين','Insurance Status',ring(insurance,insurance.reduce((s,x)=>s+x[1],0)))}${card('الحالة الاجتماعية','Marital Status',ring(marital,marital.reduce((s,x)=>s+x[1],0)))}${card('سنوات الخدمة','Years of Service',bar(serviceBins,7))}${card('ملخص الإشعارات والطلبات','Requests & Notifications',notifications)}</div><div class="lm-note">${T('جميع الأرقام من بيانات الموظفين الحالية؛ الخرائط توضيحية وتظهر المحافظات المسجلة فقط.','All counts from current employee records; maps are illustrative and governorate markers use recorded values only.')}</div></div>`;
  if(typeof hrRenderGeographicEgypt==='function')hrRenderGeographicEgypt(governorates.map(g=>g.n));
  lmRefreshNotificationUI();
@@ -1692,12 +1692,35 @@ let lmEssBadgeRefs=[];let lmEssBadgeValues={};let lmEssBadgeErrors=new Set();
 function lmPendingStatus(path,req){const s=String(req?.verificationStatus??req?.status??'').toUpperCase();return path==='attendance_requests'?(s==='PENDING_REVIEW'||s==='HELD'):(s==='PENDING'||s==='PENDING_REVIEW');}
 function lmRefreshNotificationUI(){
  const connected=typeof essPilotReady==='function'&&essPilotReady();
- const badge=document.getElementById('lm-header-badge'),count=document.getElementById('lm-notification-count'),label=document.getElementById('lm-notification-label');
- if(!connected){if(badge)badge.hidden=true;if(count)count.textContent='—';if(label)label.textContent=hrText('اتصل بحساب إدارة ESS لعرض الطلبات','Connect ESS admin to see pending requests');return;}
- const total=Object.values(lmEssBadgeValues).reduce((n,records)=>n+Object.values(records||{}).reduce((s,requests)=>s+Object.values(requests||{}).filter(Boolean).filter(req=>lmPendingStatus(Object.keys(lmEssBadgeValues).find(k=>lmEssBadgeValues[k]===records),req)).length,0),0);
- if(badge){badge.hidden=total===0;badge.textContent=total>99?'99+':String(total)}
+ const badge=document.getElementById('lm-header-badge'),count=document.getElementById('lm-notification-count'),label=document.getElementById('lm-notification-label'),list=document.getElementById('lm-notification-list');
+ if(!connected){if(badge)badge.hidden=true;if(count)count.textContent='—';if(label)label.textContent=hrText('اتصل بإدارة ESS لعرض الطلبات','Connect ESS admin to view requests');if(list)list.textContent='';return;}
+ const pending=[];
+ for(const [path,ar,en] of essPaths){
+  const byCode=lmEssBadgeValues[path]||{};
+  for(const [code,requests] of Object.entries(byCode)){
+   if(!requests||typeof requests!=='object')continue;
+   for(const [id,req] of Object.entries(requests)){
+    if(!req||typeof req!=='object'||!lmPendingStatus(path,req))continue;
+    pending.push({path,code,id,req,type:hrText(ar,en),time:Number(req.timestamp||req.createdAt||0)});
+   }
+  }
+ }
+ pending.sort((a,b)=>b.time-a.time);
+ const total=pending.length;
+ if(badge){badge.hidden=total===0;badge.textContent=total>99?'99+':String(total);}
  if(count)count.textContent=lmEssBadgeErrors.size?'—':String(total);
- if(label)label.textContent=lmEssBadgeErrors.size?hrText('تعذر قراءة بعض الطلبات','Some request sources unavailable'):hrText('طلبات معلقة للمراجعة','Pending requests for review');
+ if(label)label.textContent=lmEssBadgeErrors.size?hrText('تعذر قراءة بعض مصادر الطلبات','Some request sources unavailable'):hrText('طلبات معلقة للمراجعة','Pending requests for review');
+ if(list){
+  if(lmEssBadgeErrors.size){list.innerHTML=`<div class="lm-notify-empty">${hrText('الملخص غير مكتمل: تعذر قراءة بعض المسارات','Summary incomplete: some sources could not be read')}</div>`;}
+  else if(!total){list.innerHTML=`<div class="lm-notify-empty">${hrText('لا توجد طلبات معلقة حاليًا','No pending requests right now')}</div>`;}
+  else list.innerHTML=pending.slice(0,4).map(r=>{
+   const employee=(allEmployees||[]).find(e=>String(getEmployeeCode(e))===String(r.code));
+   const employeeName=employee?getEmployeeName(employee):'';
+   const who=employeeName?`${employeeName} · ${r.code}`:`${hrText('كود','Code')} ${r.code}`;
+   const date=r.time?new Date(r.time).toLocaleDateString(currentLang==='ar'?'ar-EG':'en-GB'):'—';
+   return `<button type="button" class="lm-notify-item" onclick="showHRPage('notifications')" title="${essEscape(r.type)} — ${essEscape(who)}"><span class="lm-notify-type">${essEscape(r.type)}</span><span class="lm-notify-who">${essEscape(who)}</span><time>${essEscape(date)}</time></button>`;
+  }).join('')+(total>4?`<div class="lm-notify-more">+${total-4} ${hrText('طلبات أخرى','more requests')}</div>`:'');
+ }
 }
 function lmStartESSBadge(){
  lmEssBadgeRefs.forEach(([ref,cb])=>ref.off('value',cb));lmEssBadgeRefs=[];lmEssBadgeValues={};lmEssBadgeErrors.clear();
