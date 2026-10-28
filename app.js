@@ -394,12 +394,15 @@ async function loadEmployeesFromFirebase() {
 
 // Employee filtering uses the current Firebase employee snapshot; never modifies records.
 let lmLastFilteredEmployees=[];
+let lmAppliedSearchQuery='';
+function lmCommitEmployeeSearch(){lmAppliedSearchQuery=String(document.getElementById('search-input')?.value||'').trim();filterEmployees();}
+
 const lmFilterSpecs=[
  ['dept',e=>getEmployeeDept(e),'الإدارة','Department'],
  ['job',e=>getEmployeeJob(e),'الوظيفة','Job title'],
  ['qual',e=>currentLang==='ar'?getField(e,'المؤهل','المؤهل ','qualification'):getField(e,'qualification','المؤهل','المؤهل '),'المؤهل','Qualification'],
  ['gender',e=>currentLang==='ar'?getField(e,'النوع','الجنس','gender','Gender'):getField(e,'gender','Gender','النوع','الجنس'),'النوع','Gender'],
- ['gov',e=>currentLang==='ar'?getField(e,'المحافظة','محافظة','governorate','governorate '):getField(e,'governorate','governorate ','المحافظة','محافظة'),'المحافظة','Governorate'],
+ ['gov',e=>currentLang==='ar'?getField(e,'المحافظة ','المحافظة','محافظة','governorate','governorate '):getField(e,'governorate','governorate ','المحافظة ','المحافظة','محافظة'),'المحافظة','Governorate'],
  ['marital',e=>currentLang==='ar'?getField(e,'الحالة الاجتماعية','marital status','maritalStatus'):getField(e,'marital status','maritalStatus','الحالة الاجتماعية'),'الحالة الاجتماعية','Marital status']
 ];
 function lmFilterValue(e,fn){const v=fn(e);return String(v??'').trim().replace(/\s+/g,' ');}
@@ -418,12 +421,12 @@ function lmPopulateEmployeeFilters(){
 }
 function lmHireISO(emp){const raw=getHireDate(emp);if(/^\d{4}-\d{2}-\d{2}$/.test(String(raw)))return raw;const m=String(raw).match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);return m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:''}
 function filterEmployees(){
- const input=document.getElementById('search-input');const query=String(input?.value||'').trim().toLocaleLowerCase();
+ const query=String(lmAppliedSearchQuery||'').trim().toLocaleLowerCase();
  // A selected job matches ANY selected job; other filter dimensions combine with AND.
  const selected=lmFilterSpecs.map(([id,fn])=>({values:[...document.getElementById('lm-filter-'+id)?.selectedOptions||[]].map(o=>o.value),fn}));
  const from=document.getElementById('lm-filter-hire-from')?.value||'',to=document.getElementById('lm-filter-hire-to')?.value||'';
  lmLastFilteredEmployees=allEmployees.filter(emp=>{
-  if(query){const text=[getEmployeeCode(emp),getEmployeeName(emp),getField(emp,'اسم الموظف ','اسم الموظف'),getField(emp,'emp_name _en','employee_name_en')].join(' ').toLocaleLowerCase();if(!text.includes(query))return false;}
+  if(query){if(/^\d+$/.test(query)){if(String(getEmployeeCode(emp)).trim()!==query)return false;}else{const text=[getEmployeeName(emp),getField(emp,'اسم الموظف ','اسم الموظف'),getField(emp,'emp_name _en','employee_name_en')].join(' ').toLocaleLowerCase();if(!text.includes(query))return false;}}
   if(selected.some(s=>s.values.length && !s.values.includes(lmFilterValue(emp,s.fn))))return false;
   if(from||to){const hire=lmHireISO(emp);if(!hire||(from&&hire<from)||(to&&hire>to))return false;}
   return true;
@@ -431,7 +434,7 @@ function filterEmployees(){
  renderTable(lmLastFilteredEmployees);
  const count=document.getElementById('lm-filter-count');if(count)count.textContent=currentLang==='ar'?`${lmLastFilteredEmployees.length} من ${allEmployees.length} موظف`:`${lmLastFilteredEmployees.length} of ${allEmployees.length} employees`;
 }
-function lmClearEmployeeFilters(){const q=document.getElementById('search-input');if(q)q.value='';document.querySelectorAll('#lm-employee-filters select,#lm-employee-filters input').forEach(el=>{if(el.multiple)[...el.options].forEach(o=>o.selected=false);else el.value='';});lmPopulateEmployeeFilters();filterEmployees()}
+function lmClearEmployeeFilters(){const q=document.getElementById('search-input');if(q)q.value='';lmAppliedSearchQuery='';document.querySelectorAll('#lm-employee-filters select,#lm-employee-filters input').forEach(el=>{if(el.multiple)[...el.options].forEach(o=>o.selected=false);else el.value='';});lmPopulateEmployeeFilters();filterEmployees()}
 // Full employee export: union of actual database columns, not just visible table columns.
 // Never export credentials, auth tokens, internal metadata, or unbounded image payloads.
 function lmExportSafeField(key){
@@ -446,6 +449,8 @@ function lmExportCell(value){
  return /^[\s\u0000-\u001f]*[=+@-]/.test(str)?"'"+str:str;
 }
 function lmExportFilteredEmployees(){
+ // Re-evaluate active filters immediately before export to avoid stale/all-company snapshots.
+ filterEmployees();
  const employees=lmLastFilteredEmployees;
  if(!employees.length){showToast(currentLang==='ar'?'لا توجد نتائج للتصدير':'No matching employees to export',true);return;}
  const keys=[...new Set(employees.flatMap(e=>Object.keys(e||{}).filter(lmExportSafeField)))];
