@@ -659,6 +659,25 @@ body.portal-signed-in:has(#portal-main-sidebar:hover)>header{padding-inline-star
 .sidebar-collapsed:not(:hover) .sidebar-item .hr-side-icon{display:block!important;width:25px!important;height:25px!important;min-width:25px!important;flex:0 0 25px!important;margin:0 auto!important;transform:none!important;justify-self:center!important}
 .sidebar-collapsed:hover .sidebar-item{display:grid!important;grid-template-columns:44px minmax(0,1fr)!important;gap:12px!important}
 </style>
+<style id="lm-three-precise-corrections">
+/* Three precise corrections; dashboard cards, data and page layout unchanged. */
+/* Circular logo, not a rectangular bitmap: clip source corners without adding a frame. */
+#hr-dashboard-view .lm-orgcenter{position:relative!important;isolation:isolate!important}
+#hr-dashboard-view .lm-orgcenter:before{content:"";position:absolute!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;width:83px!important;height:83px!important;border-radius:50%!important;background:radial-gradient(circle at 34% 24%,#147bd8 0%,#0a2a54 65%,#07182d 100%)!important;box-shadow:0 4px 13px #000b,0 0 13px #11caff75!important;z-index:-1!important}
+#hr-dashboard-view .lm-orglogo{width:78px!important;height:78px!important;border:0!important;border-radius:50%!important;clip-path:circle(49% at 50% 50%)!important;object-fit:contain!important;object-position:center!important;padding:0!important;background:#f7fbff!important;box-shadow:none!important;filter:drop-shadow(0 2px 2px #001a36)!important;transform:perspective(360px) rotateY(-5deg) rotateX(2deg)!important}
+/* Gauge number outside the dial, never on top of its needle or face. */
+#hr-dashboard-view .lm-speedometer{width:min(100%,245px)!important;height:98px!important;min-height:98px!important;flex:0 0 98px!important;margin:0 auto!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;gap:4px!important;overflow:visible!important}
+#hr-dashboard-view .lm-speedometer svg{width:174px!important;max-width:calc(100% - 68px)!important;height:102px!important;flex:1 1 auto!important;display:block!important;overflow:visible!important;filter:brightness(.83) saturate(1.1)!important}
+#hr-dashboard-view .lm-speed-center{position:static!important;top:auto!important;left:auto!important;right:auto!important;bottom:auto!important;width:65px!important;min-width:65px!important;max-width:65px!important;flex:0 0 65px!important;transform:none!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:2px!important;text-align:center!important;background:transparent!important;padding:0!important;border:0!important;box-shadow:none!important;z-index:4!important;pointer-events:none!important}
+#hr-dashboard-view .lm-speed-center strong{font-size:22px!important;line-height:1.05!important;color:#f5fbff!important}
+#hr-dashboard-view .lm-speed-center small{font-size:9px!important;line-height:1.2!important;color:#9bd7fb!important}
+/* Sidebar icons exactly at the horizontal center of the collapsed rail. */
+#portal-main-sidebar.sidebar-collapsed:not(:hover) nav{padding-left:0!important;padding-right:0!important;align-items:stretch!important}
+#portal-main-sidebar.sidebar-collapsed:not(:hover) .sidebar-item{position:relative!important;display:flex!important;align-items:center!important;justify-content:center!important;width:100%!important;min-height:58px!important;height:58px!important;padding:0!important;margin:0!important;gap:0!important;grid-template-columns:none!important;transform:none!important}
+#portal-main-sidebar.sidebar-collapsed:not(:hover) .sidebar-item .hr-side-icon{position:absolute!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;margin:0!important;width:26px!important;height:26px!important;min-width:26px!important;display:block!important;flex:none!important}
+#portal-main-sidebar.sidebar-collapsed:not(:hover) .sidebar-item:hover .hr-side-icon{transform:translate(-50%,-50%) scale(1.07)!important}
+#portal-main-sidebar.sidebar-collapsed:not(:hover) .sidebar-item .nav-text{display:none!important}
+</style>
 </head>
 <body class="min-h-screen flex flex-col">
 
