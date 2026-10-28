@@ -1715,10 +1715,15 @@ function lmRefreshNotificationUI(){
   else if(!total){list.innerHTML=`<div class="lm-notify-empty">${hrText('لا توجد طلبات معلقة حاليًا','No pending requests right now')}</div>`;}
   else list.innerHTML=pending.slice(0,4).map(r=>{
    const employee=(allEmployees||[]).find(e=>String(getEmployeeCode(e))===String(r.code));
-   const employeeName=employee?getEmployeeName(employee):'';
-   const who=employeeName?`${employeeName} · ${r.code}`:`${hrText('كود','Code')} ${r.code}`;
-   const date=r.time?new Date(r.time).toLocaleDateString(currentLang==='ar'?'ar-EG':'en-GB'):'—';
-   return `<button type="button" class="lm-notify-item" onclick="showHRPage('notifications')" title="${essEscape(r.type)} — ${essEscape(who)}"><span class="lm-notify-type">${essEscape(r.type)}</span><span class="lm-notify-who">${essEscape(who)}</span><time>${essEscape(date)}</time></button>`;
+   const nameAr=employee?lmArabicField(employee,'اسم الموظف','الاسم بالعربية','الاسم','employee_name_ar','name_ar'):'';
+   const nameEn=employee?lmEnglishField(employee,'emp_name _en','employee_name_en','name_en','english name','full_name_en','full name en'):'';
+   const preferred=currentLang==='en'?nameEn:nameAr;
+   const displayName=preferred||hrText('موظف','Employee')+' '+r.code;
+   const rawPhoto=employee?getField(employee,'photoUrl','photo','رابط الصورة','الصورة'):'';
+   // Only trusted image schemes; employee data is rendered as escaped text/attributes.
+   const photo=typeof rawPhoto==='string'&&/^(https:\/\/|data:image\/(?:png|jpeg|webp);base64,)/i.test(rawPhoto.trim())?rawPhoto.trim():'';
+   const avatar=photo?`<img class="lm-notify-avatar" src="${essEscape(photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="lm-notify-avatar-fallback" hidden aria-hidden="true">♙</span>`:`<span class="lm-notify-avatar-fallback" aria-hidden="true">♙</span>`;
+   return `<button type="button" class="lm-notify-item" onclick="showHRPage('notifications')" title="${essEscape(r.type)} — ${essEscape(displayName)}"><span class="lm-notify-person">${avatar}</span><span class="lm-notify-info"><b class="lm-notify-who" dir="auto">${essEscape(displayName)}</b><small class="lm-notify-type">${essEscape(r.type)}</small></span><span class="lm-notify-pending" title="${hrText('بانتظار المراجعة','Pending review')}">●</span></button>`;
   }).join('')+(total>4?`<div class="lm-notify-more">+${total-4} ${hrText('طلبات أخرى','more requests')}</div>`:'');
  }
 }
