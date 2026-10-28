@@ -1758,3 +1758,62 @@ function renderRichDashboard(){
   </div><div class="neon-foot">${txt('المؤشرات غير المتاحة لا تُعرض بأرقام افتراضية. الخريطة الجغرافية توضيحية.','Unavailable metrics are never fabricated. Geographic map is illustrative.')}</div></div>`;
   const mount=d.querySelector('#neon-egypt-mount');if(mount&&originalMap){mount.innerHTML=originalMap;try{hrRenderGeographicEgypt(hrGovernorates.map(()=>0).map((_,i)=>employees.filter(e=>hrGovIndex(hrGeoField(e))===i).length))}catch(err){console.warn('Map layer unavailable:',err)};mount.querySelectorAll('.hr-map-dot').forEach(node=>{const update=()=>{const el=mount.querySelector('#hr-geo-tooltip');if(el)el.textContent=node.dataset.geoName+' — '+node.dataset.geoCount};node.addEventListener('mouseenter',update);node.addEventListener('focus',update)})}
 }
+
+
+// V9 visual patch: dashboard-only; no writes to Firebase or changes to login/approval flows.
+(function(){
+const previous=renderRichDashboard;
+renderRichDashboard=function(){
+ previous();
+ const d=document.getElementById('hr-dashboard-view');if(!d)return;
+ const grid=d.querySelector('.neon-grid');if(!grid)return;
+ const card=cls=>grid.querySelector('.'+cls);
+ const gender=card('neon-gender-top'),map=card('neon-map'),egypt=card('neon-egypt'),org=card('neon-org');
+ // Keep one geographical card, in the same row as gender and organization.
+ if(map&&egypt){
+   const mount=egypt.querySelector('#neon-egypt-mount');
+   const stage=mount?.querySelector('#hr-map-stage');
+   if(stage){
+      map.querySelector('.neon-world')?.remove();
+      map.appendChild(stage);
+      stage.classList.add('v9-map-stage');
+      const world=stage.querySelector('.hr-world');
+      if(world){world.setAttribute('tabindex','0');world.setAttribute('role','button');world.setAttribute('aria-label','World map: hover or press Enter to view Egypt');
+        world.addEventListener('mouseenter',()=>hrToggleEgypt(true));
+        world.addEventListener('focus',()=>hrToggleEgypt(true));
+        world.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();hrToggleEgypt(true)}});
+      }
+      const zoom=stage.querySelector('.hr-egypt-zoom');if(zoom){zoom.setAttribute('tabindex','0');zoom.addEventListener('mouseleave',()=>hrToggleEgypt(false));zoom.addEventListener('keydown',e=>{if(e.key==='Escape')hrToggleEgypt(false)})}
+   }
+   egypt.remove();
+ }
+ if(gender){
+   const male=allEmployees.filter(e=>/^(male|m|ذكر|رجل)$/i.test(String(getField(e,'gender','Gender','gender_en','النوع','الجنس','النوع الاجتماعي','النوع الإجتماعي')||'').trim())).length;
+   const female=allEmployees.filter(e=>/^(female|f|أنثى|انثى|سيدة)$/i.test(String(getField(e,'gender','Gender','gender_en','النوع','الجنس','النوع الاجتماعي','النوع الإجتماعي')||'').trim())).length;
+   const known=male+female;const people=Array.from({length:100},(_,i)=>`<span class="v9-person ${i<Math.round(female/Math.max(1,known)*100)?'female':'male'}" aria-hidden="true">♟</span>`).join('');
+   const old=gender.querySelector('.neon-gender-row');if(old)old.outerHTML=`<div class="v9-gender"><div class="v9-people">${people}</div><div class="v9-sexlabels"><b class="v9-pink">${known?Math.round(female/known*100):'—'}%<small>${female} · ${currentLang==='ar'?'إناث':'Female'}</small></b><b class="v9-cyan">${known?Math.round(male/known*100):'—'}%<small>${male} · ${currentLang==='ar'?'ذكور':'Male'}</small></b></div></div>`;
+ }
+ if(org){
+  const box=org.querySelector('.neon-orgbox');if(box){
+   const sides=box.querySelectorAll('.neon-orgside');
+   sides.forEach((side,i)=>side.querySelectorAll('.neon-orgline').forEach((row,j)=>{
+     const path=document.createElement('span');path.className='v9-org-curve';path.setAttribute('aria-hidden','true');
+     path.innerHTML=`<svg viewBox="0 0 65 30" preserveAspectRatio="none"><path d="M${i===0?0:65} 15 Q32 ${j<3?0:30} ${i===0?65:0} 15" fill="none" stroke="${i===0?'#00d9ff':'#d95dff'}" stroke-width="1.8"/></svg>`;
+     row.appendChild(path);
+   }));
+  }
+ }
+ // The ESS request state is populated by the existing authenticated ESS request flow.
+ // Never manufacture counts when disconnected or unreadable.
+ const notifications=card('neon-notifications')||[...grid.querySelectorAll('.neon-card')].find(c=>/الطلبات والإشعارات|Requests & Notifications/.test(c.querySelector('h2')?.textContent||''));
+ if(notifications){
+   const data=(typeof essRequestState==='object'&&essRequestState)?essRequestState:null;
+   const rows=[];if(data)for(const [type,byCode] of Object.entries(data))if(byCode&&typeof byCode==='object')for(const [code,requests] of Object.entries(byCode))if(requests&&typeof requests==='object')for(const [id,req] of Object.entries(requests))if(req&&typeof req==='object'&&!Array.isArray(req)){
+     const status=String(req.status||req.verificationStatus||'').toUpperCase();if(/PENDING|NEW|SUBMITTED|PENDING_REVIEW/.test(status))rows.push([type,code]);
+   }
+   const content=notifications.querySelector('.neon-empty');if(content)content.innerHTML=`<strong>${rows.length?rows.length+' '+(currentLang==='ar'?'طلبات معلقة':'pending requests'):(currentLang==='ar'?'افتح مركز الطلبات لتحديث الحالة':'Open request center to refresh status')}</strong><br><button type="button" class="v9-open-requests" onclick="showHRPage('notifications')">${currentLang==='ar'?'عرض الطلبات والإشعارات':'View requests and notifications'} ↗</button>`;
+ }
+ // Place cards in approved visual sequence: gender, org, map.
+ if(gender&&org&&map){const first=gender;grid.insertBefore(org,first.nextSibling);grid.insertBefore(map,org.nextSibling)}
+};
+})();
