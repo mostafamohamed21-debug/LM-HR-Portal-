@@ -237,6 +237,7 @@ function setLanguage(lang) {
     if (activeEmployeeCode !== null) viewEmployee(activeEmployeeCode);
     document.querySelectorAll("[data-ar][data-en]:not(.hr-nav [data-ar])").forEach(el=>{el.textContent=el.getAttribute("data-"+currentLang);});
     if (document.getElementById('add-employee-modal') && !document.getElementById('add-employee-modal').classList.contains('hidden')) buildAddEmployeeForm();
+    if(typeof lmUpdateHeaderIdentity==='function') lmUpdateHeaderIdentity();
 
 }
 
@@ -1670,7 +1671,7 @@ function renderRichDashboard(){
  const palette=['#00c7fa','#7767ff','#ffae45','#ee39d4','#21d7bc'];
  const ring=(rows,known)=>{const shown=rows.slice(0,5);let pos=0;const gradient=shown.map(([_,n],i)=>{const start=pos;pos+=n/Math.max(1,known)*100;return `${palette[i]} ${start}% ${pos}%`}).join(',');return `<div class="lm-ringwrap"><div class="lm-ring" style="background:conic-gradient(${gradient||'#203552 0% 100%'},#203552 ${pos}% 100%)"><b title="${E(rows[0]?.[0]||'')}">${known?Math.round(rows[0][1]/known*100):0}%<small>${E(rows[0]?.[0]||'')}</small></b></div><div class="lm-legend">${shown.map(([label,n],i)=>`<div><i style="background:${palette[i]}"></i><span title="${E(label)}">${E(label)}</span><b>${n}</b></div>`).join('')}</div></div>`};
  const qualChoices=group(e=>currentLang==='en'?(field(e,'qualification','qualification_en','qualification english')||field(e,'المؤهل')):(field(e,'المؤهل')||field(e,'qualification')));
- const qualificationGauge=`<div class="lm-qual-gauge"><label for="lm-qual-select">${T('اختر المؤهل العلمي','Select qualification')}</label><select id="lm-qual-select" onchange="lmUpdateQualGauge(this.value)"><option value="">${T('بدون اختيار','None selected')}</option>${qualChoices.map(([label,n],i)=>`<option value="${i}">${E(label)} (${n})</option>`).join('')}</select><div class="lm-speedometer"><div class="lm-speed-arc" id="lm-speed-arc"></div><div class="lm-speed-center"><strong id="lm-speed-pct">0%</strong><small id="lm-speed-count">${T('اختر مؤهلًا','Select a qualification')}</small></div><div class="lm-speed-needle" id="lm-speed-needle"></div></div><div class="lm-qual-foot">${T('النسبة من إجمالي الموظفين ذوي المؤهل المسجل','Share of employees with a recorded qualification')}</div></div>`;
+ const qualificationGauge=`<div class="lm-qual-gauge"><label for="lm-qual-select">${T('اختر المؤهل العلمي','Select qualification')}</label><select id="lm-qual-select" onchange="lmUpdateQualGauge(this.value)"><option value="">${T('بدون اختيار','None selected')}</option>${qualChoices.map(([label,n],i)=>`<option value="${i}">${E(label)} (${n})</option>`).join('')}</select><div class="lm-speedometer" role="meter" aria-label="${T('نسبة المؤهل المختار','Selected qualification percentage')}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><svg viewBox="0 0 240 137" aria-hidden="true"><defs><linearGradient id="lmRpmGradient" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#9bdfff"/><stop offset="32%" stop-color="#26cfff"/><stop offset="68%" stop-color="#0874ff"/><stop offset="100%" stop-color="#a54aff"/></linearGradient><filter id="lmRpmGlow"><feGaussianBlur stdDeviation="2" result="glow"/><feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><path d="M 20 116 A 100 100 0 0 1 220 116" fill="none" stroke="#243a5c" stroke-width="13" stroke-linecap="round"/><path id="lm-speed-arc" d="M 20 116 A 100 100 0 0 1 220 116" fill="none" stroke="url(#lmRpmGradient)" stroke-width="13" stroke-linecap="round" stroke-dasharray="314.159 314.159" stroke-dashoffset="314.159" filter="url(#lmRpmGlow)"/><g id="lm-rpm-ticks">${Array.from({length:11},(_,i)=>{const a=Math.PI-i*Math.PI/10;const x1=120+80*Math.cos(a),y1=116-80*Math.sin(a),x2=120+89*Math.cos(a),y2=116-89*Math.sin(a);return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#87a9d3" stroke-width="1.5"/>`}).join('')}</g><g id="lm-speed-needle" transform="rotate(0 120 116)" style="transition:transform .65s cubic-bezier(.18,.78,.2,1)"><path d="M 31 116 L 111 111 L 124 116 L 111 121 Z" fill="#ffbd48" stroke="#fff0a5" stroke-width="1.1" filter="url(#lmRpmGlow)"/><path d="M 47 115 L 112 114" stroke="#fff5ce" stroke-width="1" opacity=".85"/><circle cx="120" cy="116" r="9" fill="#102c4e" stroke="#f4c46c" stroke-width="2.5"/><circle cx="120" cy="116" r="3.5" fill="#e6f6ff"/></g><text x="13" y="135" fill="#92bce2" font-size="10">0</text><text x="215" y="135" fill="#92bce2" font-size="10">100</text></svg><div class="lm-speed-center"><strong id="lm-speed-pct">0%</strong><small id="lm-speed-count">${T('اختر مؤهلًا','Select a qualification')}</small></div></div><div class="lm-qual-foot">${T('النسبة من إجمالي الموظفين ذوي المؤهل المسجل','Share of employees with a recorded qualification')}</div></div>`;
  window.lmQualChoices=qualChoices;window.lmQualKnown=qualChoices.reduce((n,x)=>n+x[1],0);
  const orgRows=departments.slice(0,12),left=orgRows.filter((_,i)=>i%2===0),right=orgRows.filter((_,i)=>i%2===1);
  const orgSide=(rows,side)=>`<div class="lm-orgside ${side}">${rows.map(([name,n])=>`<div class="lm-orgitem" title="${E(name)}"><span>${E(name)}</span><b>${n}</b></div>`).join('')}</div>`;
@@ -1705,12 +1706,20 @@ function lmStartESSBadge(){
 }
 essAuth.onAuthStateChanged(()=>lmStartESSBadge());
 
-function lmEnglishField(emp,...keys){for(const key of keys){const match=Object.entries(emp||{}).find(([k,v])=>k.trim().toLowerCase()===key.trim().toLowerCase()&&String(v??'').trim());if(match)return String(match[1]).trim()}return ''}
+function lmEnglishField(emp,...keys){
+ const norm=s=>String(s).trim().toLowerCase().replace(/\s+/g,' ').replace(/[_-]+/g,' ');
+ for(const key of keys){const match=Object.entries(emp||{}).find(([k,v])=>norm(k)===norm(key)&&String(v??'').trim());if(match)return String(match[1]).trim();}
+ return '';
+}
+function lmArabicField(emp,...keys){
+ for(const key of keys){const match=Object.entries(emp||{}).find(([k,v])=>k.trim()===key.trim()&&String(v??'').trim());if(match)return String(match[1]).trim();}
+ return '';
+}
 function lmUpdateHeaderIdentity(){
  const emp=(allEmployees||[]).find(e=>String(getEmployeeCode(e))===String(currentUserData?.code||PORTAL_ADMIN_CODE));
  const name=document.getElementById('lm-header-name'),job=document.getElementById('lm-header-job'),photo=document.getElementById('lm-header-photo'),flag=document.getElementById('lm-role-flag');
- if(name)name.textContent=emp?(currentLang==='en'?(lmEnglishField(emp,'emp_name _en','employee_name_en','name_en','english name')||getEmployeeName(emp)):getEmployeeName(emp)):hrText('مسؤول النظام','System Admin');
- if(job)job.textContent=emp?(currentLang==='en'?(lmEnglishField(emp,'job title ','job_title_en','jobTitleEn','jobTitle')||'—'):getEmployeeJob(emp)):hrText('مدير النظام','System Administrator');
+ if(name){const record=emp||currentUserData||{};name.textContent=(currentLang==='en'?(lmEnglishField(record,'emp_name _en','employee_name_en','name_en','english name','full_name_en','full name en','الاسم بالإنجليزي')||lmEnglishField(currentUserData||{},'name_en','english_name')):(lmArabicField(record,'اسم الموظف','الاسم بالعربية','الاسم','employee_name_ar','name_ar')||lmArabicField(currentUserData||{},'name_ar')))|| (emp?getEmployeeName(emp):hrText('مسؤول النظام','System Admin'));name.dir=currentLang==='ar'?'rtl':'ltr';}
+ if(job)job.textContent=emp?(currentLang==='en'?(lmEnglishField(emp,'job title ','job_title_en','jobTitleEn','jobTitle')||'—'):(lmArabicField(emp,'الوظيفة','المسمى الوظيفي')||getEmployeeJob(emp))):hrText('مدير النظام','System Administrator');
  const url=emp?getField(emp,'photoUrl','photo','الصورة','رابط الصورة'):'';
  if(photo){if(typeof url==='string'&&(/^(https:\/\/|data:image\/(png|jpeg|webp);base64,)/i).test(url)){photo.src=url;photo.hidden=false;photo.parentElement?.classList.add('has-photo')}else{photo.hidden=true;photo.parentElement?.classList.remove('has-photo');}}
  // Flag represents server-verified Portal role only. No client-controlled privilege escalation.
@@ -1735,8 +1744,10 @@ function lmUpdateQualGauge(value){
  const pct=document.getElementById('lm-speed-pct'),count=document.getElementById('lm-speed-count'),needle=document.getElementById('lm-speed-needle'),arc=document.getElementById('lm-speed-arc');
  if(!pct||!count||!needle||!arc)return;
  const row=value===''?null:(window.lmQualChoices||[])[Number(value)];
- const n=row?row[1]:0;const percent=row&&window.lmQualKnown?Math.round(n/window.lmQualKnown*100):0;
+ const n=row?row[1]:0,percent=row&&window.lmQualKnown?Math.min(100,Math.max(0,Math.round(n/window.lmQualKnown*100))):0;
  pct.textContent=percent+'%';count.textContent=row?(n+' '+(currentLang==='ar'?'موظف':'employees')):(currentLang==='ar'?'اختر مؤهلًا':'Select a qualification');
- needle.style.transform='translateX(-50%) rotate('+(-90+percent*1.8)+'deg)';
- arc.style.setProperty('--fill',percent+'%');
+ const a=Math.PI*(1-percent/100);
+ needle.style.transform='rotate('+(180*percent/100).toFixed(2)+'deg)';
+ arc.style.strokeDashoffset=String(314.159*(1-percent/100));
+ const meter=pct.closest('[role="meter"]');if(meter)meter.setAttribute('aria-valuenow',String(percent));
 }
