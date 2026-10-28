@@ -690,6 +690,59 @@ html[data-theme="light"] #hr-dashboard-view .neon-card,body.light #hr-dashboard-
 #hr-dashboard-view .v9-open-requests{margin-top:12px;border:1px solid #39c5f7;background:#074b77;border-radius:8px;color:#fff;padding:8px 12px}
 @media(max-width:1150px){#hr-dashboard-view .neon-gender-top,#hr-dashboard-view .neon-org,#hr-dashboard-view .neon-map{grid-column:span 12!important}}
 </style>
+<style id="v10-reference-alignment">
+/* V10 reference alignment: override only the dashboard and sidebar visuals */
+#hr-dashboard-view .neon-board{max-width:none;margin:0;direction:rtl}
+#hr-dashboard-view .neon-top{margin-bottom:14px;min-height:44px}
+#hr-dashboard-view .neon-grid{display:grid;grid-template-columns:repeat(24,minmax(0,1fr));gap:11px;align-items:stretch}
+#hr-dashboard-view .neon-grid>.neon-kpi{grid-column:span 4!important;min-height:160px}
+#hr-dashboard-view .neon-grid>.neon-attendance{grid-column:span 8!important;min-height:160px}
+#hr-dashboard-view .neon-grid>.neon-gender-top{grid-column:span 8!important;min-height:302px}
+#hr-dashboard-view .neon-grid>.neon-org{grid-column:span 9!important;min-height:302px}
+#hr-dashboard-view .neon-grid>.neon-map{grid-column:span 7!important;min-height:302px}
+#hr-dashboard-view .neon-grid>.neon-deptbars{grid-column:span 10!important;min-height:225px}
+#hr-dashboard-view .neon-grid>.neon-trend{grid-column:span 8!important;min-height:225px}
+#hr-dashboard-view .neon-grid>.neon-donut-card{grid-column:span 6!important;min-height:225px}
+#hr-dashboard-view .neon-grid>.neon-bottom{grid-column:span 6!important;min-height:225px}
+#hr-dashboard-view .neon-grid>.v10-religion{grid-column:span 6!important;min-height:225px}
+#hr-dashboard-view .neon-card{border:1px solid #224b7a;border-radius:11px;background:linear-gradient(145deg,#0b2140,#07162e);box-shadow:inset 0 1px #ffffff12,0 5px 16px #0003;padding:13px}
+#hr-dashboard-view .neon-card h2{font-size:13px;line-height:1.25}
+#hr-dashboard-view .neon-card .en{font-size:11px}
+#hr-dashboard-view .neon-grid>.neon-kpi .number{font-size:36px;margin-top:17px}
+#hr-dashboard-view .v10-people{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:3px;align-content:center;flex:1}
+#hr-dashboard-view .v10-human{height:21px;display:flex;justify-content:center;align-items:center;filter:drop-shadow(0 0 3px #02bfff)}
+#hr-dashboard-view .v10-human svg{height:18px;width:13px;fill:#13b9ff}
+#hr-dashboard-view .v10-human.female svg{fill:#f361ce}
+#hr-dashboard-view .v10-human.female{filter:drop-shadow(0 0 3px #f361ce)}
+#hr-dashboard-view .v9-gender{min-height:220px;gap:10px;flex-direction:row}
+#hr-dashboard-view .v9-sexlabels{min-width:90px;gap:24px}
+#hr-dashboard-view .neon-map .neon-world{height:240px!important;display:block!important;position:relative!important}
+#hr-dashboard-view .neon-map .neon-world svg{width:100%!important;height:100%!important;max-height:none!important}
+#hr-dashboard-view .neon-map .neon-geo-switch{min-height:242px!important;height:242px!important}
+#hr-dashboard-view .neon-map .neon-geo-switch .neon-world{opacity:1;z-index:1}
+#hr-dashboard-view .neon-map .neon-geo-switch #neon-egypt-mount{opacity:0;pointer-events:none;z-index:2}
+#hr-dashboard-view .neon-map .neon-geo-switch.v10-egypt-on .neon-world{opacity:0;pointer-events:none}
+#hr-dashboard-view .neon-map .neon-geo-switch.v10-egypt-on #neon-egypt-mount{opacity:1;pointer-events:auto}
+#hr-dashboard-view .neon-map .neon-geo-switch:hover .neon-world{opacity:1}
+#hr-dashboard-view .neon-map .neon-geo-switch.v10-egypt-on:hover .neon-world{opacity:0}
+#hr-dashboard-view .neon-map .v10-world-label{position:absolute;bottom:0;right:5px;color:#83d6ff;font-size:10px}
+#hr-dashboard-view .neon-orgbox{min-height:226px;grid-template-columns:minmax(0,1fr) 95px minmax(0,1fr)}
+#hr-dashboard-view .neon-orgline{font-size:10px}
+#hr-dashboard-view .neon-orglogo{width:95px;height:95px}
+#hr-dashboard-view .v10-religion-note{margin-top:12px;padding:12px;border:1px solid #234b77;border-radius:9px;color:#a5c7e8;font-size:12px}
+#hr-dashboard-view .v10-religion-list{display:flex;flex-direction:column;gap:12px;margin-top:18px}
+#hr-dashboard-view .v10-religion-row{display:flex;justify-content:space-between;gap:8px;color:#d9ecff;font-size:12px}
+#hr-dashboard-view .v10-religion-bar{height:7px;border-radius:10px;background:#142b4a;overflow:hidden;margin-top:5px}
+#hr-dashboard-view .v10-religion-bar i{height:100%;display:block;background:linear-gradient(90deg,#11c5fa,#9967ff)}
+#hr-dashboard-view .neon-card.neon-notifications{grid-column:span 6!important}
+/* Factory art supplied within approved user reference, visible only when sidebar expands */
+.sidebar-collapsed{position:relative}
+.sidebar-collapsed::after{content:"";display:block;position:absolute;left:4px;right:4px;bottom:35px;height:160px;background:url('factory-sidebar-reference.png') center bottom / contain no-repeat;pointer-events:none;opacity:0;transition:opacity .2s}
+.sidebar-collapsed:hover::after{opacity:.95}
+@media(max-width:1300px){#hr-dashboard-view .neon-grid>.neon-gender-top{grid-column:span 8!important}#hr-dashboard-view .neon-grid>.neon-org{grid-column:span 9!important}#hr-dashboard-view .neon-grid>.neon-map{grid-column:span 7!important}}
+@media(max-width:1000px){#hr-dashboard-view .neon-grid>.neon-kpi{grid-column:span 6!important}#hr-dashboard-view .neon-grid>.neon-attendance{grid-column:span 12!important}#hr-dashboard-view .neon-grid>.neon-gender-top,#hr-dashboard-view .neon-grid>.neon-org,#hr-dashboard-view .neon-grid>.neon-map{grid-column:span 24!important}#hr-dashboard-view .neon-grid>.neon-deptbars,#hr-dashboard-view .neon-grid>.neon-trend,#hr-dashboard-view .neon-grid>.neon-donut-card,#hr-dashboard-view .neon-grid>.neon-bottom,#hr-dashboard-view .neon-grid>.v10-religion{grid-column:span 12!important}}
+@media(max-width:600px){#hr-dashboard-view .neon-grid>*{grid-column:span 24!important}}
+</style>
 </head>
 <body class="min-h-screen flex flex-col">
 
