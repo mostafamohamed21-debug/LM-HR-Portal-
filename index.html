@@ -1081,3 +1081,17 @@ body.portal-signed-in:has(#portal-main-sidebar:hover)>header{padding-inline-star
     
 <div id="fahd-dialog" class="fahd-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="fahd-dialog-title"><div class="fahd-dialog-card"><h3 id="fahd-dialog-title"></h3><p id="fahd-dialog-message"></p><div id="fahd-dialog-inputs"></div><div class="fahd-dialog-actions"><button type="button" id="fahd-dialog-no">إلغاء</button><button type="button" id="fahd-dialog-yes">تأكيد</button></div></div></div></body>
 </html>
+<style id="lm-pending-summary-only">
+#hr-dashboard-view .lm-notifications{height:140px;min-height:0;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:4px;text-align:start;overflow:hidden}
+#hr-dashboard-view .lm-notify-head{display:flex;align-items:baseline;justify-content:center;gap:9px;min-height:25px}
+#hr-dashboard-view .lm-notify-head strong{font:700 25px Arial;color:#2fe2ff}
+#hr-dashboard-view .lm-notify-head span{font-size:10px;color:#c0dbf5}
+#hr-dashboard-view .lm-notify-list{flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#2377a5 transparent}
+#hr-dashboard-view .lm-notify-item{display:grid;grid-template-columns:1fr 1.3fr auto;align-items:center;gap:5px;width:100%;background:transparent;border:0;border-bottom:1px solid #204567;color:#d4efff;padding:4px 2px;font-size:10px;text-align:start;cursor:pointer}
+#hr-dashboard-view .lm-notify-item:hover{background:#123b68}
+#hr-dashboard-view .lm-notify-type{color:#5fd9ff;font-weight:bold;white-space:nowrap}
+#hr-dashboard-view .lm-notify-who{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#hr-dashboard-view .lm-notify-item time{font-size:9px;color:#9ab9d3;white-space:nowrap}
+#hr-dashboard-view .lm-notify-empty,#hr-dashboard-view .lm-notify-more{font-size:10px;color:#a8c6dd;text-align:center;padding:8px 0}
+#hr-dashboard-view .lm-notifications>button{flex:none;align-self:center;font-size:10px;padding:3px 9px}
+</style>
