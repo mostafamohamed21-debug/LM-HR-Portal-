@@ -1077,11 +1077,13 @@ body.portal-signed-in:has(#portal-main-sidebar:hover)>header{padding-inline-star
 
     <!-- ربط ملف الـ JS -->
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
-    <script src="app.js?v=20261028-rebuild-1"></script>
+    <script src="app.js?v=20261028-avatars-1"></script>
     
 <div id="fahd-dialog" class="fahd-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="fahd-dialog-title"><div class="fahd-dialog-card"><h3 id="fahd-dialog-title"></h3><p id="fahd-dialog-message"></p><div id="fahd-dialog-inputs"></div><div class="fahd-dialog-actions"><button type="button" id="fahd-dialog-no">إلغاء</button><button type="button" id="fahd-dialog-yes">تأكيد</button></div></div></div></body>
 </html>
 <style id="lm-pending-summary-only">
+#hr-dashboard-view .lm-notifications{height:140px}
+
 #hr-dashboard-view .lm-notifications{height:140px;min-height:0;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:4px;text-align:start;overflow:hidden}
 #hr-dashboard-view .lm-notify-head{display:flex;align-items:baseline;justify-content:center;gap:9px;min-height:25px}
 #hr-dashboard-view .lm-notify-head strong{font:700 25px Arial;color:#2fe2ff}
@@ -1094,4 +1096,15 @@ body.portal-signed-in:has(#portal-main-sidebar:hover)>header{padding-inline-star
 #hr-dashboard-view .lm-notify-item time{font-size:9px;color:#9ab9d3;white-space:nowrap}
 #hr-dashboard-view .lm-notify-empty,#hr-dashboard-view .lm-notify-more{font-size:10px;color:#a8c6dd;text-align:center;padding:8px 0}
 #hr-dashboard-view .lm-notifications>button{flex:none;align-self:center;font-size:10px;padding:3px 9px}
+/* Request summary: employee photo, localized name, and request type. */
+#hr-dashboard-view .lm-notify-item{display:flex;align-items:center;gap:8px;min-height:38px;padding:3px 5px;text-align:start;direction:inherit}
+#hr-dashboard-view .lm-notify-person{flex:0 0 30px;width:30px;height:30px;border-radius:50%;overflow:hidden;border:1px solid #2a8dbb;background:#123455;display:grid;place-items:center}
+#hr-dashboard-view .lm-notify-avatar{width:100%;height:100%;object-fit:cover;display:block}
+#hr-dashboard-view .lm-notify-avatar[hidden],#hr-dashboard-view .lm-notify-avatar-fallback[hidden]{display:none}
+#hr-dashboard-view .lm-notify-avatar-fallback{font-size:19px;line-height:1;color:#73c9ff}
+#hr-dashboard-view .lm-notify-info{display:flex;flex:1;min-width:0;flex-direction:column;gap:2px;line-height:1.15}
+#hr-dashboard-view .lm-notify-who{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:700;color:#eaf8ff}
+#hr-dashboard-view .lm-notify-type{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px;font-weight:400;color:#60d9ff}
+#hr-dashboard-view .lm-notify-pending{flex:0 0 auto;color:#ffbd58;font-size:13px}
+
 </style>
