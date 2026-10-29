@@ -1895,3 +1895,41 @@ function lmUpdateQualGauge(value){
  arc.style.strokeDashoffset=String(314.159*(1-percent/100));
  const meter=pct.closest('[role="meter"]');if(meter)meter.setAttribute('aria-valuenow',String(percent));
 }
+
+
+/* Lacto Misr date picker: presentation-only; input values remain YYYY-MM-DD */
+(function(){
+ let active=null;
+ const iso=v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?String(v):'';
+ function dateCandidate(key){return /(?:تاريخ|date|dob|birth|hire|joining|expiry|expiration)/i.test(key)&&!/(?:تاريخ.*(رقم|عدد)|update|created|modified|timestamp)/i.test(key);}
+ function close(){if(active){active.remove();active=null;}}
+ function show(input){
+  if(input.disabled||input.readOnly)return;
+  close();const pop=document.createElement('div');pop.className='lm-date-pop';pop.dir=typeof currentLang!=='undefined'&&currentLang==='en'?'ltr':'rtl';pop.setAttribute('role','dialog');pop.setAttribute('aria-label',pop.dir==='rtl'?'اختيار التاريخ':'Choose date');
+  const chosen=iso(input.value);const now=new Date();let year=chosen?+chosen.slice(0,4):now.getFullYear(),month=chosen?+chosen.slice(5,7)-1:now.getMonth();
+  const ar=pop.dir==='rtl';const months=ar?['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']:['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const week=ar?['ح','ن','ث','ر','خ','ج','س']:['Su','Mo','Tu','We','Th','Fr','Sa'];
+  function draw(){pop.replaceChildren();const top=document.createElement('div');top.className='lm-date-top';
+   const prev=document.createElement('button');prev.type='button';prev.textContent='‹';prev.setAttribute('aria-label',ar?'الشهر السابق':'Previous month');prev.onclick=()=>{month--;if(month<0){month=11;year--;}draw();};
+   const next=document.createElement('button');next.type='button';next.textContent='›';next.setAttribute('aria-label',ar?'الشهر التالي':'Next month');next.onclick=()=>{month++;if(month>11){month=0;year++;}draw();};
+   const m=document.createElement('select');months.forEach((name,i)=>{const o=document.createElement('option');o.value=i;o.textContent=name;o.selected=i===month;m.append(o);});m.onchange=()=>{month=+m.value;draw();};
+   const y=document.createElement('select');for(let n=1900;n<=2100;n++){const o=document.createElement('option');o.value=n;o.textContent=n;o.selected=n===year;y.append(o);}y.onchange=()=>{year=+y.value;draw();};
+   top.append(prev,m,y,next);pop.append(top);
+   const grid=document.createElement('div');grid.className='lm-date-grid';week.forEach(w=>{const el=document.createElement('span');el.className='lm-date-weekday';el.textContent=w;grid.append(el);});
+   const first=new Date(year,month,1).getDay(),total=new Date(year,month+1,0).getDate();for(let i=0;i<first;i++)grid.append(document.createElement('span'));
+   for(let day=1;day<=total;day++){const b=document.createElement('button');b.type='button';b.className='lm-date-day';b.textContent=day;const val=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;if(val===chosen)b.classList.add('is-selected');if(year===now.getFullYear()&&month===now.getMonth()&&day===now.getDate())b.classList.add('is-today');b.onclick=()=>{input.value=val;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));close();};grid.append(b);}pop.append(grid);
+   const footer=document.createElement('div');footer.className='lm-date-footer';const today=document.createElement('button');today.type='button';today.textContent=ar?'اليوم':'Today';today.onclick=()=>{const d=new Date(),v=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;input.value=v;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));close();};const clear=document.createElement('button');clear.type='button';clear.textContent=ar?'مسح':'Clear';clear.onclick=()=>{input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));close();};footer.append(clear,today);pop.append(footer);
+  }
+  draw();document.body.append(pop);active=pop;const r=input.getBoundingClientRect();let left=Math.min(Math.max(12,r.left),window.innerWidth-pop.offsetWidth-12),top=r.bottom+6;if(top+pop.offsetHeight>window.innerHeight-8)top=Math.max(8,r.top-pop.offsetHeight-6);pop.style.left=left+'px';pop.style.top=top+'px';
+ }
+ function attach(input){if(input.dataset.lmDateReady)return;const key=input.dataset.fahdKey||input.name||input.id||'';if(input.type!=='date'&&!(input.closest('#fahd-fields')&&dateCandidate(key)))return;
+  // Do not change the type of legacy profile fields: they may hold Excel serials or display strings.
+  if(input.type!=='date'&&input.value&&!iso(input.value))return;
+  input.dataset.lmDateReady='1';const wrap=document.createElement('span');wrap.className='lm-date-shell';input.parentNode.insertBefore(wrap,input);wrap.append(input);const btn=document.createElement('button');btn.type='button';btn.className='lm-date-trigger';btn.textContent='▦';btn.setAttribute('aria-label','Choose date / اختيار التاريخ');btn.onclick=()=>show(input);wrap.append(btn);
+  if(input.type==='date')input.addEventListener('click',e=>{if(e.target===input){e.preventDefault();show(input);}});
+ }
+ function scan(){document.querySelectorAll('input[type="date"],#fahd-fields input[data-fahd-key]').forEach(attach);}
+ document.addEventListener('click',e=>{if(active&&!active.contains(e.target)&&!e.target.closest('.lm-date-trigger')&&!e.target.closest('.lm-date-shell>input'))close();},true);
+ document.addEventListener('keydown',e=>{if(e.key==='Escape')close();});window.addEventListener('resize',close);window.addEventListener('scroll',close,true);
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{scan();new MutationObserver(scan).observe(document.body,{childList:true,subtree:true});});else{scan();new MutationObserver(scan).observe(document.body,{childList:true,subtree:true});}
+})();
