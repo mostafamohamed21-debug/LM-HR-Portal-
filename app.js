@@ -1,2057 +1,1192 @@
-// Lacto Misr HR Portal v6.2 - Strict Language Isolation & Full Stability
-
-function excelDateToJSDate(serial) {
-    if (!serial || typeof serial !== 'number') return serial || '--';
-    const utc_days = Math.floor(serial - 25569);
-    const utc_value = utc_days * 86400 * 1000;
-    const date_info = new Date(utc_value);
-    if (isNaN(date_info.getTime())) return serial;
-    const year = date_info.getUTCFullYear();
-    const month = String(date_info.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date_info.getUTCDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-function updatePasswordEyeIcon() {
-    const input = document.getElementById('login-password');
-    const icon = document.getElementById('eye-icon');
-    const button = document.getElementById('password-toggle');
-    if (!input || !icon) return;
-    const visible = input.type === 'text';
-    icon.innerHTML = visible
-        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.1A10.9 10.9 0 0 1 12 4.9c5.1 0 8.8 3.6 10 7.1-.4 1.3-1.3 2.6-2.4 3.7M6.2 6.2C4.2 7.6 2.8 9.4 2 12c1.2 3.6 4.9 7.1 10 7.1 1.2 0 2.3-.2 3.3-.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-        : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.7" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
-    if (button) {
-        button.setAttribute('aria-label', visible ? (currentLang === 'ar' ? 'إخفاء كلمة المرور' : 'Hide password') : (currentLang === 'ar' ? 'إظهار كلمة المرور' : 'Show password'));
-        button.title = button.getAttribute('aria-label');
-    }
-}
-function togglePasswordVisibility() {
-    const input = document.getElementById('login-password');
-    if (!input) return;
-    input.type = input.type === 'password' ? 'text' : 'password';
-    updatePasswordEyeIcon();
-}
-
-const firebaseConfig = {
-    apiKey: "AIzaSyA-ywy51h3TM6YF_n0bNj1D5lAMJ7uMnO4",
-    authDomain: "lm-hr-portal.firebaseapp.com",
-    databaseURL: "https://lm-hr-portal-default-rtdb.firebaseio.com",
-    projectId: "lm-hr-portal",
-    storageBucket: "lm-hr-portal.firebasestorage.app",
-    messagingSenderId: "1008702496104",
-    appId: "1:1008702496104:web:930dfe68388ef5a640cadd",
-    measurementId: "G-Z6K3VG2SJ6"
-};
-
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-    try { firebase.analytics(); } catch (e) {}
-}
-const db = firebase.database();
-const portalAuth = firebase.auth();
-const PORTAL_ADMIN_CODE = '778';
-const PORTAL_ADMIN_EMAIL = 'mostafa.mohamed21@gmail.com';
-const PORTAL_ADMIN_UID = 'iwiAJHISsqaMAVtT3NG3SNqaQ7m2';
-function portalIsAdmin() { return !!portalAuth.currentUser && portalAuth.currentUser.uid === PORTAL_ADMIN_UID; }
-
-
-let allEmployees = [];
-let lmCustomFieldDefinitions = {};
-async function lmLoadCustomFieldDefinitions(){const s=await db.ref('employee_field_definitions').once('value');lmCustomFieldDefinitions=s.val()||{};}
-
-let currentLang = localStorage.getItem('lacto_lang') || 'ar';
-let activeEmployeeCode = null;
-let currentUserData = null;
-let portalInitialized = false;
-
-const translations = {
-    ar: {
-        admin: "مسؤول النظام", control_panel: "غرفة التحكم", nav_home: "الرئيسية والموظفين", nav_depts: "الإدارات والأقسام",
-        nav_attendance: "الحضور والإنصراف", nav_reports: "التقارير والإحصائيات", total_emp: "إجمالي العاملين", active_depts: "الإدارات النشطة",
-        system_status: "حالة النظام", connected: "مستقر (متصل بـ Firebase)", emp_list: "قائمة العاملين بالقاعدة", search_placeholder: "بحث بالاسم أو الكود...",
-        th_code: "الكود", th_name: "اسم الموظف", th_dept: "الإدارة", th_job: "الوظيفة", th_hire: "تاريخ التعيين", th_actions: "الإجراءات",
-        loading: "جاري جلب البيانات من القاعدة...", no_results: "لا توجد نتائج مطابقة للبحث", action_btn: "عرض الملف", back_btn: "← العودة للقائمة",
-        profile_title: "الملف الوظيفي الشامل", edit_btn: "تعديل البيانات", save_btn: "حفظ", yes_btn: "نعم", cancel_btn: "إلغاء",
-        confirm_title: "هل ترغب في حفظ التعديلات؟", change_photo: "تعديل الصورة", sec_job: "البيانات الوظيفية", manager_label: "المدير المباشر",
-        service_years: "سنوات الخدمة", sec_qual: "المؤهل العلمي", qual_label: "المؤهل", qual_auth: "جهة المؤهل", sec_personal: "البيانات الشخصية",
-        dob_label: "تاريخ الميلاد", age_label: "السن حتى تاريخه", insurance_label: "الحالة التأمينية", pob_label: "مكان الميلاد",
-        toast_success: "تم حفظ التعديلات بنجاح وتحديث Firebase", login_title: "تسجيل الدخول", login_subtitle: "أدخل كود الموظف وكلمة المرور",
-        code_placeholder: "كود الموظف", pass_placeholder: "كلمة المرور", remember_me: "تذكرني", forgot_pass: "نسيت كلمة المرور؟", login_btn: "دخول للنظام",
-        logout_btn: "تسجيل الخروج", login_required: "يرجى إدخال كود الموظف وكلمة المرور", login_not_found: "كود الموظف غير مسجل!",
-        login_wrong_pass: "كلمة المرور غير صحيحة!", setup_password_title: "الموظف مسجل لكن لا توجد كلمة مرور. أنشئ كلمة مرور للمتابعة.", confirm_password_placeholder: "تأكيد كلمة المرور", create_password_btn: "إنشاء كلمة المرور والدخول", password_mismatch: "كلمتا المرور غير متطابقتين.", password_too_short: "كلمة المرور يجب أن تكون 6 أحرف على الأقل.", password_saved: "تم إنشاء كلمة المرور وحفظها. جاري تسجيل الدخول...", login_error: "حدث خطأ أثناء الاتصال، حاول مرة أخرى.", logged_out: "تم تسجيل الخروج بنجاح",
-        add_employee_btn: "+ إضافة موظف", add_employee_title: "إضافة موظف جديد", add_employee_hint: "سيتم إنشاء السجل مباشرة داخل Firebase.", save_employee_btn: "حفظ الموظف",
-        employee_exists: "هذا الكود موجود بالفعل.", employee_saved: "تمت إضافة الموظف بنجاح إلى Firebase.", required_code: "كود الموظف مطلوب.",
-        firebase_fields_title: "حقول Firebase", firebase_fields_hint: "كل الحقول الموجودة فعلياً على سجل الموظف تظهر هنا ويمكن تعديلها.",
-        add_custom_field_btn: "+ إضافة خانة إضافية", custom_field_title: "إضافة خانة إضافية", field_name_label: "اسم الخانة", field_value_label: "القيمة",
-        custom_field_saved: "تمت إضافة الخانة وتحديث Firebase فوراً.", custom_field_invalid: "اسم الخانة غير صالح. تجنب . # $ [ ] /",
-        forgot_title: "استعادة كلمة المرور", forgot_hint: "سيتم إرسال رابط إعادة تعيين كلمة المرور إلى بريد الإدارة.", forgot_code_placeholder: "كود الموظف",
-        forgot_email_placeholder: "البريد الإلكتروني (يُطلب فقط إذا لم يكن مسجلاً)", verification_placeholder: "رمز التحقق", new_password_placeholder: "كلمة المرور الجديدة",
-        send_code_btn: "إرسال رابط إعادة التعيين", verify_reset_btn: "تحقق وتغيير كلمة المرور", forgot_email_note: "يجب تفعيل خدمة البريد في Firebase (Trigger Email/Cloud Function) لكي يصل الرمز فعلياً إلى البريد.",
-        email_required: "أدخل البريد الإلكتروني.", code_sent: "تم إنشاء رمز التحقق وتجهيزه للإرسال إلى البريد.", code_sent_no_email: "تم تجهيز الرمز، لكن خدمة البريد غير مفعلة في Firebase بعد.",
-        invalid_code: "رمز التحقق غير صحيح أو منتهي.", password_changed: "تم تغيير كلمة المرور بنجاح.", new_password_required: "أدخل كلمة المرور الجديدة.",
-        code_expired: "انتهت صلاحية رمز التحقق، اطلب رمزاً جديداً.", employee_email_found: "تم العثور على البريد المسجل.", employee_email_missing: "لا يوجد بريد مسجل، أدخل بريد الموظف.",
-        schema_loading: "جاري تجهيز حقول Firebase...",
-        header_brand: "لاكتو مصر - شؤون العاملين", powered_by: "برمجة وتطوير إدارة الموارد البشرية", portal_version: "بورتال الموظفين v5.2 - النسخة الاحترافية"
-    },
-    en: {
-        admin: "System Admin", control_panel: "Control Room", nav_home: "Home & Employees", nav_depts: "Departments",
-        nav_attendance: "Attendance & Departure", nav_reports: "Reports & Analytics", total_emp: "Total Employees", active_depts: "Active Departments",
-        system_status: "System Status", connected: "Stable (Connected to Firebase)", emp_list: "Database Employees List", search_placeholder: "Search by name or code...",
-        th_code: "CODE", th_name: "EMPLOYEE NAME", th_dept: "DEPARTMENT", th_job: "JOB TITLE", th_hire: "HIRE DATE", th_actions: "ACTIONS",
-        loading: "Fetching data from database...", no_results: "No matching results found", action_btn: "View Profile", back_btn: "← Back to List",
-        profile_title: "Comprehensive Employee Profile", edit_btn: "Edit Data", save_btn: "Save", yes_btn: "Yes", cancel_btn: "Cancel",
-        confirm_title: "Do you want to save changes?", change_photo: "Change Photo", sec_job: "Job Details", manager_label: "Direct Manager",
-        service_years: "Years of Service", sec_qual: "Education Qualification", qual_label: "Qualification", qual_auth: "Issuing Authority", sec_personal: "Personal Data",
-        dob_label: "Date of Birth", age_label: "Age to Date", insurance_label: "Insurance Status", pob_label: "Place of Birth",
-        toast_success: "Changes saved successfully & synced with Firebase", login_title: "Sign in", login_subtitle: "Enter employee code and password",
-        code_placeholder: "Employee Code", pass_placeholder: "Password", remember_me: "Remember Me", forgot_pass: "Forgot password?", login_btn: "Sign in",
-        logout_btn: "Sign out", login_required: "Please enter employee code and password", login_not_found: "Employee code not found!",
-        login_wrong_pass: "Incorrect password!", setup_password_title: "Your employee record exists but has no password. Create one to continue.", confirm_password_placeholder: "Confirm password", create_password_btn: "Create Password & Sign In", password_mismatch: "The passwords do not match.", password_too_short: "Password must be at least 6 characters.", password_saved: "Password created and saved. Signing in...", login_error: "Connection error. Please try again.", logged_out: "Signed out successfully",
-        add_employee_btn: "+ Add Employee", add_employee_title: "Add New Employee", add_employee_hint: "The record will be created directly in Firebase.", save_employee_btn: "Save Employee",
-        employee_exists: "This employee code already exists.", employee_saved: "Employee added successfully to Firebase.", required_code: "Employee code is required.",
-        firebase_fields_title: "Firebase Fields", firebase_fields_hint: "All fields currently stored on the employee record appear here and can be edited.",
-        add_custom_field_btn: "+ Add Extra Field", custom_field_title: "Add Extra Field", field_name_label: "Field Name", field_value_label: "Value",
-        custom_field_saved: "Field added and Firebase updated immediately.", custom_field_invalid: "Invalid field name. Avoid . # $ [ ] /",
-        forgot_title: "Password Recovery", forgot_hint: "A password reset link will be sent to the admin email.", forgot_code_placeholder: "Employee Code",
-        forgot_email_placeholder: "Email (only required if not registered)", verification_placeholder: "Verification Code", new_password_placeholder: "New Password",
-        send_code_btn: "Send Reset Link", verify_reset_btn: "Verify & Change Password", forgot_email_note: "Firebase email delivery (Trigger Email/Cloud Function) must be enabled for the code to reach the mailbox.",
-        email_required: "Enter an email address.", code_sent: "Verification code created and queued for email delivery.", code_sent_no_email: "Code prepared, but Firebase email delivery is not enabled yet.",
-        invalid_code: "Invalid or expired verification code.", password_changed: "Password changed successfully.", new_password_required: "Enter the new password.",
-        code_expired: "The verification code has expired. Request a new one.", employee_email_found: "Registered email found.", employee_email_missing: "No registered email found. Enter the employee email.",
-        schema_loading: "Preparing Firebase fields...",
-        header_brand: "Lacto Misr HR", powered_by: "Powered by HR Department", portal_version: "Portal v5.2 - Pro Edition"
-    }
-};
-
-// دوال جلب البيانات الصارمة للفصل بين اللغات (بدون أي تداخل عربي مع إنجليزي)
-function getEmployeeName(emp) {
-    if (!emp) return '--';
-    if (currentLang === 'ar') {
-        return getField(emp, 'اسم الموظف ', 'اسم الموظف', 'name') || '--';
-    } else {
-        return getField(emp, 'emp_name _en', 'name', 'employee_name_en') || '--';
-    }
-}
-
-function getEmployeeDept(emp) {
-    if (!emp) return '--';
-    if (currentLang === 'ar') {
-        return getField(emp, 'الإدارة ', 'الإدارة', 'department') || '--';
-    } else {
-        return getField(emp, 'department ', 'department', 'dept') || '--';
-    }
-}
-
-function getEmployeeJob(emp) {
-    if (!emp) return '--';
-    if (currentLang === 'ar') {
-        return getField(emp, 'الوظيفة', 'الوظيفة ', 'jobTitle', 'job') || '--';
-    } else {
-        return getField(emp, 'job title ', 'jobTitle', 'job title', 'job') || '--';
-    }
-}
-
-const fieldLabels = {
-    code: ['الكود', 'CODE'], name: ['اسم الموظف', 'EMPLOYEE NAME'], department: ['الإدارة', 'DEPARTMENT'], jobTitle: ['الوظيفة', 'JOB TITLE'],
-    directManager: ['المدير المباشر', 'DIRECT MANAGER'], hireDate: ['تاريخ التعيين', 'HIRE DATE'], yearsService: ['سنوات الخدمة', 'YEARS OF SERVICE'],
-    qualification: ['المؤهل', 'QUALIFICATION'], qualAuth: ['جهة المؤهل', 'QUALIFICATION AUTHORITY'], dob: ['تاريخ الميلاد', 'DATE OF BIRTH'],
-    age: ['السن حتى تاريخه', 'AGE TO DATE'], insuranceStatus: ['الحالة التأمينية', 'INSURANCE STATUS'], pob: ['مكان الميلاد', 'PLACE OF BIRTH'],
-    photoUrl: ['رابط الصورة', 'PHOTO URL'], email: ['البريد الإلكتروني', 'EMAIL'], password: ['كلمة المرور', 'PASSWORD']
-};
-
-function tr(key) { return translations[currentLang][key] || key; }
-function getField(emp, ...keys) {
-    for (const key of keys) {
-        if (emp && emp[key] !== undefined && emp[key] !== null && String(emp[key]).trim() !== '') return emp[key];
-    }
-    return '';
-}
-function getEmployeeCode(emp) { return String(getField(emp, 'الكود', 'code', 'employeeCode', 'empCode', 'EmployeeCode', 'employee_code', 'ID', 'id') || '').trim(); }
-
-function existingKey(obj, keys, fallback) {
-    for (const key of keys) if (Object.prototype.hasOwnProperty.call(obj || {}, key)) return key;
-    return fallback || keys[0];
-}
-function putMapped(obj, source, keys, value, fallback) {
-    const key = existingKey(source, keys, fallback);
-    obj[key] = value;
-}
-
-function displayKey(key) {
-    if (fieldLabels[key]) return fieldLabels[key][currentLang==='ar'?0:1];
-    const cleaned = String(key).replace(/_/g,' ').trim();
-    return currentLang==='ar' ? cleaned : cleaned.toUpperCase();
-}
-function isValidFirebaseKey(key) { return key && !/[.#$\[\]\/]/.test(key) && key !== '.priority'; }
-
-function toggleLoginLangMenu(event) {
-    if (event) event.stopPropagation();
-    document.getElementById('login-lang-menu')?.classList.toggle('show');
-}
-function toggleLangDropdown(event) {
-    if (event) event.stopPropagation();
-    document.getElementById('lang-dropdown')?.classList.toggle('show');
-}
-
-function setLanguage(lang) {
-    if(typeof fahdHasUnsavedChanges==='function' && fahdHasUnsavedChanges() && !window.fahdNavigationApproved){fahdGuardNavigation(()=>setLanguage(lang));return;}
-    currentLang = lang === 'en' ? 'en' : 'ar';
-    if(typeof fahdEditing!=='undefined' && fahdEditing?.code && typeof allEmployees!=='undefined'){const current=allEmployees.find(e=>String(getEmployeeCode(e))===String(fahdEditing.code));if(current && document.getElementById('fahd1-native')?.offsetParent!==null)queueMicrotask(()=>fahdRender(current));}
-    localStorage.setItem('lacto_lang', currentLang);
-    document.documentElement.lang = currentLang;
-    document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
-    const hrBrand=document.getElementById('hr-header-brand');if(hrBrand)hrBrand.textContent=hrBrand.dataset[currentLang];
-
-    const short = document.getElementById('login-lang-short');
-    if (short) short.innerText = currentLang.toUpperCase();
-    const code = document.getElementById('lang-code');
-    if (code) code.innerText = currentLang.toUpperCase();
-
-    document.querySelectorAll('[data-translate]').forEach(el => {
-        const key = el.getAttribute('data-translate');
-        if (translations[currentLang][key]) el.innerText = translations[currentLang][key];
-    });
-    document.querySelectorAll('[data-translate-placeholder]').forEach(el => {
-        const key = el.getAttribute('data-translate-placeholder');
-        if (translations[currentLang][key]) el.placeholder = translations[currentLang][key];
-    });
-
-    const subtitle = document.getElementById('introSubtitle');
-    if (subtitle) subtitle.innerText = subtitle.getAttribute(`data-${currentLang}`) || '';
-    const copyright = document.getElementById('copyrightText');
-    if (copyright) copyright.innerText = copyright.getAttribute(`data-${currentLang}`) || '';
-    const slogan = document.getElementById('login-brand-slogan');
-    if (slogan) slogan.innerText = currentLang === 'ar' ? 'شركاء في رحلة نمو طفلك' : "Partners in your child's growth journey";
-    const brandName = document.getElementById('login-brand-name');
-    if (brandName) brandName.innerText = currentLang === 'ar' ? 'لاكتو مصر' : 'Lacto Misr';
-
-    document.getElementById('login-lang-menu')?.classList.remove('show');
-    document.getElementById('lang-dropdown')?.classList.remove('show');
-    updatePasswordEyeIcon();
-    const confirmPass = document.getElementById('confirm-new-password');
-    if (confirmPass) confirmPass.placeholder = tr('confirm_password_placeholder');
-    const setupNote = document.getElementById('first-password-note');
-    if (setupNote) setupNote.innerText = tr('setup_password_title');
-    const createBtn = document.getElementById('create-password-btn');
-    if (createBtn) createBtn.innerText = tr('create_password_btn');
-    lmPopulateEmployeeFilters();
-    filterEmployees();
-    if (typeof renderHRWorkspace === 'function') renderHRWorkspace();
-    if (activeEmployeeCode !== null) viewEmployee(activeEmployeeCode);
-    document.querySelectorAll("[data-ar][data-en]:not(.hr-nav [data-ar])").forEach(el=>{el.textContent=el.getAttribute("data-"+currentLang);});
-    if (document.getElementById('add-employee-modal') && !document.getElementById('add-employee-modal').classList.contains('hidden')) buildAddEmployeeForm();
-    if(typeof lmUpdateHeaderIdentity==='function') lmUpdateHeaderIdentity();
-
-}
-
-function showLoginMessage(message, type='error') {
-    const el = document.getElementById('login-error');
-    if (!el) return;
-    el.style.color = type === 'success' ? '#67e8f9' : '#f87171';
-    el.innerText = message || '';
-}
-
-function hideLogin() {
-    const modal = document.getElementById('login-modal');
-    if (!modal) return;
-    modal.style.opacity = '0';
-    modal.style.pointerEvents = 'none';
-    setTimeout(() => modal.style.display='none', 350);
-}
-
-// PORTAL V2 (2026-10-25): read/write canonical employee records by employee CODE.
-// Legacy numeric root records are intentionally untouched and no longer read.
-// The pilot employee 950 remains in its original path until separately migrated.
-const PORTAL_EMPLOYEE_COLLECTION = 'employees_v2';
-// employees_v2 is the sole employee data source; legacy roots are never read.
-function portalSafeRecord(data, code, path) {
-    const safeData = {...data};
-    for (const field of Object.keys(safeData)) {
-        if (/^(password|pass|passwordhash|كلمة المرور)$/i.test(field)) delete safeData[field];
-    }
-    return {...safeData, code: String(code), _firebasePath: path, _firebaseKey: String(code)};
-}
-async function readEmployeeSources() {
-    if (!portalIsAdmin()) throw new Error('UNAUTHORIZED_ADMIN');
-    // Fail closed: a denied /employees_v2 read must not silently show stale records.
-    const v2Snap = await db.ref(PORTAL_EMPLOYEE_COLLECTION).once('value');
-    if (!v2Snap.exists()) throw new Error('EMPLOYEES_V2_MISSING');
-    const records = [];
-    const byCode = new Set();
-    Object.entries(v2Snap.val() || {}).forEach(([key, data]) => {
-        if (!data || typeof data !== 'object' || Array.isArray(data)) return;
-        const embedded = String(getField(data,'code','الكود','employeeCode') || '').trim();
-        if (!/^\d+$/.test(key) || embedded !== key) {
-            console.warn('Skipped employee record with mismatched key/code', key);
-            return;
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" id="html-root">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="page-title">البورتال المركزي - شؤون العاملين | Lacto Misr</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <!-- Firebase SDKs (Compat v9 for Realtime Database & Analytics) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
+    <!-- خط Cairo -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+       @keyframes leafFadeIn {
+           0% { opacity: 0; transform: translateY(15px) scale(0.95); }
+           100% { opacity: 1; transform: translateY(0) scale(1); }
+           }
+           .animate-fade-in {
+           animation: leafFadeIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(rgba(5, 11, 24, 0.93), rgba(5, 11, 24, 0.98)), url('background.jpg') no-repeat center center fixed;
+            background-size: cover;
+            color: #e2e8f0;
         }
-        if (byCode.has(key)) return;
-        byCode.add(key);
-        records.push(portalSafeRecord(data, key, PORTAL_EMPLOYEE_COLLECTION + '/' + key));
-    });
-    records.sort((a,b)=>Number(a.code)-Number(b.code));
-    return records;
-}
-
-async function findEmployeeRecord(code) {
-    const records = await readEmployeeSources();
-    const match = records.find(record => String(getEmployeeCode(record)).trim() === String(code).trim());
-    if (!match) return null;
-    return {
-        key: match._firebaseKey || String(code),
-        data: match,
-        path: match._firebasePath || `${PORTAL_EMPLOYEE_COLLECTION}/${match._firebaseKey || code}`
-    };
-}
-
-function showFirstPasswordSetup(code, employeeRecord) {
-    const panel = document.getElementById('first-password-setup');
-    if (!panel) return;
-    panel.dataset.employeeCode = code;
-    panel.dataset.employeePath = employeeRecord ? employeeRecord.path : '';
-    panel.classList.remove('hidden');
-    const note = document.getElementById('first-password-note');
-    if (note) note.innerText = tr('setup_password_title');
-    const password = document.getElementById('login-password');
-    if (password) { password.value = ''; password.placeholder = currentLang === 'ar' ? 'أنشئ كلمة مرور جديدة' : 'Create a new password'; password.setAttribute('autocomplete', 'new-password'); }
-    const confirm = document.getElementById('confirm-new-password');
-    if (confirm) { confirm.value = ''; confirm.placeholder = tr('confirm_password_placeholder'); confirm.focus(); }
-    const create = document.getElementById('create-password-btn');
-    if (create) create.innerText = tr('create_password_btn');
-    showLoginMessage('', 'success');
-}
-
-async function handleLogin() {
-    const code = String(document.getElementById('login-emp-code')?.value || '').trim();
-    const pass = String(document.getElementById('login-password')?.value || '');
-    const remember = !!document.getElementById('remember-me')?.checked;
-    if (!code || !pass) { showLoginMessage(tr('login_required')); return; }
-    if (code !== PORTAL_ADMIN_CODE) { showLoginMessage(currentLang === 'ar' ? 'هذا الإصدار التجريبي مخصص لحساب الإدارة فقط.' : 'This test build is restricted to the admin account.'); return; }
-    showLoginMessage(currentLang === 'ar' ? 'جاري التحقق من Firebase...' : 'Verifying with Firebase...', 'success');
-    try {
-        await portalAuth.setPersistence(remember ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION);
-        const credential = await portalAuth.signInWithEmailAndPassword(PORTAL_ADMIN_EMAIL, pass);
-        if (credential.user.uid !== PORTAL_ADMIN_UID) {
-            await portalAuth.signOut();
-            throw new Error('ADMIN_UID_MISMATCH');
+        .glass-card {
+            background: rgba(15, 23, 42, 0.82);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(56, 189, 248, 0.22);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
-        await completeLogin(code, null, remember, {code, name: currentLang === 'ar' ? 'مسؤول النظام' : 'System Admin'});
-    } catch (error) {
-        console.error('Portal auth failed:', error.code || error.message);
-        showLoginMessage(error.message === 'ADMIN_UID_MISMATCH'
-            ? (currentLang === 'ar' ? 'الحساب لا يطابق UID المسؤول المحدد.' : 'Admin UID mismatch.')
-            : (currentLang === 'ar' ? 'تعذر تسجيل الدخول. تأكد من كلمة المرور وإعدادات Firebase.' : 'Sign-in failed. Check your password and Firebase settings.'));
-    }
-}
+        .glass-table th, .glass-table td {
+            border-color: rgba(56, 189, 248, 0.1) !important;
+        }
+        .neon-blue-icon {
+            color: #38bdf8;
+            filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.7));
+            transition: all 0.3s ease;
+        }
+        .sidebar-item:hover .neon-blue-icon {
+            filter: drop-shadow(0 0 12px rgba(56, 189, 248, 1));
+            transform: scale(1.1);
+        }
+        @keyframes rotate3D {
+            0% { transform: perspective(800px) rotateY(0deg); }
+            100% { transform: perspective(800px) rotateY(360deg); }
+        }
+        .logo-soft-3d {
+            animation: rotate3D 7s linear infinite;
+            border-radius: 12px;
+            filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.6));
+        }
+        .sidebar-collapsed {
+            width: 80px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sidebar-collapsed:hover {
+            width: 250px;
+             min-width: 250px;
+        }
+        .sidebar-collapsed .nav-text,
+        .sidebar-collapsed .sidebar-title {
+            opacity: 0;
+            white-space: nowrap;
+            transition: opacity 0.2s ease-in-out;
+            pointer-events: none;
+        }
+        .sidebar-collapsed:hover .nav-text,
+        .sidebar-collapsed:hover .sidebar-title {
+            opacity: 1;
+            pointer-events: auto;
+        }
 
-// First-time password creation must be done through Firebase Authentication, never the database.
-function createFirstPassword() {
-    showLoginMessage(currentLang === 'ar' ? 'إنشاء الحسابات يتم من Firebase Authentication.' : 'Accounts are created in Firebase Authentication.');
-}
-async function completeLogin(code, pass, remember, user) {
-    if (!portalIsAdmin()) throw new Error('UNAUTHORIZED_ADMIN');
-    currentUserData = { ...(user || {}), code };
-    localStorage.removeItem('lacto_saved_pass');
-    localStorage.setItem('lacto_saved_code', remember ? code : '');
-    sessionStorage.setItem('lacto_active_code', code);
-    const passwordInput = document.getElementById('login-password');
-    if (passwordInput) passwordInput.value = '';
-    const label = document.getElementById('current-user-label');
-    if (label) { label.classList.remove('hidden'); label.innerText = currentLang === 'ar' ? 'مسؤول النظام' : 'System Admin'; }
-    hideLogin();
-    document.body.classList.add('portal-signed-in');
-    portalInitialized = true;
-    await loadEmployeesFromFirebase();
-    lmUpdateHeaderIdentity();
-}
-async function handleLogout() {
-    localStorage.removeItem('lacto_saved_pass');
-    localStorage.removeItem('lacto_saved_code');
-    sessionStorage.removeItem('lacto_active_code');
-    document.body.classList.remove('portal-signed-in');
-    await portalAuth.signOut();
-    window.location.reload();
-}
+        /* ===== ESS INTRO + NEW LOGIN EXPERIENCE ===== */
+        .hidden { display: none !important; }
+        #intro-screen {
+            position: fixed; inset: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(rgba(11,15,25,.92),rgba(11,15,25,.97)),url('background.jpg') center/cover no-repeat;
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            display:flex; flex-direction:column; justify-content:center; align-items:center;
+            z-index:99999; perspective:1200px; overflow:hidden;
+            transition:opacity 1.2s ease, visibility 1.2s ease;
+        }
+        #intro-screen.fade-out { opacity:0; visibility:hidden; pointer-events:none; }
+        .intro-content-wrapper { display:flex; flex-direction:column; align-items:center; gap:1.2rem; text-align:center; padding:0 1rem; width:100%; }
+        .intro-title-container { width:100%; display:flex; gap:.15rem; flex-wrap:nowrap; justify-content:center; align-items:center; direction:ltr; }
+        .intro-char { font-family:'Plus Jakarta Sans',sans-serif; font-size:clamp(1.2rem,4vw,2rem); font-weight:800; background:linear-gradient(135deg,#38bdf8,#0284c7); -webkit-background-clip:text; -webkit-text-fill-color:transparent; text-shadow:0 0 20px rgba(56,189,248,.6); display:inline-block; }
+        .intro-space { width:.4rem; }
+        .intro-subtitle { font-family:'Great Vibes',cursive; font-size:clamp(1.5rem,5vw,2.5rem); color:#38bdf8; text-shadow:0 0 20px rgba(56,189,248,.6); opacity:0; line-height:1.4; width:100%; text-align:center; white-space:nowrap; }
+        #introFooter { position:absolute; bottom:-20vh; width:100%; text-align:center; opacity:0; display:flex; flex-direction:column; gap:.5rem; z-index:10; }
+        #copyrightText { font-size:.9rem; color:#94a3b8; font-family:'Cairo',sans-serif; font-weight:600; letter-spacing:1px; }
 
-async function loadEmployeesFromFirebase() {
-    const tableBody = document.getElementById('employees-table-body');
-    if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">${tr('loading')}</td></tr>`;
-    try {
-        allEmployees = await readEmployeeSources();
-        await lmLoadCustomFieldDefinitions();
-        queueMicrotask(lmUpdateHeaderIdentity);
-        lmPopulateEmployeeFilters();
-        filterEmployees();
-        updateDashboardStats();
-        if(hrActivePage==='dashboard') renderHRWorkspace();
-        if (typeof renderHRWorkspace === 'function') renderHRWorkspace();
-        const status = document.getElementById('connection-status');
-        if (status) status.textContent = currentLang === 'ar'
-            ? `متصل بـ Firebase — ${allEmployees.length} موظف`
-            : `Connected to Firebase — ${allEmployees.length} employees`;
-    } catch (error) {
-        if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-300">${tr('login_error')}</td></tr>`;
-        showToast(tr('login_error'), true);
-    }
+        #login-modal { background:linear-gradient(rgba(5,11,24,.55),rgba(5,11,24,.88)),url('background.jpg') center/cover no-repeat !important; backdrop-filter:blur(8px); }
+        #login-lang-switcher { position:absolute; top:1.25rem; right:1.25rem; z-index:20; }
+        [dir="ltr"] #login-lang-switcher { right:auto; left:1.25rem; }
+        .ess-lang-btn { display:flex; align-items:center; gap:.35rem; padding:.55rem .8rem; border-radius:.8rem; background:rgba(15,23,42,.82); border:1px solid rgba(56,189,248,.45); color:#38bdf8; font-size:.75rem; font-weight:800; box-shadow:0 6px 20px rgba(0,0,0,.3),0 0 12px rgba(56,189,248,.08); backdrop-filter:blur(12px); cursor:pointer; transition:.25s ease; }
+        .ess-lang-btn:hover { transform:translateY(-1px) scale(1.02); border-color:#38bdf8; background:rgba(56,189,248,.12); }
+        .ess-lang-menu { position:absolute; top:calc(100% + 8px); min-width:110px; padding:.35rem; border-radius:.9rem; background:rgba(15,23,42,.96); border:1px solid rgba(56,189,248,.4); box-shadow:0 20px 45px rgba(0,0,0,.55); display:none; overflow:hidden; }
+        .ess-lang-menu.show { display:block; }
+        [dir="rtl"] .ess-lang-menu { right:0; }
+        [dir="ltr"] .ess-lang-menu { left:0; }
+        .ess-lang-option { width:100%; border:0; background:transparent; color:#e2e8f0; padding:.55rem .65rem; border-radius:.6rem; cursor:pointer; text-align:left; font-size:.75rem; font-weight:700; }
+        .ess-lang-option:hover { background:rgba(56,189,248,.14); color:#38bdf8; }
+        [dir="rtl"] .ess-lang-option { text-align:right; }
+
+        #login-brand-stage { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:1; }
+        #login-brand { width:min(46vw,420px); min-width:250px; display:flex; flex-direction:column; align-items:center; text-align:center; opacity:0; transform:scale(1.55); transition:transform 1.15s cubic-bezier(.16,1,.3,1), opacity .9s ease, left 1.15s ease, right 1.15s ease; }
+        #login-brand.intro-ready { opacity:1; }
+        #login-brand.compact { transform:scale(1); }
+        [dir="rtl"] #login-brand.compact { position:absolute; right:8%; left:auto; }
+        [dir="ltr"] #login-brand.compact { position:absolute; left:8%; right:auto; }
+        .login-brand-logo {
+            width:min(32vw,280px); height:min(32vw,280px); min-width:170px; min-height:170px;
+            object-fit:contain; background:transparent; border:0; border-radius:28px;
+            filter:drop-shadow(0 18px 24px rgba(0,0,0,.28)) drop-shadow(0 0 22px rgba(56,189,248,.28));
+            transform-style:preserve-3d; backface-visibility:visible;
+            animation:loginLogoRotate3D 12s linear infinite, loginLogoGlow 4.5s ease-in-out infinite;
+        }
+        @keyframes loginLogoRotate3D {
+            0% { transform:perspective(1000px) rotateY(0deg) rotateX(0deg); }
+            50% { transform:perspective(1000px) rotateY(180deg) rotateX(2deg); }
+            100% { transform:perspective(1000px) rotateY(360deg) rotateX(0deg); }
+        }
+        @keyframes loginLogoGlow {
+            0%,100% { filter:drop-shadow(0 12px 18px rgba(0,0,0,.25)) drop-shadow(0 0 7px rgba(56,189,248,.14)); }
+            50% { filter:drop-shadow(0 16px 20px rgba(0,0,0,.29)) drop-shadow(0 0 13px rgba(56,189,248,.25)); }
+        }
+        #login-brand { transform-style:preserve-3d; }
+        #login-brand.compact .login-brand-logo { animation:loginLogoRotate3D 12s linear infinite, loginLogoGlow 4.5s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) { .login-brand-logo { animation:none !important; } }
+        .login-brand-name { margin-top:.8rem; font-size:clamp(1.35rem,3vw,2.1rem); font-weight:900; color:#fff; letter-spacing:.03em; text-shadow:0 0 18px rgba(56,189,248,.35); }
+        .login-brand-slogan { margin-top:.25rem; font-size:clamp(.75rem,1.4vw,.95rem); color:#38bdf8; font-weight:700; }
+        #login-panel { position:relative; z-index:5; width:min(420px,92vw); margin-top:3rem; opacity:0; transform:translateY(24px) scale(.98); transition:opacity .9s ease .25s, transform .9s cubic-bezier(.16,1,.3,1) .25s; }
+        #login-panel.visible { opacity:1; transform:translateY(0) scale(1); }
+        #login-panel .login-inner { background:rgba(15,23,42,.72); backdrop-filter:blur(22px); border:1px solid rgba(56,189,248,.34); box-shadow:0 25px 70px rgba(0,0,0,.45), inset 0 1px 1px rgba(255,255,255,.05); border-radius:1.5rem; padding:1.7rem; }
+        [dir="rtl"] #login-panel.compact-mode { margin-right:50%; }
+        [dir="ltr"] #login-panel.compact-mode { margin-left:50%; }
+        .login-error { min-height:1.25rem; color:#f87171; font-size:.72rem; font-weight:700; text-align:center; }
+        .portal-action-btn { background:linear-gradient(135deg,#38bdf8,#0284c7); border:1px solid rgba(56,189,248,.65); color:#fff; box-shadow:0 8px 22px rgba(2,132,199,.25); }
+        .portal-action-btn:hover { filter:brightness(1.08); transform:translateY(-1px); }
+        .portal-ghost-btn { background:rgba(56,189,248,.1); border:1px solid rgba(56,189,248,.35); color:#7dd3fc; }
+        .portal-danger-btn { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.4); color:#fca5a5; }
+        .modal-panel { max-height:88vh; overflow:auto; }
+        .dynamic-field-card { background:rgba(15,23,42,.55); border:1px solid rgba(56,189,248,.14); border-radius:1rem; padding:1rem; }
+        .firebase-key-badge { font-family:'Share Tech Mono',monospace; color:#7dd3fc; font-size:.68rem; }
+        .login-top-note { color:#94a3b8; font-size:.7rem; text-align:center; margin-bottom:.7rem; }
+        /* ===== PROFESSIONAL PASSWORD FIELD / RTL-LTR SAFE ===== */
+        .password-field {
+            position: relative;
+            width: 100%;
+            direction: inherit;
+        }
+        .password-input {
+            width: 100%;
+            height: 48px;
+            box-sizing: border-box;
+            padding-block: 0;
+            padding-inline-start: 16px;
+            padding-inline-end: 54px;
+            background: rgba(2,6,23,.78);
+            border: 1px solid rgba(56,189,248,.30);
+            border-radius: 12px;
+            color: #e2e8f0;
+            font-size: 14px;
+            font-family: 'Cairo', sans-serif;
+            outline: none;
+            transition: border-color .25s ease, box-shadow .25s ease, background .25s ease;
+        }
+        .password-input::placeholder { color: #64748b; }
+        .password-input:hover { border-color: rgba(56,189,248,.50); }
+        .password-input:focus {
+            border-color: #38bdf8;
+            background: rgba(2,6,23,.92);
+            box-shadow: 0 0 0 3px rgba(56,189,248,.10), 0 0 20px rgba(56,189,248,.08);
+        }
+        .password-toggle {
+            position: absolute;
+            inset-inline-end: 8px;
+            top: 50%;
+            width: 34px;
+            height: 34px;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            margin: 0;
+            border: 1px solid rgba(56,189,248,.22);
+            border-radius: 9px;
+            background: rgba(56,189,248,.07);
+            color: #7dd3fc;
+            cursor: pointer;
+            transition: background .2s ease, border-color .2s ease, color .2s ease, transform .2s ease, box-shadow .2s ease;
+        }
+        .password-toggle:hover {
+            background: rgba(56,189,248,.16);
+            border-color: rgba(56,189,248,.55);
+            color: #38bdf8;
+            box-shadow: 0 0 12px rgba(56,189,248,.16);
+        }
+        .password-toggle:active { transform: translateY(-50%) scale(.94); }
+        .password-toggle:focus-visible { outline: 2px solid rgba(56,189,248,.7); outline-offset: 2px; }
+        .password-toggle span { width: 19px; height: 19px; display:flex; align-items:center; justify-content:center; }
+        .password-toggle svg { width: 19px; height: 19px; display:block; }
+        html[dir="rtl"] .password-field { direction: rtl; }
+        html[dir="ltr"] .password-field { direction: ltr; }
+
+        @media (max-width: 900px) {
+            #login-brand.compact { position:relative !important; inset:auto !important; transform:scale(.86); margin:0 auto; }
+            #login-panel.compact-mode { margin:0 auto !important; }
+            #login-brand-stage { position:relative; height:48vh; align-items:center; }
+            #login-panel { margin:0 auto; }
+            .login-brand-logo { width:190px; height:190px; }
+        }
+
+        /* Fixed hover sidebar: never shifts the main workspace */
+        .sidebar-collapsed{position:fixed;top:76px;bottom:0;inset-inline-start:0;width:64px;z-index:45;overflow:hidden;transition:width .24s ease}
+        .sidebar-collapsed:hover,.sidebar-collapsed:focus-within{width:330px}
+        .sidebar-collapsed .nav-text,.sidebar-collapsed .sidebar-title{opacity:0}
+        .sidebar-collapsed:hover .nav-text,.sidebar-collapsed:focus-within .nav-text,.sidebar-collapsed:hover .sidebar-title{opacity:1}
+        .hr-nav.active {background:rgba(14,165,233,.22);color:#7dd3fc;border:1px solid rgba(56,189,248,.35)}
+        .hr-kpi{padding:20px;border-radius:18px;background:rgba(15,23,42,.85);border:1px solid rgba(56,189,248,.2)}
+        .hr-chart-bar{background:linear-gradient(0deg,#0369a1,#38bdf8);border-radius:6px 6px 0 0;min-height:3px}
+        @media(max-width:767px){.sidebar-collapsed{display:flex!important;position:fixed;top:76px;bottom:0;inset-inline-start:0;z-index:45;width:56px}.sidebar-collapsed:focus-within,.sidebar-collapsed:hover{width:300px;min-width:300px}}
+
+/* Expanded neon navigation */
+.sidebar-collapsed{box-shadow:8px 0 38px rgba(2,132,199,.13);background:rgba(8,18,37,.97)!important}
+.sidebar-collapsed nav{padding-top:12px}
+.sidebar-collapsed .sidebar-item{min-height:62px;gap:18px!important;padding-inline:14px!important;font-size:15px;font-weight:700;text-align:start}
+.hr-side-icon{width:28px;height:28px;min-width:28px;stroke:#67e8f9;filter:drop-shadow(0 0 7px rgba(56,189,248,.8));transition:filter .2s,transform .2s}
+.sidebar-item:hover .hr-side-icon{filter:drop-shadow(0 0 15px #38bdf8);transform:scale(1.09)}
+.sidebar-collapsed:not(:hover):not(:focus-within) .sidebar-item{padding-inline:12px!important}
+.hr-map-dot{cursor:pointer;outline:none}.hr-map-dot:focus circle,.hr-map-dot:hover circle{stroke:#fff;stroke-width:3;filter:drop-shadow(0 0 8px #38bdf8)}
+.hr-map-dot circle{transition:r .2s}.hr-map-dot:hover circle{r:12}
+.hr-panel{background:rgba(13,24,45,.88);border:1px solid rgba(56,189,248,.18);border-radius:20px;padding:20px;min-width:0}
+.hr-stat-label{font-size:12px;color:#94a3b8}.hr-stat-value{font-size:29px;color:#7dd3fc;font-weight:800;margin-top:6px}
+.hr-mini-track{height:9px;background:#182b46;border-radius:12px;overflow:hidden}.hr-mini-fill{height:100%;background:linear-gradient(90deg,#0369a1,#67e8f9);border-radius:12px}
+
+
+/* HR navigation: full-height hover dock, never obscures workspace */
+.sidebar-collapsed{top:0!important;bottom:0!important;height:100dvh!important;width:76px!important;z-index:40!important;overflow-y:auto!important;overflow-x:hidden!important}
+.sidebar-collapsed:hover,.sidebar-collapsed:focus-within{width:326px!important}
+.sidebar-collapsed .hr-side-icon{flex-shrink:0;stroke:#67e8f9!important}
+.sidebar-collapsed .sidebar-item{white-space:nowrap;min-height:66px}
+.sidebar-collapsed .sidebar-title{display:inline-block}
+body>header{padding-inline-start:88px;transition:padding-inline-start .25s ease}
+body>div.flex.flex-1.overflow-hidden>main{min-width:0;margin-inline-start:76px;transition:margin-inline-start .25s ease}
+@supports selector(body:has(.sidebar-collapsed:hover)){
+ body:has(.sidebar-collapsed:hover)>header,body:has(.sidebar-collapsed:focus-within)>header{padding-inline-start:338px}
+ body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden>main,body:has(.sidebar-collapsed:focus-within)>div.flex.flex-1.overflow-hidden>main{margin-inline-start:326px}
 }
+@media(max-width:767px){.sidebar-collapsed{width:60px!important}.sidebar-collapsed:hover,.sidebar-collapsed:focus-within{width:min(290px,85vw)!important}body>header{padding-inline-start:68px!important}body>div.flex.flex-1.overflow-hidden>main{margin-inline-start:60px!important;padding:12px!important}body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden>main{margin-inline-start:60px!important}}
+.hr-custom-field{background:rgba(15,23,42,.6);border:1px solid rgba(56,189,248,.23);border-radius:12px;padding:12px;overflow-wrap:anywhere}
 
-// Employee filtering uses the current Firebase employee snapshot; never modifies records.
-let lmLastFilteredEmployees=[];
-let lmAppliedSearchQuery='';
-function lmCommitEmployeeSearch(){lmAppliedSearchQuery=String(document.getElementById('search-input')?.value||'').trim();filterEmployees();}
-function lmEmployeeSearchInputChanged(input){if(!String(input?.value||'').trim()){lmAppliedSearchQuery='';filterEmployees();}}
 
-const lmFilterSpecs=[
- ['dept',e=>getEmployeeDept(e),'الإدارة','Department'],
- ['job',e=>getEmployeeJob(e),'الوظيفة','Job title'],
- ['qual',e=>currentLang==='ar'?getField(e,'المؤهل','المؤهل ','qualification'):getField(e,'qualification','المؤهل','المؤهل '),'المؤهل','Qualification'],
- ['gender',e=>currentLang==='ar'?getField(e,'النوع','الجنس','gender','Gender'):getField(e,'gender','Gender','النوع','الجنس'),'النوع','Gender'],
- ['gov',e=>currentLang==='ar'?getField(e,'المحافظة ','المحافظة','محافظة','governorate','governorate '):getField(e,'governorate','governorate ','المحافظة ','المحافظة','محافظة'),'المحافظة','Governorate'],
- ['marital',e=>currentLang==='ar'?getField(e,'الحالة الإجتماعية ','الحالة الإجتماعية','الحالة الاجتماعية ','الحالة الاجتماعية','marital status ','marital status','maritalStatus'):getField(e,'marital status ','marital status','maritalStatus','الحالة الإجتماعية ','الحالة الإجتماعية','الحالة الاجتماعية ','الحالة الاجتماعية'),'الحالة الاجتماعية','Marital status']
-];
-function lmFilterValue(e,fn){const v=fn(e);return String(v??'').trim().replace(/\s+/g,' ');}
-function lmPopulateEmployeeFilters(){
- for(const [id,fn,ar,en] of lmFilterSpecs){
-  const select=document.getElementById('lm-filter-'+id);if(!select)continue;
-  const prior=[...select.selectedOptions].map(o=>o.value);
-  // Jobs reflect the chosen departments; other choices remain available.
-  const departments=[...document.getElementById('lm-filter-dept')?.selectedOptions||[]].map(o=>o.value);
-  const source=id==='job'&&departments.length?allEmployees.filter(e=>departments.includes(lmFilterValue(e,lmFilterSpecs[0][1]))):allEmployees;
-  const values=[...new Set(source.map(e=>lmFilterValue(e,fn)).filter(v=>v&&v!=='--'))].sort((a,b)=>a.localeCompare(b,currentLang==='ar'?'ar':'en',{numeric:true}));
-  select.replaceChildren();
-  for(const value of values){const o=document.createElement('option');o.value=value;o.textContent=value;o.selected=prior.includes(value);select.append(o)}
+/* Globe analytics upgrade: layout and hover dock fixes */
+.sidebar-collapsed:focus-within:not(:hover){width:76px!important}
+.sidebar-collapsed:focus-within:not(:hover) .nav-text,.sidebar-collapsed:focus-within:not(:hover) .sidebar-title{opacity:0!important}
+body:has(.sidebar-collapsed:focus-within:not(:hover))>header{padding-inline-start:88px!important}
+body:has(.sidebar-collapsed:focus-within:not(:hover))>div.flex.flex-1.overflow-hidden>main{margin-inline-start:76px!important}
+.sidebar-collapsed .sidebar-item{display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:16px!important}
+.sidebar-collapsed .hr-side-icon{display:block!important;width:28px!important;height:28px!important;flex:0 0 28px!important}
+.hr-map-shell{min-width:0}.hr-map-stage{position:relative;min-height:360px;overflow:hidden;border:1px solid rgba(56,189,248,.15);border-radius:18px;background:radial-gradient(ellipse at center,#132c4b,#081427 70%)}
+.hr-world,.hr-egypt-zoom{position:absolute;inset:0;transition:opacity .55s ease,transform .7s cubic-bezier(.2,.8,.2,1);padding:16px}
+.hr-world{display:flex;flex-direction:column;justify-content:center;align-items:center}.hr-world svg{width:100%;max-height:285px}.hr-map-hint{text-align:center;font-size:12px;color:#7dd3fc}
+.hr-egypt-target{cursor:pointer;filter:drop-shadow(0 0 10px #38bdf8)}.hr-egypt-target circle{transition:transform .3s;transform-box:fill-box;transform-origin:center}.hr-egypt-target:hover circle{transform:scale(1.3)}
+.hr-egypt-zoom{opacity:0;pointer-events:none;transform:scale(.75) translateY(18px);overflow-y:auto}.hr-map-stage.is-zoomed .hr-world{opacity:0;pointer-events:none;transform:scale(2.4) translateX(-12%)}.hr-map-stage.is-zoomed .hr-egypt-zoom{opacity:1;pointer-events:auto;transform:scale(1)}
+.hr-zoom-top{display:flex;align-items:center;justify-content:space-between;gap:12px;color:#bae6fd;font-size:13px}.hr-map-back{padding:7px 11px;border-radius:9px;background:#0e3758;border:1px solid #38bdf8;color:#e0f2fe;cursor:pointer}
+.hr-egypt-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(115px,.75fr);gap:10px;height:300px}.hr-egypt-svg{width:100%;height:100%;object-fit:contain}.hr-geo-list{overflow:auto;font-size:11px;padding:10px}.hr-map-tooltip{margin-top:10px;padding:12px 14px;border-radius:10px;border:1px solid #38bdf8;background:#071729;color:#bae6fd;text-align:center;min-height:46px}
+.hr-donut-layout{display:flex;align-items:center;gap:20px;flex-wrap:wrap}.hr-donut{width:155px;height:155px;flex:none;border-radius:50%;display:grid;place-items:center}.hr-donut>div{width:110px;height:110px;border-radius:50%;background:#0d182d;display:flex;flex-direction:column;align-items:center;justify-content:center}.hr-donut b{font-size:26px;color:#e0f2fe}.hr-donut small{font-size:10px;color:#94a3b8}.hr-donut-legend{flex:1;min-width:140px}.hr-donut-legend>div{display:flex;align-items:center;gap:8px;font-size:11px;margin:8px 0}.hr-donut-legend i{width:9px;height:9px;border-radius:50%;flex:none}.hr-donut-legend span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hr-donut-legend b{color:#7dd3fc}.hr-hbar-row{display:grid;grid-template-columns:minmax(80px,1fr) minmax(80px,1.5fr) 35px;gap:8px;align-items:center;margin:12px 0;font-size:11px}.hr-hbar-row span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hr-hbar-row>div{height:11px;background:#1c2d49;border-radius:8px;overflow:hidden}.hr-hbar-row i{display:block;height:100%;border-radius:8px}.hr-hbar-row b{color:#7dd3fc;text-align:end}.hr-widget{cursor:pointer;transition:transform .2s,border-color .2s}.hr-widget:hover{transform:translateY(-3px);border-color:#38bdf8}
+@media(max-width:650px){.hr-egypt-layout{grid-template-columns:1fr 1fr}.hr-map-stage{min-height:330px}.hr-donut{width:120px;height:120px}.hr-donut>div{width:85px;height:85px}}
+
+    
+/* v6.4 layout: fixed sidebar dock and independent, bilingual header */
+body>header{position:relative;z-index:30;min-height:76px;box-sizing:border-box;padding-inline:24px 100px!important}
+body>header>div:first-child{min-width:0;display:flex;align-items:center;gap:12px;flex-shrink:1}
+#hr-header-brand{display:inline-block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:clamp(15px,1.7vw,24px);direction:inherit}
+.sidebar-collapsed{inset-inline-start:0!important;inset-inline-end:auto!important;top:0!important;bottom:0!important;width:76px!important;height:100dvh!important;overflow:hidden!important}
+.sidebar-collapsed:hover{width:326px!important}
+.sidebar-collapsed:focus-within:not(:hover){width:76px!important}
+.sidebar-collapsed>div:first-child{padding:12px 0!important}
+.sidebar-collapsed nav{padding:0 8px!important;display:flex;flex-direction:column;gap:8px}
+.sidebar-collapsed .sidebar-item{width:100%;height:58px;min-height:58px;box-sizing:border-box;display:grid!important;grid-template-columns:44px minmax(0,1fr);align-items:center!important;justify-content:initial!important;gap:12px!important;padding:0 7px!important;text-align:start}
+.sidebar-collapsed .hr-side-icon{width:26px!important;height:26px!important;min-width:26px!important;justify-self:center;align-self:center;display:block!important;flex:none!important;transform:none}
+.sidebar-collapsed .sidebar-item:hover .hr-side-icon{transform:scale(1.07)}
+.sidebar-collapsed .nav-text{min-width:0;overflow:hidden;text-overflow:ellipsis;opacity:0!important;pointer-events:none}
+.sidebar-collapsed:hover .nav-text{opacity:1!important;pointer-events:auto}
+.sidebar-collapsed .sidebar-title{display:none!important}
+body>div.flex.flex-1.overflow-hidden>main{margin-inline-start:76px!important;min-width:0;transition:margin-inline-start .25s ease!important}
+body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden>main{margin-inline-start:76px!important}
+body:has(.sidebar-collapsed:hover)>header{padding-inline-start:24px!important;padding-inline-end:88px!important}
+body>header{padding-inline-start:24px!important;padding-inline-end:88px!important;transition:padding-inline-end .25s ease}
+html[dir=ltr] body>header{padding-inline-start:88px!important;padding-inline-end:24px!important}
+html[dir=ltr] body:has(.sidebar-collapsed:hover)>header{padding-inline-start:338px!important;padding-inline-end:24px!important}
+html[dir=ltr] body>div.flex.flex-1.overflow-hidden>main{margin-inline-start:76px!important;margin-inline-end:0!important}
+html[dir=rtl] body>div.flex.flex-1.overflow-hidden>main{margin-inline-end:76px!important;margin-inline-start:0!important}
+html[dir=rtl] body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden>main{margin-inline-end:76px!important;margin-inline-start:0!important}
+#login-brand{transition:transform 2.4s cubic-bezier(.22,1,.36,1),opacity 1.35s ease,left 2.4s cubic-bezier(.22,1,.36,1),right 2.4s cubic-bezier(.22,1,.36,1)!important}
+#login-panel{transition:opacity 1.35s ease .35s,transform 1.6s cubic-bezier(.22,1,.36,1) .35s!important}
+.hr-world svg{max-height:325px!important;width:100%;display:block}
+.hr-world{padding:12px!important}.hr-map-stage{min-height:390px!important}
+.hr-egypt-target{cursor:pointer}.hr-egypt-target:hover{filter:drop-shadow(0 0 8px #67e8f9)}
+@media(max-width:767px){body>header{padding-inline:14px 68px!important}html[dir=ltr] body>header{padding-inline:68px 14px!important}#hr-header-brand{font-size:14px}.sidebar-collapsed{width:60px!important}.sidebar-collapsed .sidebar-item{grid-template-columns:38px minmax(0,1fr);padding:0 3px!important}.sidebar-collapsed:hover{width:min(290px,85vw)!important}body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden>main{margin-inline-start:60px!important;margin-inline-end:0!important}html[dir=rtl] body:has(.sidebar-collapsed:hover)>div.flex.flex-1.overflow-hidden>main{margin-inline-start:0!important;margin-inline-end:60px!important}}
+@media(prefers-reduced-motion:reduce){#login-brand,#login-panel,.hr-world,.hr-egypt-zoom{transition:none!important}}
+
+/* v6.5 - full-card geographic Egypt map */
+.hr-map-stage{height:clamp(430px,43vw,590px);min-height:430px}
+.hr-egypt-zoom{padding:12px 14px!important;overflow:hidden!important;display:flex;flex-direction:column;gap:8px}
+.hr-zoom-top{flex:0 0 auto;min-height:32px}
+.hr-egypt-layout{display:flex!important;flex:1 1 auto;height:auto!important;min-height:0;gap:0!important;position:relative}
+.hr-egypt-svg{height:100%!important;width:100%!important;max-height:none!important;object-fit:contain;display:block}
+.hr-geo-list{display:none!important}
+.hr-map-tooltip{margin-top:8px!important;min-height:38px!important;padding:8px 12px!important;flex:0 0 auto}
+.hr-egypt-region{stroke:#70a9c9;stroke-width:.7;vector-effect:non-scaling-stroke;cursor:pointer;transition:fill .18s ease,filter .18s ease,stroke .18s ease}
+.hr-egypt-region:hover,.hr-egypt-region:focus{stroke:#fff;stroke-width:1.8;filter:drop-shadow(0 0 7px #38bdf8);outline:none}
+.hr-egypt-zoom .hr-map-status{position:absolute;bottom:8px;inset-inline-start:12px;font-size:10px;color:#8bb4cb;pointer-events:none}
+@media(max-width:650px){.hr-map-stage{height:450px;min-height:450px}}
+
+
+/* v6.6: RTL/LTR dock clearance — sidebar is on inline-start, not inline-end. */
+html[dir="rtl"] body > div.flex.flex-1.overflow-hidden > main {
+  margin-inline-start:76px!important;
+  margin-inline-end:0!important;
+}
+html[dir="rtl"] body:has(.sidebar-collapsed:hover) > div.flex.flex-1.overflow-hidden > main {
+  margin-inline-start:326px!important;
+  margin-inline-end:0!important;
+}
+html[dir="rtl"] body > header {
+  padding-inline-start:88px!important;
+  padding-inline-end:24px!important;
+}
+html[dir="rtl"] body:has(.sidebar-collapsed:hover) > header {
+  padding-inline-start:338px!important;
+  padding-inline-end:24px!important;
+}
+body > div.flex.flex-1.overflow-hidden > main { box-sizing:border-box; overflow-x:hidden; }
+@media (max-width:767px) {
+ html[dir="rtl"] body > div.flex.flex-1.overflow-hidden > main,
+ html[dir="rtl"] body:has(.sidebar-collapsed:hover) > div.flex.flex-1.overflow-hidden > main {
+   margin-inline-start:60px!important; margin-inline-end:0!important;
  }
- document.querySelectorAll('#lm-employee-filters [data-ar][data-en]').forEach(el=>el.textContent=el.dataset[currentLang]);
-}
-function lmHireISO(emp){const raw=getHireDate(emp);if(/^\d{4}-\d{2}-\d{2}$/.test(String(raw)))return raw;const m=String(raw).match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);return m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:''}
-function filterEmployees(){
- const query=String(lmAppliedSearchQuery||'').trim().toLocaleLowerCase();
- // A selected job matches ANY selected job; other filter dimensions combine with AND.
- const selected=lmFilterSpecs.map(([id,fn])=>({values:[...document.getElementById('lm-filter-'+id)?.selectedOptions||[]].map(o=>o.value),fn}));
- const from=document.getElementById('lm-filter-hire-from')?.value||'',to=document.getElementById('lm-filter-hire-to')?.value||'';
- lmLastFilteredEmployees=allEmployees.filter(emp=>{
-  if(query){if(/^\d+$/.test(query)){if(String(getEmployeeCode(emp)).trim()!==query)return false;}else{const text=[getEmployeeName(emp),getField(emp,'اسم الموظف ','اسم الموظف'),getField(emp,'emp_name _en','employee_name_en')].join(' ').toLocaleLowerCase();if(!text.includes(query))return false;}}
-  if(selected.some(s=>s.values.length && !s.values.includes(lmFilterValue(emp,s.fn))))return false;
-  if(from||to){const hire=lmHireISO(emp);if(!hire||(from&&hire<from)||(to&&hire>to))return false;}
-  return true;
- });
- renderTable(lmLastFilteredEmployees);
- const count=document.getElementById('lm-filter-count');if(count)count.textContent=currentLang==='ar'?`${lmLastFilteredEmployees.length} من ${allEmployees.length} موظف`:`${lmLastFilteredEmployees.length} of ${allEmployees.length} employees`;
-}
-function lmClearEmployeeFilters(){const q=document.getElementById('search-input');if(q)q.value='';lmAppliedSearchQuery='';document.querySelectorAll('#lm-employee-filters select,#lm-employee-filters input').forEach(el=>{if(el.multiple)[...el.options].forEach(o=>o.selected=false);else el.value='';});lmPopulateEmployeeFilters();filterEmployees()}
-// Full employee export: union of actual database columns, not just visible table columns.
-// Never export credentials, auth tokens, internal metadata, or unbounded image payloads.
-function lmExportSafeField(key){
- const k=String(key).trim().toLowerCase().replace(/[\s_-]+/g,'');
- return !String(key).startsWith('_') && !/(password|passwd|pwd|passhash|passwordhash|authtoken|refreshtoken|accesstoken|idtoken|secret|apikey|privatekey|credential|sessiontoken|كلمةالمرور|كلمهالمرور|الرقمالسري)/i.test(k)
-  && !/(selfiedata|photo(base64|data)|imagedata|faceembedding|biometrictemplate)/i.test(k);
-}
-function lmExportCell(value){
- if(value===null||value===undefined)return '';
- const str=typeof value==='object'?JSON.stringify(value):String(value);
- // Prevent Excel interpreting untrusted cell text as a formula.
- return /^[\s\u0000-\u001f]*[=+@-]/.test(str)?"'"+str:str;
-}
-function lmExportFilteredEmployees(){
- // Re-evaluate active filters immediately before export to avoid stale/all-company snapshots.
- filterEmployees();
- const employees=lmLastFilteredEmployees;
- if(!employees.length){showToast(currentLang==='ar'?'لا توجد نتائج للتصدير':'No matching employees to export',true);return;}
- const keys=[...new Set(employees.flatMap(e=>Object.keys(e||{}).filter(lmExportSafeField)))];
- keys.sort((a,b)=>a.localeCompare(b,currentLang==='ar'?'ar':'en',{numeric:true}));
- const codeKey='Employee Code';
- const rows=[[codeKey,...keys],...employees.map(e=>[getEmployeeCode(e),...keys.map(k=>lmExportCell(e[k]))])];
- const csv='\uFEFF'+rows.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
- const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
- const a=document.createElement('a');a.href=url;a.download='LactoMisr_Employees_FullData_'+new Date().toISOString().slice(0,10)+'.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
-}
-
-function renderTable(dataList) {
-    const tableBody=document.getElementById('employees-table-body'); if(!tableBody) return;
-    tableBody.innerHTML='';
-    if(!dataList.length){ tableBody.innerHTML=`<tr><td colspan="6" class="p-6 text-center text-slate-400">${tr('no_results')}</td></tr>`; return; }
-    dataList.forEach(emp=>{
-        const code=getEmployeeCode(emp)||'--';
-        const name=getEmployeeName(emp);
-        const dept=getEmployeeDept(emp);
-        const job=getEmployeeJob(emp);
-        const hire=getHireDate(emp);
-        const row=document.createElement('tr'); row.className='hover:bg-slate-800/40 transition text-slate-300';
-        row.innerHTML=`<td class="p-3.5 font-mono text-sky-400">${escapeHtml(code)}</td><td class="p-3.5 font-semibold text-white">${escapeHtml(String(name).trim())}</td><td class="p-3.5">${escapeHtml(String(dept).trim())}</td><td class="p-3.5">${escapeHtml(String(job).trim())}</td><td class="p-3.5 font-mono text-xs">${escapeHtml(String(hire))}</td><td class="p-3.5 text-center"><button onclick="viewEmployee('${escapeAttr(code)}')" class="px-3.5 py-1.5 bg-sky-600/30 hover:bg-sky-600 text-sky-200 rounded-lg text-xs border border-sky-400/30 transition shadow-lg">${tr('action_btn')}</button></td>`;
-        tableBody.appendChild(row);
-    });
-}
-
-function getHireDate(emp) { const v=getField(emp,'تاريخ التعيين ','تاريخ التعيين','hireDate','date_of_hiring '); return typeof v==='number'?excelDateToJSDate(v):v||'--'; }
-
-function escapeHtml(value){return String(value).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
-function escapeAttr(value){return String(value).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
-
-function viewEmployee(code) {
-    if(fahdHasUnsavedChanges()&&!window.fahdNavigationApproved){fahdGuardNavigation(()=>viewEmployee(code));return;}
-
-    if (typeof showHRPage === 'function' && hrActivePage !== 'employees') showHRPage('employees');
-    activeEmployeeCode=code;
-    const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(code)); if(!emp) return;
-    const listView = document.getElementById('employees-list-view');
-    const profileView = document.getElementById('employee-profile-view');
-    if (listView) { listView.classList.add('hidden'); listView.style.display='none'; }
-    if (profileView) { profileView.classList.remove('hidden'); profileView.style.display='block'; }
-    setFieldVal('prof-code',code);
-    setFieldVal('prof-name', getEmployeeName(emp));
-    setFieldVal('prof-dept', getEmployeeDept(emp));
-    setFieldVal('prof-job', getEmployeeJob(emp));
-    setFieldVal('prof-manager', currentLang === 'ar' ? (getField(emp, 'المدير المباشر ', 'المدير المباشر', 'directManager') || '--') : (getField(emp, 'direct manager ', 'directManager') || '--'));
-    setFieldVal('prof-hire',getHireDate(emp));
-    setFieldVal('prof-service',getField(emp,'سنوات الخدمة ','سنوات الخدمة','yearsService','years service'));
-    setFieldVal('prof-qual', currentLang === 'ar' ? (getField(emp, 'المؤهل', 'qualification') || '--') : (getField(emp, 'qualification') || '--'));
-    setFieldVal('prof-qual-auth', currentLang === 'ar' ? (getField(emp, 'جهة المؤهل ', 'جهة المؤهل', 'qualAuth') || '--') : (getField(emp, 'qulification issuing authority', 'qualAuth', 'issuer') || '--'));
-    setFieldVal('prof-dob',excelDateToJSDate(getField(emp,'تاريخ الميلاد','dob')));
-    setFieldVal('prof-age',getField(emp,'السن حتى تاريخه ','السن حتى تاريخه','age','age to date'));
-    setFieldVal('prof-insurance', currentLang === 'ar' ? (getField(emp, 'الحالة التأمينية ', 'الحالة التأمينية', 'insuranceStatus') || '--') : (getField(emp, 'insurance status ', 'insuranceStatus') || '--'));
-    setFieldVal('prof-pob', currentLang === 'ar' ? (getField(emp, 'مكان الميلاد', 'pob') || '--') : (getField(emp, 'pob') || '--'));
-    document.getElementById('profile-img').src=getField(emp,'photoUrl','photo','رابط الصورة') || 'default-avatar.png';
-    document.getElementById('btn-save')?.classList.add('hidden'); document.getElementById('btn-edit')?.classList.remove('hidden'); document.getElementById('btn-photo')?.classList.add('hidden');
-    setFieldsEditable(true);
-    renderExtraEmployeeFields();
-    fahdRender(emp);
-}
-function setFieldVal(id,val){const el=document.getElementById(id);if(el)el.value=val??'';}
-function enableEditing(){setFieldsEditable(false);document.getElementById('btn-edit')?.classList.add('hidden');document.getElementById('btn-save')?.classList.remove('hidden');document.getElementById('btn-photo')?.classList.remove('hidden');}
-function setFieldsEditable(isDisabled){['prof-name','prof-dept','prof-job','prof-manager','prof-hire','prof-service','prof-qual','prof-qual-auth','prof-dob','prof-age','prof-insurance','prof-pob'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.disabled=isDisabled;el.classList.toggle('bg-slate-900/50',isDisabled);el.classList.toggle('border-slate-700',isDisabled);el.classList.toggle('bg-slate-900/90',!isDisabled);el.classList.toggle('border-sky-500/50',!isDisabled);});}
-function backToEmployeesList(){if(fahdHasUnsavedChanges()&&!window.fahdNavigationApproved){fahdGuardNavigation(()=>backToEmployeesList());return;}if (typeof showHRPage === 'function' && hrActivePage !== 'employees') showHRPage('employees');activeEmployeeCode=null;const profile=document.getElementById('employee-profile-view');const list=document.getElementById('employees-list-view');if(profile){profile.classList.add('hidden');profile.style.display='none';}if(list){list.classList.remove('hidden');list.style.display='block';}}
-
-function renderDynamicFields(){
-    const container=document.getElementById('dynamic-fields-container'); if(!container)return; container.remove(); return; // Technical fields are intentionally hidden
-    const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(activeEmployeeCode)); if(!emp)return;
-    container.innerHTML='';
-    Object.keys(emp).sort().forEach(key=>{
-        if(['code','_firebasePath','_firebaseKey'].includes(key) || ['الكود'].includes(key)) return;
-        const value=emp[key];
-        if(value && typeof value==='object') return;
-        const card=document.createElement('div'); card.className='dynamic-field-card';
-        const inputType=/date|dob|تاريخ/i.test(key)?'date':'text';
-        card.innerHTML=`<div class="flex items-center justify-between gap-2 mb-1"><label class="text-xs text-slate-400">${escapeHtml(displayKey(key))}</label><span class="firebase-key-badge">${escapeHtml(key)}</span></div><input data-firebase-key="${escapeAttr(key)}" type="${inputType}" value="${escapeHtml(value??'')}" ${key==='password'?'autocomplete="new-password"':''} class="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm" disabled>`;
-        container.appendChild(card);
-    });
-}
-
-function confirmSave(){const modal=document.getElementById('confirm-modal');if(modal){document.getElementById('confirm-title').innerText=tr('confirm_title');modal.classList.remove('hidden');}}
-function closeConfirmModal(){document.getElementById('confirm-modal')?.classList.add('hidden');}
-
-async function executeSave(){
-    closeConfirmModal(); if(activeEmployeeCode===null)return;
-    const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(activeEmployeeCode)); if(!emp)return;
-    const updatedData={};
-    putMapped(updatedData, emp, ['الكود','code','employeeCode','empCode'], activeEmployeeCode, 'code');
-    putMapped(updatedData, emp, ['اسم الموظف ','اسم الموظف','name','emp_name _en'], document.getElementById('prof-name').value, 'name');
-    putMapped(updatedData, emp, ['الإدارة ','الإدارة','department','dept'], document.getElementById('prof-dept').value, 'department');
-    putMapped(updatedData, emp, ['الوظيفة','الوظيفة ','jobTitle','job title','job'], document.getElementById('prof-job').value, 'jobTitle');
-    putMapped(updatedData, emp, ['المدير المباشر ','المدير المباشر','directManager','direct manager'], document.getElementById('prof-manager').value, 'directManager');
-    putMapped(updatedData, emp, ['تاريخ التعيين ','تاريخ التعيين','hireDate','date_of_hiring '], document.getElementById('prof-hire').value, 'hireDate');
-    putMapped(updatedData, emp, ['سنوات الخدمة ','سنوات الخدمة','yearsService','years service'], document.getElementById('prof-service').value, 'yearsService');
-    putMapped(updatedData, emp, ['المؤهل','qualification'], document.getElementById('prof-qual').value, 'qualification');
-    putMapped(updatedData, emp, ['جهة المؤهل ','جهة المؤهل','qualAuth','qulification issuing authority','issuer'], document.getElementById('prof-qual-auth').value, 'qualAuth');
-    putMapped(updatedData, emp, ['تاريخ الميلاد','dob'], document.getElementById('prof-dob').value, 'dob');
-    putMapped(updatedData, emp, ['السن حتى تاريخه ','السن حتى تاريخه','age','age to date'], document.getElementById('prof-age').value, 'age');
-    putMapped(updatedData, emp, ['الحالة التأمينية ','الحالة التأمينية','insuranceStatus','insurance status'], document.getElementById('prof-insurance').value, 'insuranceStatus');
-    putMapped(updatedData, emp, ['مكان الميلاد','pob'], document.getElementById('prof-pob').value, 'pob');
-    putMapped(updatedData, emp, ['photoUrl','photo','رابط الصورة'], document.getElementById('profile-img').src, 'photoUrl');
-    document.querySelectorAll('#dynamic-fields-container [data-firebase-key]').forEach(input=>{
-        const key=input.getAttribute('data-firebase-key'); if(isValidFirebaseKey(key) && !/password|pass|كلمة المرور/i.test(key)) updatedData[key]=input.value;
-    });
-    try{
-        const savePath = emp._firebasePath || `${PORTAL_EMPLOYEE_COLLECTION}/${activeEmployeeCode}`;
-        await db.ref(savePath).update(updatedData);
-        Object.assign(emp,updatedData); showToast(); setFieldsEditable(true); document.getElementById('btn-save')?.classList.add('hidden'); document.getElementById('btn-edit')?.classList.remove('hidden'); document.getElementById('btn-photo')?.classList.add('hidden'); renderTable(allEmployees);
-    }catch(error){showToast(tr('login_error'),true);}
-}
-
-function uploadEmployeePhoto(event){const file=event.target.files?.[0];if(!file||activeEmployeeCode===null)return;const reader=new FileReader();reader.onload=async e=>{const base64=e.target.result;document.getElementById('profile-img').src=base64;try{const emp=allEmployees.find(x=>String(getEmployeeCode(x))===String(activeEmployeeCode));const savePath=emp?emp._firebasePath:`${PORTAL_EMPLOYEE_COLLECTION}/${activeEmployeeCode}`;await db.ref(savePath).update({photoUrl:base64});if(emp)emp.photoUrl=base64;showToast();}catch(err){}};reader.readAsDataURL(file);}
-
-function showToast(message=null,isError=false){const toast=document.getElementById('toast-notification');const msg=document.getElementById('toast-message');if(!toast||!msg)return;msg.innerText=message||tr('toast_success');msg.classList.toggle('text-red-300',isError);msg.classList.toggle('text-white',!isError);toast.classList.remove('translate-y-32','opacity-0');setTimeout(()=>toast.classList.add('translate-y-32','opacity-0'),3200);}
-function updateDashboardStats(){const el=document.getElementById('total-employees-count');if(el)el.innerText=allEmployees.length;}
-
-function getFirebaseSchema(){
-    const keys=new Set();
-    allEmployees.forEach(emp=>Object.keys(emp||{}).filter(k=>!k.startsWith('_')).forEach(k=>keys.add(k)));
-    if(!keys.size) ['code','name','department','jobTitle','directManager','hireDate','yearsService','qualification','qualAuth','dob','age','insuranceStatus','pob','photoUrl','email'].forEach(k=>keys.add(k));
-    const codeKey=allEmployees.length ? existingKey(allEmployees[0], ['الكود','code','employeeCode','empCode'], 'code') : 'code';
-    keys.delete(codeKey); keys.delete('code'); keys.delete('الكود'); keys.delete('employeeCode'); keys.delete('empCode');
-    const businessOrder=['اسم الموظف ','emp_name _en','الإدارة ','department ','الوظيفة','job title ','المدير المباشر ','direct manager ','تاريخ التعيين ','date_of_hiring ','سنوات الخدمة ','years of service','المؤهل','qualification','جهة المؤهل ','qulification issuing authority','تاريخ الميلاد','dob','السن حتى تاريخه ','age to date','الحالة التأمينية ','insurance status ','مكان الميلاد','pob','phone','address','governorate','الرقم التأمينى','insurance number','الأجر الشامل','comprehensiveSalary','أجر الاشتراك التأميني','insuranceContributionWage','رصيد الاجازات ','annual leave balance'];
-    const priority = new Map(businessOrder.map((k,i)=>[k,i]));
-    return [codeKey,...Array.from(keys).sort((a,b)=>(priority.get(a)??999)-(priority.get(b)??999)||a.localeCompare(b,'ar'))];
-}
-function openAddEmployeeModal(){document.getElementById('add-employee-modal')?.classList.remove('hidden');buildAddEmployeeForm();fahdCreateTab('personal',document.querySelector('.fahd-create-tabs button'));}
-function closeAddEmployeeModal(){document.getElementById('add-employee-modal')?.classList.add('hidden');}
-function fahdCreateTab(tab,button){document.querySelectorAll('.fahd-create-pane').forEach(el=>el.hidden=el.id!=='fahd-create-'+tab);document.querySelectorAll('.fahd-create-tabs button').forEach(el=>el.classList.toggle('selected',el===button));}
-function fahdParseBirthDate(raw){
- if(!raw)return null;const t=String(raw).trim();let d;
- if(/^\d{4}-\d{2}-\d{2}$/.test(t)){const [y,m,day]=t.split('-').map(Number);d=new Date(y,m-1,day);if(d.getFullYear()!==y||d.getMonth()!==m-1||d.getDate()!==day)return null;}
- else if(/^\d{1,2}[\/-]\d{1,2}[\/-]\d{4}$/.test(t)){const [day,m,y]=t.split(/[\/-]/).map(Number);d=new Date(y,m-1,day);if(d.getFullYear()!==y||d.getMonth()!==m-1||d.getDate()!==day)return null;}
- else return null;
- return d>new Date()?null:d;
-}
-function fahdAge(raw){const dob=fahdParseBirthDate(raw);if(!dob)return '';const now=new Date();let age=now.getFullYear()-dob.getFullYear();if(now.getMonth()<dob.getMonth()||(now.getMonth()===dob.getMonth()&&now.getDate()<dob.getDate()))age--;return String(age);}
-/* v11: bilingual employee creation uses explicit Firebase schema pairs. */
-const FAHD_PAIRS=[
- ['name','الاسم','Name','اسم الموظف ','emp_name _en'],
- ['department','الإدارة','Department','الإدارة ','department '],
- ['jobTitle','الوظيفة','Job title','الوظيفة','job title '],
- ['directManager','المدير المباشر','Direct manager','المدير المباشر ','direct manager '],
- ['qualification','المؤهل','Qualification','المؤهل','qualification'],
- ['qualificationAuthority','جهة المؤهل','Qualification authority','جهة المؤهل ','qulification issuing authority'],
- ['insuranceStatus','الحالة التأمينية','Insurance status','الحالة التأمينية ','insurance status '],
- ['pob','مكان الميلاد','Birthplace','مكان الميلاد','pob']
-];
-const FAHD_COMMON=[
- ['hireDate','تاريخ التعيين','Hire date','تاريخ التعيين ','date_of_hiring ','date'],
- ['dob','تاريخ الميلاد','Date of birth','تاريخ الميلاد','dob','date'],
- ['qualificationDate','تاريخ المؤهل','Qualification date','تاريخ الحصول على المؤهل ','qualification date ','text'],
- ['phone','الهاتف','Phone','phone','phone','tel'],
- ['address','العنوان','Address','العنوان ','address','text'],
- ['governorate','المحافظة','Governorate','المحافظة ','governorate','text']
-];
-function fahdLang(ar,en){return currentLang==='ar'?ar:en;}
-function fahdISO(value){const d=fahdParseBirthDate(value);if(!d)return '';return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');}
-function fahdStoredDate(iso){if(!iso)return '';const [y,m,d]=iso.split('-');return Number(d)+'/'+Number(m)+'/'+y;}
-function fahdInput(label,key,value='',type='text',extra={}){
- const wrap=document.createElement('div');wrap.className='fahd-entry';const lab=document.createElement('label');lab.textContent=label;wrap.append(lab);
- const input=document.createElement('input');input.type=type;input.value=type==='date'?fahdISO(value):String(value??'');input.dataset.addKey=key;input.maxLength=1000;
- if(extra.readonly){input.readOnly=true;input.dataset.computedAge='true';delete input.dataset.addKey;}
- if(extra.required)input.required=true;
- if(extra.onchange)input.addEventListener('change',extra.onchange);
- wrap.append(input);return wrap;
-}
-function fahdAddSection(title,subtitle){const section=document.createElement('section');section.className='fahd-add-section';const heading=document.createElement('h3');heading.textContent=title;section.append(heading);if(subtitle){const small=document.createElement('p');small.textContent=subtitle;section.append(small);}const grid=document.createElement('div');grid.className='fahd-add-grid';section.append(grid);document.getElementById('add-employee-fields').append(section);return grid;}
-function buildAddEmployeeForm(){
- const container=document.getElementById('add-employee-fields');if(!container)return;container.replaceChildren();
- const base=fahdAddSection(fahdLang('البيانات الأساسية','Core identity'),fahdLang('كود الموظف والبيانات باللغتين','Employee code and both languages'));
- base.append(fahdInput(fahdLang('الكود','Employee code'),'code','', 'text',{required:true}));
- for(const [id,ar,en,arKey,enKey] of FAHD_PAIRS){base.append(fahdInput(ar+' (AR)',arKey));base.append(fahdInput(en+' (EN)',enKey));}
- const details=fahdAddSection(fahdLang('البيانات الوظيفية والشخصية','Job & personal details'),fahdLang('التواريخ والعمر المحسوب','Dates and calculated age'));
- for(const [id,ar,en,arKey,enKey,type] of FAHD_COMMON){
-  if(arKey===enKey)details.append(fahdInput(fahdLang(ar,en),arKey,'',type,type==='date'?{onchange:fahdUpdateNewAge}:{}));
-  else if(type==='date'){
-   const dateInput=fahdInput(fahdLang(ar,en),arKey,'','date',{onchange:fahdUpdateNewAge});dateInput.querySelector('input').dataset.mirrorKey=enKey;details.append(dateInput);
-  }else{details.append(fahdInput(ar+' (AR)',arKey));details.append(fahdInput(en+' (EN)',enKey));}
- }
- details.append(fahdInput(fahdLang('العمر — تلقائي','Age — calculated'),'','', 'text',{readonly:true}));
- const extra=fahdAddSection(fahdLang('بيانات إضافية','Additional fields'),fahdLang('بيانات اختيارية','Optional information'));
- extra.insertAdjacentHTML('beforeend','<div class="fahd-entry"><label>'+fahdLang('صورة الموظف','Employee photo')+'</label><img id="fahd-create-photo-preview" class="fahd-photo" alt=""><button type="button" class="fahd-photo-button" onclick="fahdPickPhoto(true)">'+fahdLang('اختيار صورة من الملفات','Choose photo file')+'</button></div><div id="fahd-new-custom"></div>');
- const err=document.getElementById('add-employee-error');if(err)err.textContent='';fahdUpdateNewAge();fahdEnableDropdowns();fahdTranslateUI();
-}
-function fahdUpdateNewAge(){const birth=document.querySelector('#add-employee-fields [data-add-key="تاريخ الميلاد"]');const age=fahdAge(birth?.value);document.querySelectorAll('#add-employee-fields [data-computed-age]').forEach(el=>el.value=age?age+' '+fahdLang('سنة','years'):'—');}
-async function saveNewEmployee(){
- const data={};document.querySelectorAll('#add-employee-fields [data-add-key]').forEach(input=>{
-  const key=input.dataset.addKey;let value=input.value.trim();if(input.type==='date')value=fahdStoredDate(value);
-  if(value){data[key]=value;if(input.dataset.mirrorKey)data[input.dataset.mirrorKey]=value;}
- });
- const code=String(data.code||'').trim(),err=document.getElementById('add-employee-error');
- if(!/^\d{1,12}$/.test(code)){err.textContent=fahdLang('أدخل كود موظف رقمي صحيح','Enter a valid numeric employee code');return;}
- if(allEmployees.some(e=>String(getEmployeeCode(e))===code)){err.textContent=tr('employee_exists');return;}
- if(!data['اسم الموظف ']||!data['emp_name _en']){err.textContent=fahdLang('أدخل الاسم بالعربي والإنجليزي','Enter both Arabic and English names');return;}
- const age=fahdAge(data['تاريخ الميلاد']);if(age){data['السن حتى تاريخه ']=age;data['age to date']=age;}
- data['الكود']=code;if(window.fahdNewPhoto)data.photoUrl=window.fahdNewPhoto;
- for(const key of Object.keys(lmCustomFieldDefinitions)){if(/^cf_[a-z0-9_]{1,50}$/.test(key)){data.hr_custom_fields??={};data.hr_custom_fields[key]={valueAr:'',valueEn:''};}}
-
- const saveButton=document.querySelector('#add-employee-modal [data-save-new]');if(saveButton)saveButton.disabled=true;
- try{const ref=db.ref(PORTAL_EMPLOYEE_COLLECTION+'/'+code);const snapshot=await ref.once('value');if(snapshot.exists()){err.textContent=tr('employee_exists');return;}
-  await ref.set(data);allEmployees.push({...data,_firebasePath:PORTAL_EMPLOYEE_COLLECTION+'/'+code,_firebaseKey:code});closeAddEmployeeModal();window.fahdNewPhoto=null;renderTable(allEmployees);updateDashboardStats();showToast(tr('employee_saved'));
- }catch(error){err.textContent=(error?.message||tr('login_error'));}finally{if(saveButton)saveButton.disabled=false;}
-}
-
-function openAddCustomFieldModal(){if(activeEmployeeCode===null){showToast(currentLang==='ar'?'افتح ملف موظف أولاً':'Open an employee profile first',true);return;}document.getElementById('custom-field-modal')?.classList.remove('hidden');document.getElementById('custom-field-name').value='';document.getElementById('custom-field-value').value='';document.getElementById('custom-field-error').innerText='';}
-function closeAddCustomFieldModal(){document.getElementById('custom-field-modal')?.classList.add('hidden');}
-const HR_FIELD_LABELS={address:['العنوان','Address'],governorate:['المحافظة','Governorate'],phone:['رقم الهاتف','Phone'],emergency_contact:['رقم الطوارئ','Emergency contact'],national_id:['الرقم القومي','National ID']};
-const HR_PROTECTED_KEYS=new Set(['password','pass','photoUrl','photo','code','_firebasePath','_firebaseKey','employeeCode','id','role','permissions']);
-function getHRCustomKeys(){try{return JSON.parse(localStorage.getItem("lacto_custom_keys")||"[]")}catch{return []}}
-function renderExtraEmployeeFields(){
- const box=document.getElementById('hr-custom-fields');if(!box)return;
- const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(activeEmployeeCode));if(!emp){box.innerHTML='';return;}
- const keys=Object.keys(emp).filter(k=>(Object.prototype.hasOwnProperty.call(HR_FIELD_LABELS,k)||Boolean(emp.hr_custom_fields?.[k])) && emp[k]!==undefined && emp[k]!==null && String(emp[k]).trim()!=='');
- box.innerHTML=`<h3 class="text-sky-300 font-bold mb-3">${currentLang==='ar'?'بيانات إضافية':'Additional details'}</h3>`+(keys.length?`<div class="grid grid-cols-1 md:grid-cols-2 gap-3">${keys.map(k=>`<div class="hr-custom-field"><p class="text-xs text-slate-400">${escapeHtml((HR_FIELD_LABELS[k]||[k.replace(/_/g," "),k.replace(/_/g," ")])[currentLang==='ar'?0:1])}</p><p class="text-sm text-slate-100 mt-1">${escapeHtml(String(emp[k]))}</p></div>`).join('')}</div>`:`<p class="text-sm text-slate-400">${currentLang==='ar'?'لا توجد بيانات إضافية بعد':'No additional fields yet'}</p>`);
-}
-async function saveCustomField(){
- const key=document.getElementById('custom-field-name').value.trim();
- const value=document.getElementById('custom-field-value').value.trim();
- const err=document.getElementById('custom-field-error');
- const normalized=key.toLowerCase();
- if(!/^[a-z][a-z0-9_]{1,49}$/.test(key)||HR_PROTECTED_KEYS.has(key)||normalized.includes('password')){err.textContent=currentLang==='ar'?'استخدم مفتاح إنجليزي آمن مثل address أو governorate':'Use a safe English key such as address or governorate';return;}
- if(!value){err.textContent=currentLang==='ar'?'أدخل القيمة':'Enter a value';return;}
- const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(activeEmployeeCode));
- if(!emp||!emp._firebasePath){err.textContent=currentLang==='ar'?'تعذر تحديد سجل الموظف':'Employee record path not found';return;}
- if(Object.prototype.hasOwnProperty.call(emp,key)&&!Object.prototype.hasOwnProperty.call(HR_FIELD_LABELS,key)) {err.textContent=currentLang==='ar'?'الحقل موجود بالفعل؛ لا يمكن استبداله من هنا':'Existing field cannot be overwritten here';return;}
- try{
-   await db.ref(emp._firebasePath).update({[key]:value,[`hr_custom_fields/${key}`]:true});
-   emp[key]=value;emp.hr_custom_fields={...(emp.hr_custom_fields||{}),[key]:true};
-   if(!HR_FIELD_LABELS[key]){const keys=getHRCustomKeys();if(!keys.includes(key)){keys.push(key);localStorage.setItem("lacto_custom_keys",JSON.stringify(keys));}}
-   if(!HR_FIELD_LABELS[key])HR_FIELD_LABELS[key]=[key.replace(/_/g,' '),key.replace(/_/g,' ')];
-   closeAddCustomFieldModal();renderExtraEmployeeFields();showToast(tr('custom_field_saved'));
- }catch(error){console.error('Field save failed',error);err.textContent=tr('login_error');}
-}
-
-async function sendPasswordVerificationCode() {
-    const code = document.getElementById('forgot-emp-code')?.value.trim();
-    const msg = document.getElementById('forgot-message');
-    if (code !== PORTAL_ADMIN_CODE) { if(msg) msg.textContent = currentLang === 'ar' ? 'هذه النسخة مخصصة لكود الإدارة 778.' : 'This build is for admin code 778.'; return; }
-    try {
-        await portalAuth.sendPasswordResetEmail(PORTAL_ADMIN_EMAIL);
-        if(msg) { msg.style.color = '#67e8f9'; msg.textContent = currentLang === 'ar' ? 'تم طلب إرسال رابط إعادة تعيين كلمة المرور إلى بريد حساب الإدارة.' : 'A password reset link was requested for the admin email.'; }
-    } catch (e) { console.error(e); if(msg) msg.textContent = tr('login_error'); }
-}
-function verifyAndResetPassword() { /* Legacy database password reset intentionally disabled. */ }
-function openForgotPassModal() {
-    document.getElementById('forgot-pass-modal')?.classList.remove('hidden');
-    document.getElementById('forgot-emp-code').value = document.getElementById('login-emp-code')?.value || '';
-    document.getElementById('forgot-message').innerText = '';
-}
-function closeForgotPassModal() { document.getElementById('forgot-pass-modal')?.classList.add('hidden'); }
-
-function runPortalIntro(){
-    const intro=document.getElementById('intro-screen');const container=document.getElementById('introTitle');const subtitle=document.getElementById('introSubtitle');
-    if(!intro||!container||!window.gsap){ intro?.classList.add("fade-out"); revealLoginAfterIntro(); return; }
-    container.innerHTML='';const chars=[];const text='LACTO MISR S.A.E';
-    for(const ch of text){if(ch===' '){const sp=document.createElement('span');sp.className='intro-space';container.appendChild(sp);}else{const el=document.createElement('span');el.className='intro-char';el.innerText=ch;container.appendChild(el);chars.push(el);}}
-    chars.forEach(el=>gsap.set(el,{y:-250,x:(Math.random()-.5)*400,rotation:(Math.random()-.5)*720,opacity:0,scale:.8}));
-    gsap.set(subtitle,{opacity:0,y:20});gsap.set('#introFooter',{opacity:0,bottom:'-20vh'});
-    const dirs=[{x:-900,y:-700},{x:0,y:-900},{x:900,y:-700},{x:900,y:0},{x:900,y:700},{x:0,y:900},{x:-900,y:700},{x:-900,y:0}];
-    const tl=gsap.timeline({onComplete:()=>{intro.classList.add('fade-out');setTimeout(revealLoginAfterIntro,500);}});
-    tl.to(chars,{duration:2.5,x:0,y:0,rotation:360,opacity:1,scale:1,stagger:.1,ease:'power2.out'},'start');
-    tl.to(subtitle,{duration:1.5,opacity:1,y:0,ease:'power2.out'},'start+=1');
-    tl.to('#introFooter',{duration:1.5,bottom:'12%',opacity:1,ease:'power2.out'},'start+=1.5');
-    tl.to([subtitle,'#introFooter'],{duration:1.2,opacity:0,y:20,ease:'power1.in'},'start+=6');
-    chars.forEach((el,index)=>tl.to(el,{duration:1.6,x:dirs[index%dirs.length].x,y:dirs[index%dirs.length].y,opacity:0,scale:.5,ease:'power1.inOut'},'start+=7'));
-}
-function revealLoginAfterIntro(){
-    const brand=document.getElementById('login-brand');const panel=document.getElementById('login-panel');
-    if(brand){brand.classList.add('intro-ready');setTimeout(()=>brand.classList.add('compact'),1050);}
-    if(panel){setTimeout(()=>panel.classList.add('visible','compact-mode'),2250);}
-}
-
-function prepareRememberedLogin(){
-    localStorage.removeItem('lacto_saved_pass');
-    const code = localStorage.getItem('lacto_saved_code');
-    if (code === PORTAL_ADMIN_CODE) {
-        document.getElementById('login-emp-code').value = code;
-        document.getElementById('remember-me').checked = true;
-    }
-}
-
-window.addEventListener('click',(e)=>{
-    if(!e.target.closest('#login-lang-switcher')) document.getElementById('login-lang-menu')?.classList.remove('show');
-    if(!e.target.closest('#lang-dropdown') && !e.target.closest('button[onclick*="toggleLangDropdown"]')) document.getElementById('lang-dropdown')?.classList.remove('show');
-});
-
-window.addEventListener('DOMContentLoaded',async()=>{
-    setLanguage(currentLang);
-    prepareRememberedLogin();
-    try { runPortalIntro(); } catch (err) { console.error("Intro error", err); document.getElementById("intro-screen")?.classList.add("fade-out"); revealLoginAfterIntro(); }
-});
-
-
-// HR workspace: presentation-only demo data until ESS integration is configured.
-let hrActivePage='dashboard';
-const hrText=(ar,en)=>currentLang==='ar'?ar:en;
-function showHRPage(page){
-    if(page!=='employees' && fahdHasUnsavedChanges()&&!window.fahdNavigationApproved){fahdGuardNavigation(()=>showHRPage(page));return;}
-
-    if(!['dashboard','employees','payroll','notifications','attendance','leave-balances','permissions','bradford'].includes(page))return;
-    hrActivePage=page;
-    ['dashboard','payroll','notifications','attendance','leave-balances','permissions','bradford'].forEach(p=>document.getElementById('hr-'+p+'-view')?.classList.toggle('hidden',p!==page));
-    const list=document.getElementById('employees-list-view'),profile=document.getElementById('employee-profile-view');
-    if(page==='employees'){if(activeEmployeeCode!==null){if(profile){profile.classList.remove('hidden');profile.style.display='block';}if(list){list.classList.add('hidden');list.style.display='none';}}else{if(list){list.classList.remove('hidden');list.style.display='block';}if(profile){profile.classList.add('hidden');profile.style.display='none';}}}
-    else {if(list){list.classList.add('hidden');list.style.display='none';}if(profile){profile.classList.add('hidden');profile.style.display='none';}}
-    document.querySelectorAll('.hr-nav').forEach(el=>el.classList.toggle('active',el.dataset.page===page));
-    renderHRWorkspace();
-}
-function hrCard(label,value,foot=''){return `<div class="hr-kpi"><p class="text-xs text-slate-400">${escapeHtml(label)}</p><div class="text-3xl text-sky-300 font-bold mt-2">${escapeHtml(value)}</div><p class="text-xs text-slate-500 mt-2">${escapeHtml(foot)}</p></div>`}
-function renderHRWorkspace(){
-    document.querySelectorAll('.hr-nav [data-ar]').forEach(el=>{el.textContent=el.dataset[currentLang]});
-    if(hrActivePage==='dashboard'){renderRichDashboard();}
-    if(['attendance','leave-balances','permissions','bradford'].includes(hrActivePage)) renderHRFeature(hrActivePage);
-    if(hrActivePage==='payroll'){
-        const d=document.getElementById('hr-payroll-view');if(!d)return;
-        const demo=allEmployees.slice(0,30).map((e,i)=>{const base=5500+(i%9)*850,allowance=500+(i%4)*250,deduction=(i%3)*175;return {e,base,allowance,deduction,net:base+allowance-deduction}});
-        d.innerHTML=`<h1 class="text-2xl font-extrabold mb-2">${hrText('المرتبات','Payroll')}</h1><p class="text-amber-300 text-sm mb-5">${hrText('بيانات تجريبية فقط — غير مرتبطة برواتب الموظفين الفعلية','DEMO ONLY — not actual employee salaries')}</p><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">${hrCard(hrText('عدد السجلات التجريبية','Demo records'),String(demo.length))}${hrCard(hrText('إجمالي الأساسي التجريبي','Demo basic total'),demo.reduce((s,r)=>s+r.base,0).toLocaleString()+' EGP')}${hrCard(hrText('إجمالي الصافي التجريبي','Demo net total'),demo.reduce((s,r)=>s+r.net,0).toLocaleString()+' EGP')}</div><div class="glass-card rounded-2xl overflow-x-auto"><table class="w-full text-sm text-start"><thead class="bg-slate-900/70 text-sky-300"><tr>${[hrText('الموظف','Employee'),hrText('الأساسي','Basic'),hrText('البدلات','Allowances'),hrText('الخصومات','Deductions'),hrText('الصافي','Net')].map(x=>`<th class="p-4 text-start">${x}</th>`).join('')}</tr></thead><tbody>${demo.map(r=>`<tr class="border-t border-slate-700/50"><td class="p-3">${escapeHtml(getEmployeeName(r.e))}</td><td class="p-3">${r.base.toLocaleString()}</td><td class="p-3">${r.allowance.toLocaleString()}</td><td class="p-3">${r.deduction.toLocaleString()}</td><td class="p-3 text-sky-300">${r.net.toLocaleString()}</td></tr>`).join('')}</tbody></table></div>`;
-    }
-    if(hrActivePage==='notifications'){
-        const d=document.getElementById('hr-notifications-view');if(!d)return;
-        d.innerHTML=`<h1 class="text-2xl font-extrabold mb-5">${hrText('الإشعارات والطلبات','Notifications & Requests')}</h1><div class="glass-card rounded-2xl p-6 mb-5"><h2 class="font-bold text-sky-300 mb-3">${hrText('طلبات ESS المعلقة','Pending ESS requests')}</h2><div id="ess-request-panel" class="text-slate-300 text-sm">${hrText('جاري فحص اتصال ESS...','Checking ESS connection...')}</div></div><div class="glass-card rounded-2xl p-6"><h2 class="font-bold text-sky-300 mb-3">${hrText('إنشاء إشعار إداري','Compose HR notification')}</h2><label class="block text-sm mb-1">${hrText('العنوان','Title')}</label><input id="hr-notify-title" maxlength="120" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-3" placeholder="${hrText('عنوان الإشعار','Notification title')}"><label class="block text-sm mb-1">${hrText('الرسالة','Message')}</label><textarea id="hr-notify-body" maxlength="1000" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-3" placeholder="${hrText('نص الرسالة','Message body')}"></textarea><label class="block text-sm mb-1">${hrText('إرسال إلى','Audience')}</label><select id="hr-notify-target" onchange="hrNotificationAudienceChanged()" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-3"><option value="all">${hrText('الشركة بالكامل','Entire company')}</option><option value="department">${hrText('إدارة كاملة','Department')}</option><option value="employees">${hrText('موظفون محددون','Selected employees')}</option></select><div id="hr-notify-target-fields" class="mb-3"></div><label class="flex items-center gap-3 mb-4 text-sm"><input id="hr-notify-ack" type="checkbox" class="w-5 h-5 accent-sky-500">${hrText('هذا الإشعار يتطلب إقرار الموظف بالاطلاع','Employee acknowledgement required')}</label><button type="button" onclick="hrPreviewNotification()" class="portal-action-btn px-5 py-3 rounded-xl">${hrText('معاينة المستلمين','Preview recipients')}</button> <button type="button" id="hr-notify-send" onclick="hrSendNotification()" class="portal-action-btn px-5 py-3 rounded-xl ml-2" style="background:#0878ad">${hrText('إرسال الإشعار','Send notification')}</button><div id="hr-notify-preview" class="mt-4 text-sm text-slate-300" aria-live="polite"></div><p class="text-xs text-amber-300 mt-3">${hrText('إرسال داخلي مجاني على Spark للكودين 2 و102 فقط، دون Push في الخلفية. يلزم تسجيل دخول إدارة ESS.','Free Spark internal delivery for codes 2 and 102 only; no background push. ESS admin sign-in required.')}</p></div>`;
-        hrNotificationAudienceChanged();
-        setTimeout(essRenderRequestPanel,0);
-    }
-}
-document.addEventListener('DOMContentLoaded',()=>showHRPage('dashboard'));
-
-
-// Dashboard uses employee records only. Geographic dots are schematic, not official boundaries.
-const hrGovernorates=[
- ['Cairo','القاهرة',30.044,31.236],['Giza','الجيزة',30.01,31.12],['Alexandria','الإسكندرية',31.20,29.92],['Qalyubia','القليوبية',30.33,31.22],['Sharqia','الشرقية',30.59,31.50],['Dakahlia','الدقهلية',31.05,31.38],['Gharbia','الغربية',30.87,31.03],['Monufia','المنوفية',30.60,30.98],['Beheira','البحيرة',30.85,30.34],['Kafr El Sheikh','كفر الشيخ',31.11,30.94],['Damietta','دمياط',31.42,31.81],['Port Said','بورسعيد',31.26,32.29],['Ismailia','الإسماعيلية',30.60,32.27],['Suez','السويس',29.97,32.55],['North Sinai','شمال سيناء',30.56,33.80],['South Sinai','جنوب سيناء',28.25,33.80],['Fayoum','الفيوم',29.31,30.84],['Beni Suef','بني سويف',29.07,31.10],['Minya','المنيا',28.10,30.75],['Assiut','أسيوط',27.18,31.18],['Sohag','سوهاج',26.56,31.69],['Qena','قنا',26.16,32.72],['Luxor','الأقصر',25.69,32.64],['Aswan','أسوان',24.09,32.90],['Red Sea','البحر الأحمر',26.75,33.94],['New Valley','الوادي الجديد',25.44,30.55],['Matrouh','مطروح',31.35,27.23]
-];
-function hrNormalize(s){return String(s||'').trim().toLowerCase().replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[\u064b-\u065f]/g,'').replace(/[_-]/g,' ').replace(/\s+/g,' ')}
-function hrGovIndex(value){const s=hrNormalize(value);if(!s)return -1;const aliases={'sharkia':4,'sharqia':4,'ash sharqiyah':4,'el sharkia':4,'qalyubiya':3,'qalubia':3,'kalyoubia':3,'dakahlieh':5,'dakahlia':5,'menoufia':7,'monufia':7,'menofia':7,'beheira':8,'behira':8,'kafr el sheikh':9,'kafr elsheikh':9,'bani suef':17,'assiout':19,'asiyut':19,'red sea':24,'el minya':18,'minia':18,'الشرقيه':4};if(Object.prototype.hasOwnProperty.call(aliases,s))return aliases[s];return hrGovernorates.findIndex(([en,ar])=>s===hrNormalize(en)||s===hrNormalize(ar)||s.includes(hrNormalize(ar))||s.includes(hrNormalize(en)))}
-function hrGeoField(emp){const direct=getField(emp,'المحافظة ','المحافظة','محافظة','محافظة السكن','محافظة الإقامة','governorate ','governorate','Governorate','governorate_name','province');if(direct)return direct;return getField(emp,'محل الإقامة','العنوان ','العنوان','address','residence','city')}
-function hrPercent(a,b){return b?Math.round(a/b*100):0}
-function hrSvgIcon(kind,extra=''){const paths={users:'<circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 6a3 3 0 0 1 0 6M19 15a5 5 0 0 1 2 4"/>',building:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 7h2m3 0h2M9 11h2m3 0h2M10 21v-5h4v5"/>',briefcase:'<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12a20 20 0 0 0 18 0"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/>',map:'<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15m6-12v15"/>',bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>'};return `<svg class="${extra||'hr-stat-icon'}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[kind]||paths.users}</svg>`} 
-let hrStatIconCounter=0;
-function hrStat(label,value,foot){const icon=['users','building','briefcase','clock','calendar','map'][(hrStatIconCounter++)%6];return `<div class="hr-panel">${hrSvgIcon(icon)}<div class="hr-stat-label">${escapeHtml(label)}</div><div class="hr-stat-value">${escapeHtml(String(value))}</div><div class="text-xs text-slate-500 mt-2">${escapeHtml(foot||'')}</div></div>`}
-function hrPanel(title,content){return `<section class="hr-panel"><h2 class="font-bold text-sky-200 mb-5">${escapeHtml(title)}</h2>${content}</section>`}
-function hrBars(rows,total,maxItems=9){const top=rows.slice(0,maxItems);return top.map(([name,count])=>`<div class="mb-3"><div class="flex justify-between gap-3 text-xs mb-1"><span class="truncate">${escapeHtml(name)}</span><span class="text-sky-300">${count} · ${hrPercent(count,total)}%</span></div><div class="hr-mini-track"><div class="hr-mini-fill" style="width:${hrPercent(count,total)}%"></div></div></div>`).join('')||`<p class="text-slate-400 text-sm">${hrText('لا توجد بيانات متاحة','No available data')}</p>`}
-function hrToggleEgypt(open){const stage=document.getElementById('hr-map-stage');if(stage)stage.classList.toggle('is-zoomed',!!open)}
-function hrDonut(rows,total){const palette=['#38bdf8','#a78bfa','#34d399','#fbbf24','#fb7185','#22d3ee'];let offset=0;const top=rows.slice(0,5);const segments=top.map(([name,n],i)=>{const p=total?n/total*100:0;const a=offset;offset+=p;return `${palette[i]} ${a}% ${offset}%`});if(offset<100)segments.push(`#243650 ${offset}% 100%`);return `<div class="hr-donut-layout"><div class="hr-donut" style="background:conic-gradient(${segments.join(',')||'#243650 0 100%'})"><div><b>${total}</b><small>${hrText('موظف','employees')}</small></div></div><div class="hr-donut-legend">${top.map(([name,n],i)=>`<div><i style="background:${palette[i]}"></i><span>${escapeHtml(name)}</span><b>${n}</b></div>`).join('')}</div></div>`}
-function hrHorizontalBars(rows,total,limit=8){const max=Math.max(1,...rows.map(r=>r[1]));return rows.slice(0,limit).map(([name,n],i)=>`<div class="hr-hbar-row"><span title="${escapeHtml(name)}">${escapeHtml(name)}</span><div><i style="width:${Math.max(3,n/max*100)}%;background:${['#38bdf8','#a78bfa','#34d399','#fbbf24'][i%4]}"></i></div><b>${n}</b></div>`).join('')||hrText('لا توجد بيانات','No data')}
-// Geographic boundaries from Natural Earth administrative level 1, via the
-// publicly licensed Egypt governorates TopoJSON example (MIT).
-// No employee information is transmitted to this map data source.
-const HR_EGYPT_TOPO_URL='https://gist.githubusercontent.com/mohdali/662bf79127f6e068ed6815c06f92bfb5/raw/03faa83169183c357bd07da775ffc65561a4a808/egypt.json';
-let hrEgyptGeoCache=null;
-function hrEgyptGeoPath(geometry,project){
- const lines=[];
- function ring(points){if(!Array.isArray(points)||!points.length)return;const xy=points.map(project);lines.push('M'+xy.map(p=>p[0].toFixed(2)+','+p[1].toFixed(2)).join('L')+'Z')}
- if(geometry.type==='Polygon')geometry.coordinates.forEach(ring);
- else if(geometry.type==='MultiPolygon')geometry.coordinates.forEach(poly=>poly.forEach(ring));
- return lines.join('');
-}
-function hrEgyptEnglishName(name){
- const n=hrNormalize(name);
- const aliases={
- 'al qahirah':'Cairo','cairo':'Cairo','al jizah':'Giza','giza':'Giza','alexandria':'Alexandria','al iskandariyah':'Alexandria',
- 'al qalyubiyah':'Qalyubia','qalyubia':'Qalyubia','ash sharqiyah':'Sharqia','sharqia':'Sharqia',
- 'ad daqahliyah':'Dakahlia','dakahlia':'Dakahlia','al buhayrah':'Beheira','beheira':'Beheira',
- 'al gharbiyah':'Gharbia','gharbia':'Gharbia','al minufiyah':'Monufia','monufia':'Monufia',
- 'kafr ash shaykh':'Kafr El Sheikh','kafr el sheikh':'Kafr El Sheikh','dumyat':'Damietta','damietta':'Damietta',
- 'bur said':'Port Said','port said':'Port Said','as suways':'Suez','suez':'Suez',
- 'al ismailiyah':'Ismailia','ismailia':'Ismailia','matruh':'Matrouh','al fayyum':'Fayoum','fayoum':'Fayoum',
- 'bani suwayf':'Beni Suef','beni suef':'Beni Suef','al minya':'Minya','minya':'Minya',
- 'asyut':'Assiut','assiut':'Assiut','suhaj':'Sohag','sohag':'Sohag',
- 'qina':'Qena','qena':'Qena','al uqsur':'Luxor','luxor':'Luxor','aswan':'Aswan',
- 'al bahr al ahmar':'Red Sea','red sea':'Red Sea','al wadi al jadid':'New Valley','new valley':'New Valley',
- 'shamal sina':'North Sinai','north sinai':'North Sinai','janub sina':'South Sinai','south sinai':'South Sinai'};
- return aliases[n]||name;
-}
-function hrShowTransport(governorate){
- const panel=document.getElementById('cc-transport-details');if(!panel)return;
- const list=new Map();let known=0;
- allEmployees.forEach(e=>{
-  const geo=hrGeoField(e);if(hrGovIndex(geo)!==hrGovIndex(governorate)||hrGovIndex(geo)<0)return;
-  const line=String(getField(e,'transportLine','transport_line','busLine','bus_line','routeName','transport route','خط النقل','خط السير','خط الأتوبيس','خط الاتوبيس')||'').trim();
-  if(!line)return;known++;list.set(line,(list.get(line)||0)+1);
- });
- const rows=[...list].sort((a,b)=>b[1]-a[1]);
- panel.replaceChildren();const title=document.createElement('strong');title.textContent=governorate+' · '+(currentLang==='ar'?'خطوط النقل':'Transport routes');panel.append(title);
- if(!rows.length){const empty=document.createElement('p');empty.textContent=currentLang==='ar'?'لا توجد بيانات خطوط نقل لهذه المحافظة بعد':'No transport-route data for this governorate yet';panel.append(empty);return;}
- rows.forEach(([name,count])=>{const row=document.createElement('div');row.className='cc-transport-row';const a=document.createElement('span');a.textContent=name;const b=document.createElement('b');b.textContent=count+' '+(currentLang==='ar'?'موظف':'employees');row.append(a,b);panel.append(row)});
-}
-async function hrRenderGeographicEgypt(counts){
- const svg=document.getElementById('hr-real-egypt-map');if(!svg)return;
- const current=svg;
- try{
-  if(!window.topojson?.feature)throw Error('TopoJSON unavailable');
-  if(!hrEgyptGeoCache){const response=await fetch(HR_EGYPT_TOPO_URL);if(!response.ok)throw Error('Map HTTP '+response.status);hrEgyptGeoCache=await response.json()}
-  if(!current.isConnected)return;
-  const topo=hrEgyptGeoCache;const obj=topo.objects.governate||topo.objects.governorate||Object.values(topo.objects)[0];
-  const fc=window.topojson.feature(topo,obj);const features=fc.features||[];
-  if(features.length<20)throw Error('Incomplete governorate boundaries');
-  const project=([lon,lat])=>[28+(lon-24.2)/(37.2-24.2)*480,20+(32.2-lat)/(32.2-21.5)*455];
-  const paths=features.map((f,i)=>{
-   const raw=String(f.properties?.name||f.properties?.NAME_1||f.properties?.name_en||'');
-   const normalized=hrEgyptEnglishName(raw);
-   const idx=hrGovIndex(normalized);const count=idx<0?0:counts[idx];
-   const label=idx<0?raw:(currentLang==='ar'?hrGovernorates[idx][1]:hrGovernorates[idx][0]);
-   const max=Math.max(1,...counts);const intensity=count/max;
-   const fill=count?'hsl(194 95% '+(37+intensity*23)+'%)':'#18334d';
-   const d=hrEgyptGeoPath(f.geometry,project);
-   return `<path class="hr-egypt-region" tabindex="0" role="img" aria-label="${escapeHtml(label+': '+count)}" data-geo-name="${escapeHtml(label)}" data-geo-count="${count}" d="${d}" fill="${fill}" fill-rule="evenodd"><title>${escapeHtml(label)}: ${count}</title></path>`;
-  }).join('');
-  current.setAttribute('viewBox','0 0 540 500');current.innerHTML=`<defs><radialGradient id="hrEgyptWater"><stop stop-color="#102e50"/><stop offset="1" stop-color="#081729"/></radialGradient></defs><rect width="540" height="500" fill="url(#hrEgyptWater)" rx="12"/>${paths}`;
-  current.querySelectorAll('.hr-egypt-region').forEach(node=>{
-   const update=()=>{const t=document.getElementById('hr-geo-tooltip');if(t)t.textContent=node.dataset.geoName+' — '+node.dataset.geoCount+' '+hrText('موظف','employees');hrShowTransport(node.dataset.geoName)};
-   node.addEventListener('mouseenter',update);node.addEventListener('focus',update);node.addEventListener('click',update);
-  });
- }catch(err){
-  if(!current.isConnected)return;
-  // Honest fallback: never present schematic shapes as real governorate borders.
-  current.innerHTML=`<text x="270" y="220" text-anchor="middle" fill="#7dd3fc" font-size="15">${hrText('تعذر تحميل حدود المحافظات','Could not load governorate boundaries')}</text><text x="270" y="255" text-anchor="middle" fill="#94a3b8" font-size="11">${hrText('تأكد من الاتصال بالإنترنت','Check internet connection')}</text>`;
-  console.warn('Egypt geographic map:',err);
+ html[dir="rtl"] body > header,
+ html[dir="rtl"] body:has(.sidebar-collapsed:hover) > header {
+   padding-inline-start:68px!important; padding-inline-end:14px!important;
  }
 }
 
 
-// ESS phase 1: clearly-labelled read-only scaffolding; no invented employee balances or attendance.
-function hrFeatureShell(title,subtitle,body){return `<h1 class="text-2xl font-extrabold text-sky-100 mb-2">${title}</h1><p class="text-sm text-slate-400 mb-5">${subtitle}</p>${body}`}
-function hrFeatureNotice(ar,en){return `<div class="hr-panel border-amber-500/30 text-amber-200 text-sm mb-5">${hrText(ar,en)}</div>`}
-function renderHRFeature(page){
- const d=document.getElementById('hr-'+page+'-view');if(!d)return;
- const pending=hrFeatureNotice('بانتظار ربط ESS الآمن ومراجعة صلاحيات الوصول. لا توجد بيانات حضور أو إجازات فعلية معروضة حاليًا.','Awaiting secure ESS integration and access review. No actual attendance or leave data is displayed yet.');
- if(page==='attendance') d.innerHTML=hrFeatureShell(hrText('الحضور والانصراف','Attendance & departure'),hrText('استيراد السجلات الفعلية من Excel / CSV','Import real attendance records from Excel / CSV'),hrImportUI('attendance'));
- if(page==='leave-balances')d.innerHTML=hrFeatureShell(hrText('أرصدة الإجازات','Leave balances'),hrText('استيراد أرصدة الإجازات الفعلية من Excel / CSV','Import actual leave balances from Excel / CSV'),hrImportUI('leave-balances'));
- if(page==='permissions')d.innerHTML=hrFeatureShell(hrText('الأذون الشخصية','Personal permissions'),hrText('طلبات الخروج المبكر والتأخير والأذون بالساعة','Early exit, late arrival and hourly permissions'),pending+`<div class="hr-panel"><table class="hr-feature-table"><thead><tr>${[hrText('الموظف','Employee'),hrText('التاريخ','Date'),hrText('المدة','Duration'),hrText('الحالة','Status')].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody><tr><td colspan="4" class="text-slate-400">${hrText('لا توجد طلبات متصلة حتى الآن','No connected requests yet')}</td></tr></tbody></table></div>`);
- if(page==='bradford')d.innerHTML=hrFeatureShell('Bradford Factor',hrText('مؤشر تكرار الغياب: B = S² × D — أداة مراجعة وليست قرارًا تأديبيًا آليًا','Absence frequency indicator: B = S² × D — a review aid, not an automated disciplinary decision'),`<div class="hr-panel mb-5"><p class="text-sm text-slate-300 mb-4">${hrText('حاسبة تجريبية: أدخل عدد فترات الغياب المنفصلة وإجمالي أيام الغياب خلال فترة موحدة (مثل آخر 52 أسبوعًا). لا تُحفظ المدخلات.','Local preview calculator: enter separate absence spells and total absent days for a consistent period (e.g. 52 weeks). Inputs are not saved.')}</p><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><label class="text-sm">${hrText('فترات الغياب (S)','Absence spells (S)')}<input id="bradford-spells" type="number" min="0" step="1" class="hr-feature-input mt-2" placeholder="0" oninput="calculateBradford()"></label><label class="text-sm">${hrText('إجمالي أيام الغياب (D)','Total absent days (D)')}<input id="bradford-days" type="number" min="0" step="1" class="hr-feature-input mt-2" placeholder="0" oninput="calculateBradford()"></label></div><div id="bradford-result" class="mt-5 text-sky-300 font-bold" aria-live="polite">—</div></div>`+hrFeatureNotice('Clear / Action required لا يمكن تحديدهما بمصداقية قبل اعتماد سياسة الشركة وحدود المؤشر، وتصنيف الإجازات المستثناة ومراجعة الحالات الفردية.','Clear / Action required statuses require an approved company policy, thresholds, absence exclusions and individual review.')+pending);
-}
-function calculateBradford(){
- const s=document.getElementById('bradford-spells'),d=document.getElementById('bradford-days'),out=document.getElementById('bradford-result');if(!s||!d||!out)return;
- if(s.value===''||d.value===''){out.textContent='—';return}
- const spells=Number(s.value),days=Number(d.value);
- if(!Number.isInteger(spells)||!Number.isInteger(days)||spells<0||days<0||(spells===0)!==(days===0)||spells>days){out.textContent=hrText('تحقق من الأرقام: عدد الفترات لا يزيد عن عدد الأيام، والصفر يجب أن يكون في الخانتين.','Check inputs: spells cannot exceed days, and zero must appear in both fields.');return}
- out.textContent=`Bradford Factor = ${spells*spells*days}  (${spells}² × ${days})`;
-}
+/* v6.7 - World map occupies the full available dashboard map stage. */
+.hr-map-stage .hr-world{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;box-sizing:border-box;display:flex!important;flex-direction:column!important;justify-content:stretch!important;align-items:stretch!important;padding:8px!important;min-width:0!important;min-height:0!important}
+.hr-map-stage .hr-world>svg{display:block!important;flex:1 1 auto!important;width:100%!important;height:100%!important;min-height:0!important;max-width:none!important;max-height:none!important;object-fit:fill!important;border-radius:12px}
+.hr-map-stage .hr-world .hr-map-hint{flex:0 0 auto!important;margin:5px 0 0!important;line-height:1.5!important}
 
-// HR import engine: staging, validation, explicit commit, separate namespace (never alters employee records).
-const hrImportState={};
-const hrImportColumns={
- 'attendance':{code:['code','employee code','employee_code','emp code','employee id','كود الموظف','كود','رقم الموظف','رقم البصمه','رقم البصمة'],date:['date','التاريخ','تاريخ'],time:['time','الوقت','الساعة'],type:['type','movement','direction','الحركة','نوع الحركة','نوع الحركه','الحالة'],timestamp:['timestamp','datetime','date time','التاريخ والوقت','التاريخ والوقت '],source:['source','device','المصدر','الجهاز','الإداره','الإدارة']},
- 'leave-balances':{code:['code','employee code','employee_code','emp code','employee id','كود الموظف','كود','رقم الموظف'],entitled:['entitled','total','allowance','الاستحقاق','المستحق','الرصيد الكلي'],used:['used','taken','المستخدم','المستهلك'],remaining:['remaining','balance','المتبقي','الرصيد المتبقي'],year:['year','السنة','العام']}
-};
-function hrImportUI(type){const isA=type==='attendance';return `<div class="hr-panel mb-5"><h2 class="font-bold text-sky-300 mb-2">${hrText('محرك استيراد Excel','Excel Import Engine')}</h2><p class="text-sm text-slate-300 mb-3">${isA?hrText('الأعمدة المطلوبة: كود الموظف، التاريخ والوقت (أو Timestamp). اختياري: نوع الحركة والمصدر.','Required: employee code, date and time (or timestamp). Optional: type and source.'):hrText('الأعمدة المطلوبة: كود الموظف، الاستحقاق، المستخدم، المتبقي. اختياري: السنة.','Required: employee code, entitled, used, remaining. Optional: year.')}</p><input type="file" id="hr-import-file-${type}" accept=".xlsx,.xls,.csv" class="hr-feature-input" onchange="hrReadImport('${type}',this)"><p class="text-xs text-amber-200 mt-3">${hrText('الملف يمر بمراجعة قبل الحفظ. لن تتغير سجلات الموظفين الأصلية أو أرصدة ESS تلقائيًا.','Review before saving. Original employee records and ESS balances are never modified automatically.')}</p><div id="hr-import-preview-${type}" class="mt-4 text-sm text-slate-300">${hrText('اختر ملفًا لعرض المعاينة','Choose a file to preview')}</div></div><div id="hr-import-saved-${type}" class="hr-panel text-sm text-slate-300">${hrText('تحميل آخر دفعة محفوظة...','Loading latest saved batch...')}</div>`}
-function hrNorm(x){return String(x??'').trim().toLowerCase().replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/[_\-]+/g,' ').replace(/\s+/g,' ')}
-function hrEscape(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function hrNum(x){let n=Number(String(x??'').replace(/,/g,''));return Number.isFinite(n)?n:NaN}
-function hrDate(x){if(typeof x==='number'&&window.XLSX){let d=XLSX.SSF.parse_date_code(x);return d?`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`:String(x)}return String(x??'').trim()}
-function hrImportRows(type,rows){const aliases=hrImportColumns[type], keys=Object.keys(rows[0]||{}), mapped={};for(let field in aliases){let match=keys.find(k=>aliases[field].some(a=>hrNorm(a)===hrNorm(k)));if(match)mapped[field]=match}
- const missing=(type==='attendance'?['code']:['code','entitled','used','remaining']).filter(k=>!mapped[k]);if(type==='attendance'&&!mapped.timestamp&&!(mapped.date&&mapped.time))missing.push('timestamp OR date+time');if(missing.length)throw Error('Missing columns: '+missing.join(', '));
- let result=[],errors=[];rows.forEach((r,i)=>{let rec={};for(let k in mapped)rec[k]=r[mapped[k]];rec.code=String(rec.code??'').trim();if(type==='attendance' && mapped.code && /بصم/.test(mapped.code)){rec.biometricId=rec.code;}let err='';if(!rec.code)err='Missing employee code';if(type==='attendance'&&!err&&Array.isArray(allEmployees)&&allEmployees.length&&!allEmployees.some(e=>getEmployeeCode(e)===rec.code))err='Employee code '+rec.code+' not found in Firebase employees';if(type==='attendance'){rec.timestamp=String(rec.timestamp??`${hrDate(rec.date)} ${rec.time??''}`).trim();if(!rec.timestamp||rec.timestamp==='undefined')err='Missing date/time';rec.source=String(rec.source||'Excel import');rec.type=String(rec.type||'Unspecified')}else{for(let k of ['entitled','used','remaining'])rec[k]=hrNum(rec[k]);if(['entitled','used','remaining'].some(k=>!Number.isFinite(rec[k])||rec[k]<0))err='Invalid balance';if(!err&&Math.abs(rec.entitled-rec.used-rec.remaining)>0.02)err='Balance mismatch';rec.year=String(rec.year||new Date().getFullYear())}if(err)errors.push(`Row ${i+2}: ${err}`);else result.push(rec)});return {result,errors,mapped};}
-async function hrReadImport(type,input){let box=document.getElementById('hr-import-preview-'+type);if(!input.files?.[0])return;let file=input.files[0];if(file.size>5*1024*1024){box.textContent='File exceeds 5 MB';return}if(!window.XLSX){box.textContent='Excel parser unavailable. Check internet connection.';return}try{const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false});const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});if(!rows.length)throw Error('Sheet is empty');if(rows.length>3000)throw Error('Maximum 3000 rows per batch');const parsed=hrImportRows(type,rows);hrImportState[type]={records:parsed.result,errors:parsed.errors,filename:file.name};let sample=parsed.result.slice(0,8);box.innerHTML=`<p class="mb-2">${hrText('سجلات صحيحة','Valid rows')}: <b>${parsed.result.length}</b> · ${hrText('أخطاء','Errors')}: <b>${parsed.errors.length}</b></p>${parsed.errors.length?`<div class="text-rose-300 mb-3">${parsed.errors.slice(0,12).map(hrEscape).join('<br>')}</div>`:''}<div style="overflow-x:auto"><table class="hr-feature-table"><thead><tr>${Object.keys(sample[0]||{}).map(k=>`<th>${hrEscape(k)}</th>`).join('')}</tr></thead><tbody>${sample.map(r=>`<tr>${Object.values(r).map(v=>`<td>${hrEscape(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>${parsed.result.length&&!parsed.errors.length?`<button class="portal-ghost-btn px-5 py-3 rounded-xl mt-4" onclick="hrCommitImport('${type}')">${hrText('حفظ الدفعة في Firebase بعد التأكيد','Save batch to Firebase after confirmation')}</button>`:'<p class="text-amber-200 mt-3">Fix errors before saving.</p>'}`;}catch(e){hrImportState[type]=null;box.textContent='Import error: '+e.message}}
-async function hrCommitImport(type){const state=hrImportState[type];if(!state?.records.length||state.errors.length)return;const ok=confirm(hrText('تأكيد حفظ البيانات المستوردة في قاعدة البورتال؟ لن يتم تحديث ESS تلقائيًا.','Save imported data in Portal Firebase? ESS will not be updated automatically.'));if(!ok)return;const batch=db.ref('hr_imports/'+type).push();try{await batch.set({filename:state.filename,createdAt:firebase.database.ServerValue.TIMESTAMP,recordCount:state.records.length,records:state.records});alert(hrText('تم حفظ الدفعة بنجاح','Batch saved successfully'));hrLoadImport(type)}catch(e){alert('Firebase write failed: '+e.message)}}
-async function hrLoadImport(type){const box=document.getElementById('hr-import-saved-'+type);if(!box)return;try{let snap=await db.ref('hr_imports/'+type).limitToLast(1).once('value'),items=snap.val();if(!items){box.textContent=hrText('لا توجد دفعات محفوظة بعد','No saved batches yet');return}let batch=Object.values(items)[0];box.innerHTML=`<b>${hrText('آخر دفعة محفوظة','Latest saved batch')}</b><p>${hrEscape(batch.filename)} — ${Number(batch.recordCount)||0} ${hrText('سجل','records')}</p><p class="text-xs text-slate-400">${new Date(batch.createdAt||Date.now()).toLocaleString()}</p>`}catch(e){box.textContent=hrText('تعذر قراءة البيانات: راجع صلاحيات Firebase','Cannot read saved data: check Firebase rules')}}
+/* Phase 1 navigation: allow all tabs on short displays */
+.sidebar-collapsed nav{padding-bottom:18px}.sidebar-collapsed .sidebar-item{min-height:54px!important}
+.sidebar-collapsed{scrollbar-width:thin;scrollbar-color:#164e63 transparent}
+.hr-feature-table{width:100%;border-collapse:collapse;font-size:13px}
+.hr-feature-table th,.hr-feature-table td{padding:12px;text-align:start;border-bottom:1px solid rgba(56,189,248,.14)}
+.hr-feature-input{width:100%;background:#081529;border:1px solid #24607d;border-radius:10px;padding:12px;color:#e2e8f0}
+    
+/* FAHD1 v8 unified native employee profile */
+#employee-profile-view{display:none}
+#employee-profile-view:not(.hidden){display:block!important}
+#employee-profile-view > :not(#fahd1-native){display:none!important}
+#fahd1-native{display:block;width:100%;min-width:0}
 
-// Real-data phase: read-only batch inspection and deterministic settlement schedule.
-function hrSettlementSchedule(hireDate, asOfYear=new Date().getFullYear()) {
- const m=String(hireDate||'').match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
- if(!m)return null;
- const year=Number(m[1]),month=Number(m[2]),day=Number(m[3]);
- const date=new Date(year,month-1,day);
- if(date.getFullYear()!==year||date.getMonth()!==month-1||date.getDate()!==day)return null;
- const cycle=Math.max(1,Math.floor((asOfYear-year)/3)+1);
- return {hireYear:year,firstSettlement:year+3,lastCompletedSettlement:year+3*Math.max(0,Math.floor((asOfYear-year)/3)),nextSettlement:year+3*cycle,cycleStart:year+3*(cycle-1),cycleEnd:year+3*cycle-1};
-}
-function hrExtraTools(type){
- if(type==='attendance')return `<div class="hr-panel mb-5"><h2 class="font-bold text-sky-300 mb-2">${hrText('مراجعة سجلات البصمة','Biometric import review')}</h2><p class="text-sm text-slate-300">${hrText('رقم البصمة يساوي كود الموظف في النظام. رقم جهاز البصمة (1–4) هو معرّف الجهاز وليس كود موظف. لا يتم حساب الغياب أو التأخير قبل اعتماد قواعد الشيفتات.','Biometric number equals the employee code. Device number (1–4) identifies the machine, not the employee. Absence and lateness require approved shift rules.')}</p><div id="hr-attendance-summary" class="mt-3 text-sm text-slate-300"></div></div>`;
- return `<div class="hr-panel mb-5"><h2 class="font-bold text-sky-300 mb-3">${hrText('معاينة دورة التسوية الثلاثية','Three-year settlement schedule preview')}</h2><div class="grid grid-cols-1 md:grid-cols-2 gap-3"><label>${hrText('تاريخ التعيين (YYYY-MM-DD)','Hire date (YYYY-MM-DD)')}<input id="hr-settlement-hire" class="hr-feature-input mt-2" type="date" onchange="hrShowSettlement()"></label><label>${hrText('الأجر الشامل (اختياري)','Gross wage (optional)')}<input id="hr-settlement-wage" class="hr-feature-input mt-2" type="number" min="0" step="0.01" oninput="hrShowSettlement()"></label></div><p id="hr-settlement-result" class="mt-3 text-sm text-slate-200">${hrText('أدخل تاريخ التعيين لعرض دورة التسوية. هذه معاينة للمواعيد وليست اعتمادًا لرصيد أو مستحق مالي.','Enter a hire date to preview the schedule. This does not approve balances or payments.')}</p></div>`;
-}
-function hrShowSettlement(){
- const out=document.getElementById('hr-settlement-result');if(!out)return;
- const x=hrSettlementSchedule(document.getElementById('hr-settlement-hire')?.value);
- if(!x){out.textContent=hrText('اختر تاريخ تعيين صحيحًا','Choose a valid hire date');return}
- out.textContent=hrText(`سنوات الدورة الحالية: ${x.cycleStart}–${x.cycleEnd} | أول تسوية: يناير ${x.firstSettlement} | التسوية القادمة: يناير ${x.nextSettlement}. يتم حساب المبلغ بعد اعتماد الأيام القابلة للصرف والأجر الشامل.`,`Current cycle: ${x.cycleStart}–${x.cycleEnd} | First settlement: January ${x.firstSettlement} | Next settlement: January ${x.nextSettlement}. Payment requires approved eligible days and gross wage.`);
-}
-async function hrShowImportedData(type){
- const target=document.getElementById('hr-import-records-'+type);if(!target)return;
- try{
-  const snap=await db.ref('hr_imports/'+type).limitToLast(1).once('value');const obj=snap.val();
-  if(!obj){target.textContent=hrText('لا توجد بيانات مستوردة','No imported data');return}
-  const batch=Object.values(obj)[0],records=Object.values(batch.records||{}),valid=records.filter(x=>x&&typeof x==='object');
-  const cols=type==='attendance'?['code','timestamp','type','source']:['code','year','entitled','used','remaining'];
-  target.innerHTML=`<p class="mb-3">${hrText('سجلات آخر دفعة','Latest batch records')}: ${valid.length} — ${hrEscape(batch.filename||'')}</p><div style="overflow:auto;max-height:360px"><table class="hr-feature-table"><thead><tr>${cols.map(c=>`<th>${hrEscape(c)}</th>`).join('')}</tr></thead><tbody>${valid.slice(0,100).map(r=>`<tr>${cols.map(c=>`<td>${hrEscape(r[c]??'')}</td>`).join('')}</tr>`).join('')}</tbody></table></div><p class="text-xs text-slate-400 mt-2">${hrText('عرض أول 100 سجل فقط. القيم المعروضة بيانات مصدر وليست نتائج حسابية معتمدة.','Showing first 100 records. Source data, not approved calculations.')}</p>`;
- }catch(e){target.textContent=hrText('تعذر قراءة الدفعة: راجع صلاحيات Firebase','Cannot read batch: check Firebase permissions')}
-}
-const _hrFeatureOriginal=renderHRFeature;
-renderHRFeature=function(page){_hrFeatureOriginal(page);if(['attendance','leave-balances'].includes(page)){const container=document.getElementById('hr-'+page+'-view');if(container){container.insertAdjacentHTML('beforeend',hrExtraTools(page)+`<div class="hr-panel mt-5"><h2 class="font-bold text-sky-300 mb-3">${hrText('البيانات المستوردة فعليًا','Actual imported records')}</h2><button class="portal-ghost-btn px-4 py-2 rounded-xl mb-3" onclick="hrShowImportedData('${page}')">${hrText('عرض آخر دفعة','View latest batch')}</button><div id="hr-import-records-${page}"></div></div>`)}hrLoadImport(page)}};
+.fahd1-back{margin:0 0 12px;padding:9px 15px;border:1px solid #285c83;border-radius:10px;color:#d5eeff;background:#103154;font-weight:650;cursor:pointer}
+.fahd1-back:hover{background:#194a77}
+/* Original spacious KPI cards with SVG icons, preserve analytics and data views */
+#hr-dashboard-view .hr-stat-grid{grid-template-columns:repeat(6,minmax(0,1fr))!important}
+@media(max-width:1100px){#hr-dashboard-view .hr-stat-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}}@media(max-width:800px){#hr-dashboard-view .hr-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:480px){#hr-dashboard-view .hr-stat-grid{grid-template-columns:1fr!important}}
+#hr-dashboard-view .hr-stat-grid{gap:12px!important;margin-bottom:14px!important}
+#hr-dashboard-view .hr-stat-grid>.hr-panel{padding:14px 16px!important;border-radius:14px;min-height:96px;position:relative}
+#hr-dashboard-view .hr-stat-label{font-size:11px!important;padding-inline-end:27px}
+#hr-dashboard-view .hr-stat-value{font-size:25px!important;line-height:1.2;margin-top:5px!important}
+#hr-dashboard-view .hr-stat-grid .text-xs{font-size:10px!important;margin-top:5px!important}
+.hr-stat-icon{position:absolute;inset-inline-end:12px;top:12px;width:24px;height:24px;color:#7dd3fc;opacity:.88}
+#hr-dashboard-view .hr-shortcut-grid{gap:10px!important}
+#hr-dashboard-view .hr-shortcut-grid .hr-widget{padding:13px 15px!important;border-radius:14px;min-height:105px}
+#hr-dashboard-view .hr-shortcut-grid .hr-widget .text-3xl{font-size:22px!important;margin-top:7px!important}
+#hr-dashboard-view .hr-shortcut-grid .hr-widget .text-lg{font-size:14px!important;margin-top:7px!important}
+.hr-shortcut-icon{width:21px;height:21px;vertical-align:middle;margin-inline-end:8px;color:#7dd3fc;display:inline-block}
+@media(max-width:640px){#hr-dashboard-view .hr-stat-grid>.hr-panel{min-height:90px;padding:10px!important}#hr-dashboard-view .hr-stat-value{font-size:20px!important}}
 
 
-// ESS cross-project read-only integration. Credentials are never stored in source.
-const ESS_ADMIN_UID = 'wNAq91LfdQcrcQCfSSWsJpNtFP82';
-const ESS_ADMIN_EMAIL = 'mostafa.el-sayed@lactomisr.com';
-const essFirebaseConfig = {
-  apiKey: 'AIzaSyBObCeo4PM20UNYObThwdY4UaOiIhWdXa0',
-  authDomain: 'lacto-hr-system.firebaseapp.com',
-  databaseURL: 'https://lacto-hr-system-default-rtdb.firebaseio.com',
-  projectId: 'lacto-hr-system',
-  storageBucket: 'lacto-hr-system.firebasestorage.app',
-  messagingSenderId: '671259800401',
-  appId: '1:671259800401:web:905e1a36adba52ba2d1970'
-};
-const essApp = firebase.apps.find(app=>app.name==='ESS_ADMIN') || firebase.initializeApp(essFirebaseConfig,'ESS_ADMIN');
-const essAuth = essApp.auth();
-const essDb = essApp.database();
-const essPaths = [
- ['permission_requests','أذونات','Permissions'],['leave_requests','إجازات','Leaves'],
- ['loan_requests','سلف','Loans'],['mission_requests','مأموريات','Missions'],
- ['suggestions_and_complaints','شكاوى ومقترحات','Feedback'],
- ['attendance_requests','طلبات حضور','Attendance requests']
-];
-let essRequestUnsubscribers=[];
-let essRequestState={};
-let essRequestErrors={};
-function essEscape(v){return escapeHtml(String(v??''));}
-function essStopListeners(){essRequestUnsubscribers.forEach(f=>f());essRequestUnsubscribers=[];}
-function essRenderRequestPanel(){
- const panel=document.getElementById('ess-request-panel');if(!panel)return;
- if(!portalIsAdmin()) {essStopListeners();panel.textContent=hrText('هذه الصفحة متاحة للإدارة فقط','Admin only');return;}
- const u=essAuth.currentUser;
- if(!u||u.uid!==ESS_ADMIN_UID){
-  essStopListeners();
-  panel.innerHTML=`<p class="mb-3">${hrText('لرؤية طلبات ESS سجّل الدخول مرة واحدة بالحساب الإداري المنفصل. لن تتغير جلسة البورتال.','Sign in to the separate ESS admin account to view requests. Your Portal session stays active.')}</p><form id="ess-admin-form" class="flex flex-col gap-3 max-w-md"><input id="ess-admin-email" type="email" readonly value="${ESS_ADMIN_EMAIL}" class="p-3 rounded-lg bg-slate-900 border border-slate-700"><input id="ess-admin-password" type="password" required autocomplete="current-password" placeholder="${hrText('كلمة مرور حساب إدارة ESS','ESS admin password')}" class="p-3 rounded-lg bg-slate-900 border border-slate-700"><button class="px-4 py-3 rounded-lg bg-sky-700" type="submit">${hrText('اتصال آمن بـ ESS','Connect to ESS securely')}</button><p id="ess-auth-error" role="alert" class="text-red-300"></p></form>`;
-  panel.querySelector('#ess-admin-form').addEventListener('submit',async e=>{
-   e.preventDefault();const password=panel.querySelector('#ess-admin-password').value;
-   panel.querySelector('#ess-admin-password').value='';
-   try{const c=await essAuth.signInWithEmailAndPassword(ESS_ADMIN_EMAIL,password);
-    if(c.user.uid!==ESS_ADMIN_UID){await essAuth.signOut();throw Error('ESS admin UID mismatch');}
-    essRenderRequestPanel();
-   }catch(err){const p=document.getElementById('ess-auth-error');if(p)p.textContent=hrText('فشل تسجيل الدخول الإداري إلى ESS. تحقق من كلمة المرور والصلاحيات.','ESS admin sign-in failed. Check credentials and permissions.');}
-  });return;
+/* Refined dashboard components — existing card grid dimensions intentionally unchanged */
+#hr-dashboard-view .lm-gender-body{justify-content:space-evenly;gap:12px}
+#hr-dashboard-view .lm-gender-orb{display:block;width:min(68%,224px);height:auto;aspect-ratio:1;flex:none;filter:drop-shadow(0 0 11px #0075e355)}
+#hr-dashboard-view .lm-gender-stats{flex:0 1 100px;min-width:72px}
+#hr-dashboard-view .lm-org{grid-template-columns:minmax(0,1fr) 92px minmax(0,1fr);gap:0}
+#hr-dashboard-view .lm-orgcenter{display:grid;place-items:center;position:relative;z-index:3}
+#hr-dashboard-view .lm-orglogo{width:88px;height:88px}
+#hr-dashboard-view .lm-orgside{justify-content:space-between;padding:0;z-index:3}
+#hr-dashboard-view .lm-orgitem{height:40px;gap:5px;direction:ltr}
+#hr-dashboard-view .lm-orgside.left .lm-orgitem{flex-direction:row}
+#hr-dashboard-view .lm-orgside.right .lm-orgitem{flex-direction:row-reverse}
+#hr-dashboard-view .lm-orgside.left .lm-orgitem span{text-align:right}
+#hr-dashboard-view .lm-orgside.right .lm-orgitem span{text-align:left}
+#hr-dashboard-view .lm-orgitem b{width:23px;height:23px;font-size:10px}
+#hr-dashboard-view .lm-orgsvg{z-index:2;opacity:.75}
+#hr-dashboard-view .lm-orgsvg path{stroke-width:.75;filter:none}
+#hr-dashboard-view .lm-world-real img{width:100%;height:90%;object-fit:contain;filter:drop-shadow(0 0 7px #086ce999)}
+#hr-dashboard-view .lm-map-missing{color:#ffb4a8;font-size:11px;text-align:center;padding:15px}
+#hr-dashboard-view .lm-egypt-real #hr-real-egypt-map{width:100%;height:90%;max-width:100%;overflow:hidden}
+#hr-dashboard-view .lm-egypt-real .hr-egypt-region{stroke:#38bdf8;stroke-width:1;cursor:pointer;transition:fill .2s}
+#hr-dashboard-view .lm-egypt-real .hr-egypt-region:hover{stroke:#fff;stroke-width:2;filter:drop-shadow(0 0 5px #3fe6ff)}
+#hr-dashboard-view .lm-notifications{height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;text-align:center}
+#hr-dashboard-view .lm-notify-count{font:700 40px Arial;color:#2fe2ff}
+#hr-dashboard-view .lm-notify-label{font-size:10px;color:#c0dbf5}
+#hr-dashboard-view .lm-notifications button{font-size:11px;background:#123b68;border:1px solid #258bd0;color:#d4f3ff;padding:5px 12px;border-radius:8px;cursor:pointer}
+.lm-header-identity{display:flex;align-items:center;gap:9px;min-width:0}
+.lm-header-avatar{height:39px;width:39px;border-radius:50%;border:1px solid #3b8ed6;background:#14385b;display:grid;place-items:center;overflow:hidden;flex:none}
+.lm-header-avatar img{width:100%;height:100%;object-fit:cover;grid-area:1/1}
+.lm-avatar-fallback{color:#6bb9ff;font-size:21px;grid-area:1/1}
+.lm-header-names{display:flex;flex-direction:column;max-width:160px;line-height:1.4}
+.lm-header-names b{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lm-header-names small{font-size:10px;color:#91bfe2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#lm-role-flag{flex:none;color:#ff4268;filter:drop-shadow(0 0 5px #ff426855)}
+.lm-header-bell{position:relative;border:1px solid #25547b;background:#0a2340;color:#80d8ff;border-radius:11px;padding:8px;flex:none}
+.lm-header-bell b{position:absolute;top:-8px;right:-7px;background:#fb3768;border-radius:100px;color:white;min-width:19px;height:19px;padding:0 4px;display:grid;place-items:center;font:700 11px Arial}
+#portal-main-sidebar .lm-sidebar-art{height:190px;mask-image:linear-gradient(to bottom,transparent,#000 17%,#000 75%,transparent);-webkit-mask-image:linear-gradient(to bottom,transparent,#000 17%,#000 75%,transparent)}
+#portal-main-sidebar .lm-factory-illustration{width:100%;height:100%;object-fit:cover;object-position:center 58%;mix-blend-mode:screen}
+@media(max-width:800px){.lm-header-names{max-width:95px}.lm-header-identity{gap:4px}#lm-role-flag{width:19px}}
+
+
+/* Surgical visual refinements: preserve dashboard card grid */
+#hr-dashboard-view .lm-gender-orb{filter:none}
+#hr-dashboard-view .lm-orgsvg path{stroke-width:.48;opacity:.68;filter:none}
+#hr-dashboard-view .lm-orgitem b{flex-shrink:0}
+#hr-dashboard-view .lm-orgside{gap:3px}
+#hr-dashboard-view .lm-orgitem{height:37px}
+#hr-dashboard-view .lm-geo-controls{display:flex;align-items:center;gap:8px;justify-content:space-between;padding:3px 8px;color:#8bdfff;font-size:10px}
+#hr-dashboard-view .lm-geo-controls select{background:#0b2746;color:#e5f7ff;border:1px solid #236a9e;border-radius:7px;max-width:72%;padding:3px 6px;font-size:10px}
+#hr-dashboard-view .lm-egypt-real{height:208px}
+
+/* Dashboard finish: existing grid dimensions unchanged */
+#hr-dashboard-view .lm-gender-orb{width:min(70%,240px);height:225px;filter:drop-shadow(0 0 13px #0bb8ff38)!important;overflow:visible}
+#hr-dashboard-view .lm-orglogo{width:82px!important;height:82px!important;object-fit:contain!important;padding:5px!important;background:radial-gradient(circle at 35% 25%,#173e6d,#061229 80%)!important;border:2px solid #38ceff!important;box-shadow:0 0 0 4px #047bdf25,0 0 13px #04d7ff9c,0 0 24px #1453ff6b,inset 0 0 10px #07baff55!important;transform:perspective(350px) rotateY(-7deg) rotateX(4deg)}
+#hr-dashboard-view .lm-qual-gauge{height:155px;position:relative;text-align:center;color:#cbe8ff;font-size:10px}
+#hr-dashboard-view .lm-qual-gauge>label{display:block;text-align:start;margin-bottom:3px}
+#hr-dashboard-view .lm-qual-gauge select{width:100%;max-width:260px;border:1px solid #245c8a;background:#081c36;color:#eaf8ff;border-radius:6px;padding:5px;font-size:11px}
+#hr-dashboard-view .lm-speedometer{position:relative;width:164px;height:87px;margin:8px auto 0;overflow:hidden}
+#hr-dashboard-view .lm-speed-arc{--fill:0%;position:absolute;width:164px;height:164px;left:0;top:0;border-radius:50%;background:conic-gradient(from 270deg,#08caff 0 var(--fill),#253a5a var(--fill) 50%,transparent 50% 100%);mask:radial-gradient(farthest-side,transparent 73%,#000 75%)}
+#hr-dashboard-view .lm-speed-center{position:absolute;top:31px;width:100%;display:flex;flex-direction:column;align-items:center}
+#hr-dashboard-view .lm-speed-center strong{font-size:23px;color:#fff}
+#hr-dashboard-view .lm-speed-center small{font-size:9px;color:#9ec9e7}
+#hr-dashboard-view .lm-speed-needle{position:absolute;width:2px;height:53px;background:#ffbd5a;left:50%;bottom:0;transform-origin:bottom center;transform:translateX(-50%) rotate(-90deg);transition:transform .4s ease}
+#hr-dashboard-view .lm-qual-foot{font-size:9px;color:#8ebcda;margin-top:0}
+#hr-dashboard-view .lm-spark text{paint-order:stroke;stroke:#07162e;stroke-width:2px}
+
+/* RPM SVG gauge and legible organization connectors; dashboard grid unchanged */
+#hr-dashboard-view .lm-qual-gauge{height:auto;min-height:155px}
+#hr-dashboard-view .lm-speedometer{width:min(100%,240px);height:137px;margin:3px auto 0;overflow:visible;position:relative}
+#hr-dashboard-view .lm-speedometer svg{display:block;width:100%;height:137px;overflow:visible}
+#hr-dashboard-view .lm-speed-center{top:75px;left:0;right:0;pointer-events:none}
+#hr-dashboard-view .lm-speed-center strong{font-size:21px;line-height:1.1}
+#hr-dashboard-view .lm-speed-center small{font-size:10px;line-height:1.3}
+#hr-dashboard-view .lm-qual-foot{margin-top:0;line-height:1.3}
+#hr-dashboard-view .lm-orgsvg{opacity:1!important;z-index:2!important}
+#hr-dashboard-view .lm-orgsvg path{stroke-width:1.18!important;opacity:.95!important;filter:drop-shadow(0 0 1.5px #12bfff)!important}
+#hr-dashboard-view .lm-orgsvg path.r{filter:drop-shadow(0 0 1.5px #c070ff)!important}
+#hr-dashboard-view .lm-orgcenter,#hr-dashboard-view .lm-orgside{z-index:3}
+
+/* 2026-10-28: qualification dial fits within the existing card; no grid changes. */
+#hr-dashboard-view .lm-qual-gauge{min-height:0!important;height:100%!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:2px!important}
+#hr-dashboard-view .lm-qual-gauge>label{margin:0!important;line-height:1.15!important}
+#hr-dashboard-view .lm-qual-gauge select{padding:3px 6px!important;min-height:25px!important;flex:0 0 auto!important}
+#hr-dashboard-view .lm-speedometer{width:min(100%,208px)!important;height:91px!important;min-height:91px!important;margin:0 auto!important;overflow:hidden!important;flex:0 0 91px!important}
+#hr-dashboard-view .lm-speedometer svg{width:100%!important;height:115px!important;display:block!important;overflow:visible!important}
+#hr-dashboard-view .lm-speed-center{top:56px!important;left:0!important;right:0!important}
+#hr-dashboard-view .lm-speed-center strong{font-size:17px!important;line-height:1!important}
+#hr-dashboard-view .lm-speed-center small{font-size:8px!important;line-height:1.15!important}
+#hr-dashboard-view .lm-qual-foot{font-size:8px!important;line-height:1.15!important;text-align:center!important;margin-top:0!important}
+/* Restore readable but slender department connectors. */
+#hr-dashboard-view .lm-orgsvg path{stroke-width:1.65!important;opacity:1!important;filter:drop-shadow(0 0 2px #16c9ff)!important}
+#hr-dashboard-view .lm-orgsvg path.r{filter:drop-shadow(0 0 2px #c078ff)!important}
+
+/* Employees-only inline filter panel; dashboard untouched */
+#lm-employee-filters{padding:18px 20px;background:linear-gradient(135deg,rgba(8,26,48,.95),rgba(12,34,60,.87));border-bottom:1px solid rgba(56,189,248,.24)}
+.lm-filter-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;color:#bae6fd;font-size:14px;margin-bottom:14px}.lm-filter-heading span{color:#67e8f9;font-weight:800}
+.lm-filter-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.lm-filter-grid label{display:flex;flex-direction:column;gap:6px;color:#cbd5e1;font-size:12px;font-weight:700;min-width:0}
+.lm-filter-grid select,.lm-filter-grid input{width:100%;min-width:0;height:40px;padding:0 10px;border:1px solid rgba(56,189,248,.35);border-radius:10px;background:#0b1930;color:#e2e8f0;outline:none;color-scheme:dark}
+.lm-filter-grid select:focus,.lm-filter-grid input:focus{border-color:#67e8f9;box-shadow:0 0 0 2px rgba(56,189,248,.12)}
+.lm-filter-grid select[multiple]{height:132px;min-height:132px;padding:5px 7px;overflow-y:auto}.lm-filter-grid select[multiple] option{padding:6px 8px;border-radius:6px}.lm-filter-grid select[multiple] option:checked{background:#0369a1 linear-gradient(#0369a1,#0369a1);color:white}.lm-filter-grid label small{color:#93c5fd;font-size:10px;line-height:1.5}.lm-filter-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:14px}.lm-filter-actions button{border:1px solid rgba(56,189,248,.4);border-radius:10px;padding:9px 15px;background:rgba(14,116,144,.22);color:#e0f2fe;font-weight:800;font-size:12px}.lm-filter-actions button:hover{background:rgba(14,116,144,.46)}
+@media(max-width:1000px){.lm-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.lm-filter-grid{grid-template-columns:1fr}}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style id="fahd-native-style">.fahd-native{color:#e3f3ff;font-family:inherit}.fahd-top,.fahd-content{border:1px solid #17476c;border-radius:20px;background:linear-gradient(135deg,#0b1a33,#071427);padding:24px;margin-bottom:14px}.fahd-top{display:flex;align-items:center;gap:24px;justify-content:space-between}.fahd-top h2{font-size:29px;font-weight:800;color:#62d4ff}.fahd-top small{color:#60a5fa}.fahd-top p{color:#9dbbd0}.fahd-top button,.fahd-actions button{background:#123b64;border:1px solid #2972a5;padding:11px 16px;border-radius:12px;color:#e2f4ff}.fahd-tabs{display:flex;gap:9px;overflow-x:auto;padding:10px 0 18px}.fahd-tabs button{white-space:nowrap;border:1px solid #24527d;border-radius:13px;padding:13px 15px;color:#c1dcef;background:#0c1c36}.fahd-tabs button.selected{background:#125e99;border-color:#47c6ff;color:white}.fahd-summary,.fahd-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}.fahd-tile,.fahd-field{background:linear-gradient(145deg,#112849,#0a1930);border:1px solid #24517a;border-radius:15px;padding:18px;min-width:0;box-shadow:0 10px 30px #0002}.fahd-tile span,.fahd-field label{display:block;color:#9bb9d1;font-size:13px;margin-bottom:9px}.fahd-tile strong{font-size:19px;color:#6fd4ff;overflow-wrap:anywhere}.fahd-field input{width:100%;padding:11px;background:#071427;border:1px solid #31638a;border-radius:9px;color:white}.fahd-actions{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap}.fahd-empty{padding:36px;text-align:center;color:#8fb4d3;border:1px dashed #285477;border-radius:16px}.fahd-pane[hidden]{display:none!important}#fahd-status{color:#7dd3fc;margin-top:14px}@media(max-width:900px){.fahd-summary,.fahd-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.fahd-summary,.fahd-fields{grid-template-columns:1fr}.fahd-top{flex-wrap:wrap}}
+</style>
+<style id="fahd-v9-fixes">
+.fahd-photo{width:108px;height:108px;object-fit:cover;flex:none;border-radius:23px;border:2px solid #36c8ff;box-shadow:0 0 30px #1aaaff55;background:#10243d}.fahd-top{justify-content:flex-start}.fahd-top>div{flex:1}.fahd-top>span{align-self:flex-start;border:1px solid #2c6286;padding:8px 12px;border-radius:12px}.fahd-top>button{order:4}.fahd-tab-icon{display:inline-block;width:19px;height:19px;vertical-align:middle;margin-inline-end:7px;filter:drop-shadow(0 0 5px #39bfff66)}.fahd-tabs button{display:flex;align-items:center}.fahd-field input:disabled{border-color:transparent;background:transparent;padding:5px 0;color:#d9f2ff;opacity:1;font-weight:650;cursor:default}.fahd-field:has(input:disabled){background:linear-gradient(145deg,#102947,#091a31)}.fahd-actions button[hidden]{display:none}.fahd-dialog[hidden]{display:none!important}.fahd-dialog{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:#020918d9;backdrop-filter:blur(8px);padding:16px}.fahd-dialog-card{width:min(94vw,470px);background:linear-gradient(135deg,#112d4e,#071629);border:1px solid #318ac0;box-shadow:0 24px 80px #000a,0 0 35px #00aeff22;border-radius:20px;padding:25px;color:#e5f6ff}.fahd-dialog-card h3{font-size:20px;font-weight:800;color:#63d6ff}.fahd-dialog-card p{margin:12px 0 16px;color:#b7d5e9}.fahd-dialog-card input{width:100%;padding:12px;margin-bottom:12px;border:1px solid #3b789f;border-radius:10px;background:#061527;color:#fff}.fahd-dialog-actions{display:flex;justify-content:flex-end;gap:10px}.fahd-dialog-actions button{padding:10px 20px;border-radius:10px;border:1px solid #307cb0;background:#124e7b;color:#fff}.fahd-dialog-actions button:first-child{background:#182b42}.fahd-pane .fahd-tile{transform-style:preserve-3d;transition:transform .25s,box-shadow .25s}.fahd-pane .fahd-tile:hover{transform:perspective(700px) translateY(-3px) rotateX(2deg);box-shadow:0 16px 30px #0006,0 0 22px #00bfff22}@media(max-width:650px){.fahd-photo{width:75px;height:75px}.fahd-top{gap:10px;padding:15px}.fahd-top h2{font-size:20px}}
+
+</style><style id="fahd-v10-style">
+#add-employee-modal{align-items:stretch!important;padding:12px!important}
+#add-employee-modal .modal-panel{width:100%!important;max-width:none!important;height:calc(100vh - 24px)!important;max-height:none!important;overflow-y:auto!important;border-radius:20px!important}
+#add-employee-fields .dynamic-field-card{background:linear-gradient(145deg,#102746,#081a32);border:1px solid #235e91;border-radius:15px;padding:15px}
+#add-employee-fields input:focus{outline:2px solid #4acbff;outline-offset:1px}
+#add-employee-fields input[readonly]{color:#67e8f9;background:#122d46;cursor:default}
+.fahd-tabs{gap:12px!important;flex-wrap:wrap!important;padding:12px 0!important}
+.fahd-tabs button{background:linear-gradient(145deg,#07192d,#14365d)!important;border:1px solid #2e93cb!important;box-shadow:0 5px 17px #0008,0 0 10px #1a91d62c!important;border-radius:16px!important;transition:transform .2s,box-shadow .2s!important}
+.fahd-tabs button:hover{transform:translateY(-4px);box-shadow:0 10px 22px #0009,0 0 19px #48c9ff8c!important}
+.fahd-tabs button.selected{background:linear-gradient(145deg,#11598d,#0a2d54)!important;border-color:#79e1ff!important;box-shadow:0 0 0 1px #64d6ff,0 0 23px #35bdff9c!important}
+
+</style>
+
+<style id="fahd-v11-workspace">
+.fahd-create-workspace{position:fixed;inset:0;z-index:9990;background:radial-gradient(ellipse at 70% 0%,#143d65 0%,#071527 43%,#030b18 100%);color:#e5f5ff;display:flex;flex-direction:column;overflow:hidden;padding:22px 28px}
+.fahd-create-workspace.hidden{display:none!important}
+.fahd-create-top{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:12px 4px 18px;border-bottom:1px solid #25567d}
+.fahd-create-top h2{font-size:clamp(20px,2.2vw,32px);font-weight:850;color:#69d8ff}.fahd-create-top small{color:#5dbef6}.fahd-create-top p{color:#93b9d0;font-size:13px}
+.fahd-create-top button,.fahd-create-footer button{background:#10385c;color:#e6f6ff;border:1px solid #38a7e0;border-radius:12px;padding:11px 19px}
+.fahd-create-tabs{display:flex;gap:12px;overflow-x:auto;padding:20px 4px}.fahd-create-tabs button{white-space:nowrap;border-radius:16px;padding:13px 19px;background:linear-gradient(145deg,#091a32,#164169);border:1px solid #3297d0;color:#d5f2ff;box-shadow:0 8px 22px #0006,0 0 12px #1caaff44;transition:transform .2s}
+.fahd-create-tabs button.selected{background:linear-gradient(145deg,#176eac,#0b335b);border-color:#80e6ff;box-shadow:0 0 0 1px #5cd7ff,0 0 25px #34c4ff90;transform:translateY(-3px)}
+.fahd-create-body{flex:1;min-height:0;overflow:auto;padding:0 4px 20px}.fahd-create-pane[hidden]{display:none!important}
+.fahd-add-section{margin-bottom:22px;background:linear-gradient(135deg,#0c213e,#07192f);border:1px solid #245d8c;border-radius:20px;padding:22px}
+.fahd-add-section h3{font-size:19px;font-weight:800;color:#6edbff}.fahd-add-section p{font-size:12px;color:#8daec5;margin:5px 0 16px}
+.fahd-add-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}.fahd-entry{min-width:0;padding:12px 15px;border:1px solid #285d88;background:#102746;border-radius:13px}
+.fahd-entry label{display:block;font-size:12px;color:#9ad3f4;margin-bottom:9px}.fahd-entry input{width:100%;min-width:0;border:1px solid #276392;border-radius:9px;background:#061529;color:#fff;padding:11px;font-size:14px}
+.fahd-entry input:focus{outline:2px solid #65d9ff}.fahd-entry input[readonly]{color:#80e5ff;background:#143957}
+.fahd-create-footer{display:flex;align-items:center;gap:10px;padding:16px 4px 4px;border-top:1px solid #25567d}.fahd-create-footer #add-employee-error{flex:1;color:#ff8c9c;font-size:13px}.fahd-create-footer [data-save-new]{background:#0875b9;font-weight:800}.fahd-create-footer button:disabled{opacity:.5}
+#fahd-fields .fahd-field[hidden]{display:none!important}
+@media(max-width:680px){.fahd-create-workspace{padding:10px}.fahd-create-top{flex-wrap:wrap}.fahd-add-grid{grid-template-columns:1fr}.fahd-add-section{padding:13px}}
+
+</style>
+<style id="fahd-v13-styles">
+.fahd-photo-area{display:flex;flex-direction:column;align-items:center;gap:8px;flex:0 0 120px}.fahd-photo-button{background:#103d65;border:1px solid #45baf5;color:#bfeeff;border-radius:10px;padding:9px 12px;cursor:pointer;font-size:12px}.fahd-photo-button:hover{box-shadow:0 0 18px #00bfff66}
+.fahd-holo-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:18px;margin:18px 0 26px}.fahd-holo-panel{position:relative;overflow:hidden;min-height:320px;border:1px solid #2b90c4;border-radius:20px;background:radial-gradient(ellipse at 50% 120%,#075d8799,transparent 68%),linear-gradient(155deg,#07152c,#0a2543);box-shadow:inset 0 0 30px #00cfff11,0 16px 38px #0007;padding:20px;perspective:850px}.fahd-holo-panel:before{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(transparent 97%,#2edaff13 98%);background-size:100% 28px}.fahd-holo-head{display:flex;align-items:center;gap:10px;color:#b7efff;position:relative}.fahd-holo-head span{font-size:26px;color:#55dcff;text-shadow:0 0 18px #27ceff}.fahd-holo-head h2{font-weight:800;font-size:16px;flex:1}.fahd-holo-head small{font-size:11px;color:#85b9d1}.fahd-holo-skyline{position:relative;display:flex;gap:10px;align-items:flex-end;justify-content:space-around;height:245px;transform:rotateX(12deg);transform-style:preserve-3d;border-bottom:1px solid #59d9ff88;padding:22px 8px 0}.fahd-holo-column{display:flex;flex:1;min-width:0;height:100%;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px}.fahd-holo-bar{width:min(95%,40px);height:var(--height);background:linear-gradient(90deg,hsl(var(--hue),90%,23%),hsl(var(--hue),95%,57%) 55%,hsl(var(--hue),85%,32%));box-shadow:6px -4px 0 #1b739a77,0 0 20px #23c8ff44;transform:skewY(-7deg);transition:height .5s}.fahd-holo-value{color:#c5f8ff;font-size:12px;font-weight:800}.fahd-holo-label{font-size:9px;color:#9ac5dc;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}.fahd-holo-radial{position:relative;display:grid;gap:18px;margin-top:30px}.fahd-holo-row{display:grid;grid-template-columns:minmax(75px,1.4fr) 2fr 30px;gap:10px;align-items:center;color:#c9e8f8;font-size:11px}.fahd-holo-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fahd-holo-track{height:12px;background:#173451;border-radius:9px;transform:perspective(250px) rotateX(20deg)}.fahd-holo-track i{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,hsl(var(--hue),88%,30%),hsl(var(--hue),98%,65%));box-shadow:0 0 16px #26d8ff55}.fahd-holo-row b{color:#70dcff}.fahd-create-workspace{inset:0!important;padding:0!important}.fahd-create-top,.fahd-create-tabs,.fahd-create-body,.fahd-create-footer{padding-left:28px!important;padding-right:28px!important}.fahd-create-body{min-height:0;flex:1}.fahd-create-workspace .fahd-create-top{padding-top:24px!important}.fahd-entry input[list]{border-color:#3599c4}.fahd-photo-area img{object-fit:cover}#fahd-new-custom{display:contents}@media(max-width:850px){.fahd-holo-grid{grid-template-columns:1fr}.fahd-holo-panel{min-height:270px}}
+@media(prefers-reduced-motion:reduce){.fahd-holo-bar{transition:none}}
+
+</style>
+
+<style id="lm-dashboard-rebuild">
+/* Lacto Misr Dashboard: single isolated design system */
+#portal-main-sidebar{visibility:hidden;pointer-events:none}
+body.portal-signed-in #portal-main-sidebar{visibility:visible;pointer-events:auto}
+body.portal-signed-in #portal-main-sidebar:hover{width:326px!important}
+html[dir=rtl] body.portal-signed-in:has(#portal-main-sidebar:hover)>div.flex.flex-1.overflow-hidden>main{margin-inline-end:76px!important}
+html[dir=ltr] body.portal-signed-in:has(#portal-main-sidebar:hover)>div.flex.flex-1.overflow-hidden>main{margin-inline-start:76px!important}
+body.portal-signed-in:has(#portal-main-sidebar:hover)>header{padding-inline-start:24px!important;padding-inline-end:88px!important}
+#portal-main-sidebar:after{content:"";position:absolute;bottom:0;inset-inline:0;height:225px;pointer-events:none;background:linear-gradient(to bottom,#07172c00,#07172c 96%)}
+#portal-main-sidebar .lm-sidebar-art{height:170px;overflow:hidden;mask-image:linear-gradient(to bottom,transparent,#000 35%,#000 75%,transparent);-webkit-mask-image:linear-gradient(to bottom,transparent,#000 35%,#000 75%,transparent)}#portal-main-sidebar .lm-sidebar-art svg{width:100%;height:100%}#portal-main-sidebar .sidebar-factory{width:100%;height:240px;object-fit:cover;object-position:center bottom;mask-image:linear-gradient(to bottom,transparent 0%,black 34%,black 72%,transparent 100%);-webkit-mask-image:linear-gradient(to bottom,transparent 0%,black 34%,black 72%,transparent 100%)}
+#hr-dashboard-view{width:100%;padding:0!important;overflow:visible!important}
+#hr-dashboard-view .lm-board{--cyan:#05caff;--violet:#8463ff;--pink:#f24aca;--line:#173d6b;direction:ltr;max-width:1680px;margin:auto;color:#f1f7ff;font-family:Cairo,Arial,sans-serif}
+#hr-dashboard-view .lm-board *{box-sizing:border-box}
+#hr-dashboard-view .lm-row{display:grid;gap:11px;margin-bottom:11px;min-width:0}
+#hr-dashboard-view .lm-top{grid-template-columns:repeat(4,minmax(0,1fr)) minmax(265px,1.35fr)}
+#hr-dashboard-view .lm-middle{grid-template-columns:minmax(0,1.48fr) minmax(0,1.8fr) minmax(0,1fr) minmax(0,1fr)}
+#hr-dashboard-view .lm-charts{grid-template-columns:minmax(0,1.55fr) minmax(0,1.55fr) minmax(0,1fr)}
+#hr-dashboard-view .lm-bottom{grid-template-columns:repeat(4,minmax(0,1fr))}
+#hr-dashboard-view .lm-card{min-width:0;overflow:hidden;position:relative;border-radius:10px;border:1px solid #214774;background:linear-gradient(125deg,#0c2342,#08162e 75%);box-shadow:inset 0 1px #ffffff09,0 5px 20px #0002;padding:13px 14px}
+#hr-dashboard-view .lm-top .lm-card{height:175px}#hr-dashboard-view .lm-middle .lm-card{height:300px}#hr-dashboard-view .lm-charts .lm-card{height:215px}#hr-dashboard-view .lm-bottom .lm-card{height:210px}
+#hr-dashboard-view .lm-heading{font-weight:800;font-size:13px;line-height:1.35;min-width:0;direction:rtl;text-align:right;display:block;color:white}
+#hr-dashboard-view .lm-heading small{font:11px Arial,sans-serif;display:block;color:#c6dfff;direction:ltr;text-align:left;margin-top:4px}
+#hr-dashboard-view .lm-stathead{display:flex;gap:10px;align-items:flex-start;direction:ltr}
+#hr-dashboard-view .lm-stathead svg{height:34px;width:34px;flex:none;color:#46b8ff;stroke-width:1.8}
+#hr-dashboard-view .lm-stathead .lm-heading{flex:1}
+#hr-dashboard-view .lm-value{font:bold 35px Arial,sans-serif;text-align:center;margin-top:17px}
+#hr-dashboard-view .lm-unit{font-size:11px;color:#c8dfff;text-align:center;margin-top:6px}
+#hr-dashboard-view .lm-blank{display:grid;place-items:center;height:95px;color:#8ab2d3;font-size:12px;text-align:center;padding:8px}
+#hr-dashboard-view .lm-gaugebox{display:flex;gap:15px;justify-content:space-around;align-items:center;margin-top:8px}
+#hr-dashboard-view .lm-gauge{text-align:center;min-width:0;flex:1}
+#hr-dashboard-view .lm-donut{height:105px;width:105px;max-width:100%;aspect-ratio:1;border-radius:50%;margin:auto;display:grid;place-items:center;background:conic-gradient(#04d3eb 0%,#4362f9 65%,#d42be0 90%,#203753 90%);box-shadow:0 0 12px #04c5ef33}
+#hr-dashboard-view .lm-donut:before{content:"";position:absolute;width:69px;height:69px;border-radius:50%;background:#0a1a34}
+#hr-dashboard-view .lm-donut span{position:relative;font:bold 24px Arial;color:#03f5db}
+#hr-dashboard-view .lm-gauge label{font-size:10px;display:block;margin-top:5px}
+#hr-dashboard-view .lm-gender-body{display:flex;gap:8px;align-items:center;height:237px;direction:ltr}
+#hr-dashboard-view .lm-gender-ball{width:66%;max-width:260px;aspect-ratio:1;flex:none;border-radius:50%;display:grid;grid-template-columns:repeat(12,1fr);align-content:center;justify-items:center;gap:1px;padding:10px 8px;overflow:hidden;clip-path:circle(49% at 50% 50%);background:radial-gradient(circle at 45% 45%,#123a66aa,#081a3200 70%)}
+#hr-dashboard-view .lm-person{width:100%;height:18px;display:block;fill:#06baff;filter:drop-shadow(0 0 3px #08d4ff)}#hr-dashboard-view .lm-person.f{fill:#f54ed5;filter:drop-shadow(0 0 3px #f54ed5)}
+#hr-dashboard-view .lm-gender-stats{flex:1;text-align:left;font-size:11px;line-height:1.8}
+#hr-dashboard-view .lm-gender-stats strong{font:bold 29px Arial;display:block;color:#02caff}#hr-dashboard-view .lm-gender-stats .female{color:#f65dd8}
+#hr-dashboard-view .lm-org{position:relative;height:242px;display:grid;grid-template-columns:1fr 100px 1fr;gap:5px;align-items:center;direction:ltr}
+#hr-dashboard-view .lm-orgside{display:flex;flex-direction:column;justify-content:space-evenly;height:100%;z-index:2;min-width:0}
+#hr-dashboard-view .lm-orgitem{display:flex;align-items:center;gap:5px;min-width:0;height:33px;direction:ltr}
+#hr-dashboard-view .lm-orgitem.r{flex-direction:row-reverse}
+#hr-dashboard-view .lm-orgitem span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px;flex:1;text-align:right;direction:rtl}
+#hr-dashboard-view .lm-orgitem b{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#136ac5;font-size:10px;flex:none}
+#hr-dashboard-view .lm-orgitem.r b{background:#8c40c4}
+#hr-dashboard-view .lm-orglogo{width:94px;height:94px;border:2px solid #32baff;border-radius:50%;background:#08182f;box-shadow:0 0 20px #008fffaa;padding:6px;object-fit:contain;position:relative;z-index:3}
+#hr-dashboard-view .lm-orgsvg{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}
+#hr-dashboard-view .lm-orgsvg path{fill:none;stroke:#04baff;stroke-width:1.5;opacity:.85;filter:drop-shadow(0 0 3px #03bfff)}
+#hr-dashboard-view .lm-orgsvg path.r{stroke:#bb60f7}
+#hr-dashboard-view .lm-mapbody{height:238px;display:grid;place-items:center;position:relative}
+#hr-dashboard-view .lm-mapbody svg{width:100%;height:100%;object-fit:contain;overflow:visible}
+#hr-dashboard-view .lm-worldpath{fill:#0967e5;stroke:#1da6ff;stroke-width:.45;filter:drop-shadow(0 0 3px #007dff)}
+#hr-dashboard-view .lm-geo-tooltip{position:absolute;bottom:0;left:0;right:0;text-align:center;color:#7bd8ff;font-size:10px}
+#hr-dashboard-view .lm-geo-list{position:absolute;right:0;top:4px;width:43%;max-height:218px;overflow:auto;font-size:10px;direction:rtl;background:#07182eaa;padding:4px;border-radius:7px}
+#hr-dashboard-view .lm-geo-list div{display:flex;justify-content:space-between;gap:6px;border-bottom:1px solid #16446b;padding:4px 0}
+#hr-dashboard-view .lm-geo-list b{color:#75d9ff}
+#hr-dashboard-view .lm-egypt-svg{max-width:65%;margin-right:auto}
+#hr-dashboard-view .lm-egypt-dot{fill:#04ecff;stroke:#c5ffff;stroke-width:1;filter:drop-shadow(0 0 4px #02d9ff)}
+#hr-dashboard-view .lm-bars{display:flex;align-items:flex-end;gap:5px;height:146px;margin-top:12px;border-bottom:1px solid #25466b}
+#hr-dashboard-view .lm-bar{flex:1;min-width:0;height:100%;display:flex;align-items:center;flex-direction:column;justify-content:flex-end;gap:3px}
+#hr-dashboard-view .lm-bar i{width:80%;max-width:36px;min-height:3px;background:linear-gradient(#00caff,#0d4fcb);border-radius:5px 5px 0 0;box-shadow:0 0 8px #0089ff66}
+#hr-dashboard-view .lm-bar:nth-child(even) i{background:linear-gradient(#a879ff,#4933c3)}
+#hr-dashboard-view .lm-bar b{font:10px Arial;color:#fff}
+#hr-dashboard-view .lm-bar small{width:100%;font-size:8px;color:#b9d4ef;text-overflow:ellipsis;white-space:nowrap;overflow:hidden;text-align:center}
+#hr-dashboard-view .lm-spark{height:145px;width:100%;margin-top:10px}
+#hr-dashboard-view .lm-ringwrap{display:flex;align-items:center;gap:9px;height:147px}
+#hr-dashboard-view .lm-ring{flex:none;width:118px;height:118px;border-radius:50%;display:grid;place-items:center}
+#hr-dashboard-view .lm-ring:before{content:"";width:80px;height:80px;border-radius:50%;background:#0b1b35;position:absolute}
+#hr-dashboard-view .lm-ring b{font:bold 23px Arial;color:white;position:relative}
+#hr-dashboard-view .lm-legend{flex:1;min-width:0;font-size:10px;max-height:142px;overflow:auto}
+#hr-dashboard-view .lm-legend div{display:flex;gap:5px;align-items:center;margin-bottom:8px;direction:rtl}
+#hr-dashboard-view .lm-legend i{width:9px;height:9px;border-radius:50%;flex:none}
+#hr-dashboard-view .lm-legend span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+#hr-dashboard-view .lm-legend b{font:10px Arial}
+#hr-dashboard-view .lm-latest{margin-top:9px;font-size:10px}
+#hr-dashboard-view .lm-latest div{display:flex;justify-content:space-between;gap:6px;padding:5px 0;border-bottom:1px solid #25476a;direction:rtl}
+#hr-dashboard-view .lm-latest span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#hr-dashboard-view .lm-note{font-size:10px;color:#82abc9;text-align:center;padding:5px}
+@media(max-width:1280px){#hr-dashboard-view .lm-top{grid-template-columns:repeat(4,minmax(0,1fr))}#hr-dashboard-view .lm-top .lm-attendance{grid-column:span 4;height:150px}#hr-dashboard-view .lm-middle{grid-template-columns:1.5fr 1.5fr 1fr 1fr}}
+@media(max-width:1050px){#hr-dashboard-view .lm-middle{grid-template-columns:1fr 1fr}#hr-dashboard-view .lm-charts{grid-template-columns:1fr 1fr}#hr-dashboard-view .lm-bottom{grid-template-columns:1fr 1fr}}
+@media(max-width:690px){#hr-dashboard-view .lm-top,#hr-dashboard-view .lm-middle,#hr-dashboard-view .lm-charts,#hr-dashboard-view .lm-bottom{grid-template-columns:1fr}#hr-dashboard-view .lm-top .lm-attendance{grid-column:auto}#hr-dashboard-view .lm-middle .lm-card{height:auto;min-height:300px}}
+
+/* Focused visual polish: no changes to card grid, navigation or Firebase */
+.lm-header-avatar.has-photo .lm-avatar-fallback{display:none!important}
+#hr-dashboard-view .lm-gender-orb{filter:none!important;overflow:visible}
+#hr-dashboard-view .lm-gender-body{justify-content:center;gap:18px}
+#hr-dashboard-view .lm-orgsvg path{stroke-width:.24!important;opacity:.45!important;filter:none!important}
+#hr-dashboard-view .lm-orglogo{width:76px!important;height:76px!important;padding:3px!important;box-shadow:0 0 9px #008fff66!important;border-width:1px!important}
+#hr-dashboard-view .lm-orgitem b{width:22px!important;height:22px!important;font-size:9px!important}
+#hr-dashboard-view .lm-orgitem span{font-size:8.5px!important}
+#hr-dashboard-view .lm-world-real img{width:100%!important;height:100%!important;max-height:none!important;object-fit:fill!important}
+#hr-dashboard-view .lm-world-real{overflow:hidden}
+#hr-dashboard-view .lm-trend-axis{display:flex;justify-content:space-between;gap:2px;font-size:8px;line-height:1.25;color:#b9dcff;margin-top:-4px}
+#hr-dashboard-view .lm-trend-axis span{min-width:0;text-align:center;flex:1}
+#hr-dashboard-view .lm-trend-axis b,#hr-dashboard-view .lm-trend-axis small{display:block;font-size:8px;font-weight:normal}
+#hr-dashboard-view .lm-ring b{max-width:72px;text-align:center;font-size:20px!important}
+#hr-dashboard-view .lm-ring b small{display:block;font-size:8px;font-weight:normal;line-height:1.1;max-height:28px;overflow:hidden}
+</style>
+<style id="lm-three-fixes">
+/* Three targeted fixes: dock reserves actual space in either writing direction. */
+@media (min-width:768px){
+ body.portal-signed-in:has(#portal-main-sidebar:hover) > div.flex.flex-1.overflow-hidden > main{
+   margin-left:326px!important;margin-right:0!important;max-width:calc(100% - 326px)!important;
  }
- panel.innerHTML=`<div class="flex flex-wrap gap-3 items-center mb-4"><span class="text-emerald-300">${hrText('متصل بحساب إدارة ESS','ESS admin connected')}</span><button id="ess-signout" class="border border-slate-600 px-3 py-1 rounded-lg">${hrText('فصل ESS','Disconnect ESS')}</button></div><div id="ess-requests-content">${hrText('جاري تحميل الطلبات...','Loading requests...')}</div>`;
- panel.querySelector('#ess-signout').onclick=()=>essAuth.signOut();
- essStopListeners();essRequestState={};essRequestErrors={};
- essPaths.forEach(([path])=>{
-  const ref=essDb.ref(path);
-  const cb=s=>{essRequestState[path]=s.val()||{};delete essRequestErrors[path];essDrawRequests();};
-  const err=e=>{essRequestErrors[path]=e.code||e.message;essDrawRequests();};
-  ref.on('value',cb,err);essRequestUnsubscribers.push(()=>ref.off('value',cb));
- });
- essPilotSweep();
-}
-function essDrawRequests(){
- const area=document.getElementById('ess-requests-content');if(!area)return;
- const rows=[];
- essPaths.forEach(([path,ar,en])=>{
-  const codes=essRequestState[path]||{};
-  Object.entries(codes).forEach(([code,requests])=>{
-   if(!requests||typeof requests!=='object')return;
-   Object.entries(requests).forEach(([id,req])=>{
-    if(!req||typeof req!=='object')return;
-    const t=Number(req.timestamp||req.createdAt||0);
-    rows.push({type:hrText(ar,en),path,code,id,req,time:t});
-   });
-  });
- });
- rows.sort((a,b)=>b.time-a.time);
- const errors=Object.entries(essRequestErrors).map(([p,e])=>`${essEscape(p)}: ${essEscape(e)}`).join(' | ');
- const msg=errors?`<p class="text-amber-300 mb-3">${hrText('تعذر قراءة بعض المسارات','Some paths could not be read')}: ${errors}</p>`:'';
- if(!rows.length){area.innerHTML=msg+`<p>${hrText('لا توجد طلبات حاليًا، أو لم تصل بيانات بعد.','No requests yet, or still loading.')}</p>`;return;}
- area.innerHTML=msg+`<div class="ess-command-bar mb-4" role="toolbar" aria-label="${hrText('غرفة التحكم في الطلبات','Requests control room')}">
-<div class="ess-command-title"><span>◈ ${hrText('غرفة التحكم | بصمات الكود 2','Control room | Code 2 punches')}</span><span class="ess-command-count">${hrText('المحدد','Selected')}: <strong id="ess-selected-count">0</strong></span></div>
-<div class="ess-command-actions">
-<button type="button" class="ess-command-btn ess-command-approve" data-ess-selection-action="APPROVED" disabled>✓ ${hrText('اعتماد المحدد','Approve selected')}</button>
-<button type="button" class="ess-command-btn ess-command-hold" data-ess-selection-action="HELD" disabled>◷ ${hrText('تعليق المحدد','Hold selected')}</button>
-<button type="button" class="ess-command-btn ess-command-reject" data-ess-selection-action="REJECTED" disabled>✕ ${hrText('رفض المحدد','Reject selected')}</button>
-<button type="button" class="ess-command-btn ess-command-delete" id="ess-delete-selected" disabled>▤ ${hrText('حذف المحدد','Delete selected')}</button>
-</div><div class="ess-command-help">${hrText('حدد الطلبات من مربعات الاختيار في الطرف المقابل ثم اختر الإجراء.','Select requests using the checkboxes on the opposite side, then choose an action.')}</div></div><p class="mb-3">${rows.length} ${hrText('طلب','requests')}</p><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr>${[hrText('النوع','Type'),hrText('الكود','Code'),hrText('الحالة','Status'),hrText('التاريخ','Date'),hrText('التفاصيل','Details'),hrText('إجراء','Action')].map(x=>`<th class="p-2 text-start border-b border-slate-700">${x}</th>`).join('')}<th class="ess-selection-col p-2 border-b border-slate-700"><input type="checkbox" id="ess-select-all" aria-label="${hrText('تحديد كل بصمات الاختبار الظاهرة','Select all visible test punches')}" class="ess-choice"></th></tr></thead><tbody>${rows.slice(0,300).map(r=>{
- const date=r.time?new Date(r.time).toLocaleString(currentLang==='ar'?'ar-EG':'en-GB'):'—';
- const status=r.req.status||r.req.verificationStatus||'—';
- const detail=Object.entries(r.req).filter(([k])=>!['selfieData','code','timestamp','createdAt','status','verificationStatus'].includes(k)).slice(0,8).map(([k,v])=>`${k}: ${typeof v==='object'?'[object]':String(v).slice(0,90)}`).join(' | ');
- const selfie=r.path==='attendance_requests' && typeof r.req.selfieData==='string' && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(r.req.selfieData) ? `<button type="button" class="ess-selfie-open" aria-label="${hrText('تكبير صورة التحقق','Enlarge verification photo')}" data-selfie-id="${escapeHtml(r.id)}"><img src="${r.req.selfieData}" alt="${hrText('صورة التحقق','Verification selfie')}" class="ess-selfie-thumb"></button>` : '';
- const review=r.path==='attendance_requests'&&r.req.verificationStatus==='PENDING_REVIEW'&&String(r.code)==='2' ? ['APPROVED','REJECTED','HELD'].map((v,i)=>`<button class="px-2 py-1 rounded bg-slate-700 mr-1" onclick="essReviewAttendance('${r.code}','${r.id}','${v}')">${[hrText('موافقة','Approve'),hrText('رفض','Reject'),hrText('تعليق','Hold')][i]}</button>`).join(' ') : '';
- return `<tr class="border-b border-slate-700/40"><td class="p-2">${essEscape(r.type)}</td><td class="p-2">${essEscape(r.code)}</td><td class="p-2">${essEscape(status)}</td><td class="p-2">${essEscape(date)}</td><td class="p-2">${essEscape(detail)} ${selfie}</td><td class="p-2">${(r.path==='attendance_requests'&&String(r.code)==='2') ? '—' : ( (portalIsAdmin() && essAuth.currentUser?.uid===ESS_ADMIN_UID && r.req.status==='Pending' && r.path!=='attendance_requests' && r.path!=='suggestions_and_complaints' ? `<button class="px-2 py-1 bg-emerald-700 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Approved')">${hrText('موافقة','Approve')}</button> <button class="px-2 py-1 bg-red-800 rounded" onclick="essDecide('${r.path}','${essEscape(r.code)}','${essEscape(r.id)}','Rejected')">${hrText('رفض','Reject')}</button>` : '—'))}</td><td class="ess-selection-col p-2">${r.path==='attendance_requests'&&String(r.code)==='2'&&portalIsAdmin()?`<input type="checkbox" class="ess-pilot-check ess-choice" value="${escapeHtml(r.id)}" aria-label="${hrText('تحديد الطلب','Select request')} ${escapeHtml(r.id)}">`:''}</td></tr>`;
- }).join('')}</tbody></table></div>`;
- essUpdateSelectionUI();
-}
-const essSelectedPilotIds = new Set();
-function essUpdateSelectionUI(){
- const area=document.getElementById('ess-requests-content');
- if(!area)return;
- const checks=[...area.querySelectorAll('.ess-pilot-check')];
- const visible=new Set(checks.map(x=>x.value));
- for(const id of [...essSelectedPilotIds])if(!visible.has(id))essSelectedPilotIds.delete(id);
- checks.forEach(x=>x.checked=essSelectedPilotIds.has(x.value));
- const counter=area.querySelector('#ess-selected-count');
- if(counter)counter.textContent=String(essSelectedPilotIds.size);
- const del=area.querySelector('#ess-delete-selected');
- if(del)del.disabled=essSelectedPilotIds.size===0;
- area.querySelectorAll('[data-ess-selection-action]').forEach(b=>b.disabled=essSelectedPilotIds.size===0);
- const all=area.querySelector('#ess-select-all');
- if(all){all.checked=checks.length>0&&checks.every(x=>x.checked);all.indeterminate=checks.some(x=>x.checked)&&!all.checked;}
-}
-document.addEventListener('change',event=>{
- if(event.target.matches?.('.ess-pilot-check')){
-  if(event.target.checked)essSelectedPilotIds.add(event.target.value);else essSelectedPilotIds.delete(event.target.value);
-  essUpdateSelectionUI();
- }else if(event.target.matches?.('#ess-select-all')){
-  document.querySelectorAll('#ess-requests-content .ess-pilot-check').forEach(x=>{
-   x.checked=event.target.checked;
-   if(x.checked)essSelectedPilotIds.add(x.value);else essSelectedPilotIds.delete(x.value);
-  });
-  essUpdateSelectionUI();
+ html[dir="rtl"] body.portal-signed-in:has(#portal-main-sidebar:hover) > div.flex.flex-1.overflow-hidden > main{
+   margin-right:326px!important;margin-left:0!important;max-width:calc(100% - 326px)!important;
  }
-});
-essAuth.onAuthStateChanged(()=>{if(document.getElementById('ess-request-panel'))essRenderRequestPanel();else essStopListeners();});
-
-async function essDecide(path,code,id,status){
- if(!portalIsAdmin()||essAuth.currentUser?.uid!==ESS_ADMIN_UID) return await lmDialog('غير مصرح');
- if(!['permission_requests','leave_requests','loan_requests','mission_requests'].includes(path)||!['Approved','Rejected'].includes(status)||!/^\d+$/.test(code)||!/^[\w-]+$/.test(id))return;
- if(!await lmDialog(status==='Approved'?'تأكيد الموافقة؟':'تأكيد الرفض؟',true))return;
- const ref=essDb.ref(path+'/'+code+'/'+id);
- try{
-  const s=await ref.once('value');if(s.val()?.status!=='Pending')throw Error('الطلب لم يعد معلقًا');
-  await essDb.ref().update({[path+'/'+code+'/'+id+'/status']:status,[path+'/'+code+'/'+id+'/reviewedAt']:firebase.database.ServerValue.TIMESTAMP,[path+'/'+code+'/'+id+'/reviewedBy']:ESS_ADMIN_UID});
-  try {await essDb.ref('notifications/'+code).push({title:status==='Approved'?'تمت الموافقة على الطلب':'تم رفض الطلب',body:'حالة طلبك ('+path+') أصبحت '+status,createdAt:firebase.database.ServerValue.TIMESTAMP,senderUid:ESS_ADMIN_UID});await lmDialog('تم تسجيل القرار وإرسال الإشعار');}catch(notifyError){await lmDialog('تم تسجيل القرار، لكن إرسال الإشعار فشل: '+(notifyError.code||notifyError.message));}
- }catch(e){await lmDialog('تعذر تسجيل القرار أو إرسال الإشعار: '+(e.code||e.message));console.error(e)}
-}
-async function essSendNotification(){
- if(!portalIsAdmin()||essAuth.currentUser?.uid!==ESS_ADMIN_UID)return;
- const code=document.getElementById('ess-notify-code')?.value.trim(),title=document.getElementById('ess-notify-title')?.value.trim(),body=document.getElementById('ess-notify-body')?.value.trim();
- if(!/^(2|102)$/.test(code)||!title||!body||title.length>120||body.length>1000)return await lmDialog('الكود المسموح حاليًا 2 أو 102، والعنوان والرسالة مطلوبان');
- try{await essDb.ref('notifications/'+code).push({title,body,createdAt:firebase.database.ServerValue.TIMESTAMP,senderUid:ESS_ADMIN_UID});await lmDialog('تم إرسال الإشعار')}catch(e){await lmDialog('فشل إرسال الإشعار: '+(e.code||e.message))}
-}
-
-
-// Branded dark dialog; avoids browser alert/confirm windows.
-function lmDialog(message,ask=false){
- return new Promise(resolve=>{
-  const lang=currentLang==='en'?'en':'ar';
-  const overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(2,6,23,.84);display:grid;place-items:center;padding:20px';
-  const card=document.createElement('div');
-  card.setAttribute('role','dialog');card.setAttribute('aria-modal','true');
-  card.setAttribute('aria-label',lang==='ar'?'رسالة النظام':'System message');
-  card.dir=lang==='ar'?'rtl':'ltr';
-  card.style.cssText='width:min(420px,95vw);padding:24px;border-radius:20px;background:#101d35;color:#e2e8f0;border:1px solid #24547c;box-shadow:0 20px 60px #0009;text-align:center;font-family:inherit';
-  const msg=document.createElement('div');msg.style.cssText='line-height:1.8;white-space:pre-wrap;margin-bottom:22px;overflow-wrap:anywhere';
-  msg.textContent=message;
-  const row=document.createElement('div');row.style.cssText='display:flex;justify-content:center;gap:12px';
-  const close=(result)=>{document.removeEventListener('keydown',onKey,true);overlay.remove();resolve(result)};
-  const onKey=(event)=>{if(event.key==='Escape'){event.preventDefault();close(false)}};
-  document.addEventListener('keydown',onKey,true);
-  function add(label,result,color){const button=document.createElement('button');button.type='button';button.textContent=label;button.style.cssText='padding:11px 22px;border-radius:12px;border:0;background:'+color+';color:white;font-weight:700;cursor:pointer';button.onclick=()=>close(result);row.append(button);return button}
-  if(ask)add(lang==='ar'?'إلغاء':'Cancel',false,'#475569');
-  const primary=add(ask?(lang==='ar'?'تأكيد':'Confirm'):(lang==='ar'?'حسنًا':'OK'),true,'#167bb7');
-  card.append(msg,row);overlay.append(card);document.body.append(overlay);primary.focus();
- });
-}
-
-// Notification audience preview only. Actual sends must use an authenticated trusted backend.
-function hrNotificationAudienceChanged(){
- const target=document.getElementById('hr-notify-target')?.value;
- const el=document.getElementById('hr-notify-target-fields');if(!el)return;
- const opts=[...new Set(allEmployees.map(e=>String(getEmployeeDept(e)||'').trim()).filter(x=>x&&x!=='--'))].sort();
- if(target!=='employees')hrSelectedNotificationCodes.clear();
- if(target==='department')el.innerHTML='<label class="block text-sm mb-1">'+hrText('الإدارة','Department')+'</label><select id="hr-notify-department" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30">'+opts.map((x,i)=>'<option value="'+i+'">'+escapeHtml(x)+'</option>').join('')+'</select>';
- else if(target==='employees')el.innerHTML='<label class="block text-sm mb-1">'+hrText('بحث واختيار الموظفين','Search and select employees')+'</label><input id="hr-notify-search" oninput="hrFilterNotificationEmployees()" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-2" placeholder="'+hrText('الاسم أو الكود','Name or code')+'"><div id="hr-notify-employee-list" class="max-h-52 overflow-auto border border-slate-700 rounded-xl p-2"></div>',hrFilterNotificationEmployees();
- else el.innerHTML='';
- const p=document.getElementById('hr-notify-preview');if(p)p.replaceChildren();
-}
-let hrSelectedNotificationCodes=new Set();
-function hrFilterNotificationEmployees(){
- const area=document.getElementById('hr-notify-employee-list');if(!area)return;
- const checked=hrSelectedNotificationCodes;
- const q=String(document.getElementById('hr-notify-search')?.value||'').toLocaleLowerCase();
- const employees=allEmployees.filter(e=>String(getEmployeeCode(e)).includes(q)||String(getEmployeeName(e)).toLocaleLowerCase().includes(q)).slice(0,150);
- area.innerHTML=employees.map(e=>{const code=getEmployeeCode(e);return '<label class="flex items-center gap-2 p-1 text-sm"><input class="hr-recipient-checkbox" type="checkbox" value="'+escapeHtml(code)+'" '+(checked.has(code)?'checked':'')+'><span>'+escapeHtml(getEmployeeName(e))+' — '+escapeHtml(code)+'</span></label>'}).join('')||hrText('لا توجد نتائج','No results');
- area.querySelectorAll('.hr-recipient-checkbox').forEach(el=>el.addEventListener('change',()=>{if(el.checked)hrSelectedNotificationCodes.add(el.value);else hrSelectedNotificationCodes.delete(el.value);}));
-}
-function hrPreviewNotification(){
- const area=document.getElementById('hr-notify-preview');if(!area)return;
- const title=String(document.getElementById('hr-notify-title')?.value||'').trim(),body=String(document.getElementById('hr-notify-body')?.value||'').trim();
- if(!title||!body){area.textContent=hrText('أدخل العنوان والرسالة أولًا.','Enter title and message first.');return;}
- const target=document.getElementById('hr-notify-target')?.value;
- let recipients=[];
- if(target==='all')recipients=allEmployees;
- else if(target==='department'){
- const opts=[...new Set(allEmployees.map(e=>String(getEmployeeDept(e)||'').trim()).filter(x=>x&&x!=='--'))].sort();const dept=opts[Number(document.getElementById('hr-notify-department')?.value)];recipients=allEmployees.filter(e=>String(getEmployeeDept(e)||'').trim()===dept);
- }else{recipients=allEmployees.filter(e=>hrSelectedNotificationCodes.has(getEmployeeCode(e)));}
- const ack=!!document.getElementById('hr-notify-ack')?.checked;
- area.replaceChildren();const p=document.createElement('p');p.className='p-3 rounded-xl border border-sky-500/30 bg-slate-900/50';p.textContent=hrText('معاينة فقط — ','Preview only — ')+recipients.length+' '+hrText('موظف من بيانات البورتال. الإقرار: ','employees from portal data. Acknowledgement: ')+(ack?hrText('مطلوب','Required'):hrText('غير مطلوب','Not required'))+'. '+hrText('لا يُفترض أن لديهم جميعًا حساب ESS أو اشتراك Push.','Not all necessarily have ESS accounts or push subscriptions.');area.appendChild(p);
-}
-
-
-// Spark-only internal delivery: ESS admin Firebase Auth, no FCM server secrets.
-// Pilot restricted to codes 2 and 102. This is NOT background push.
-async function hrSendNotification(){
- const title=String(document.getElementById('hr-notify-title')?.value||'').trim();
- const body=String(document.getElementById('hr-notify-body')?.value||'').trim();
- const target=document.getElementById('hr-notify-target')?.value;
- if(!title||!body||title.length>120||body.length>1000)return lmDialog(hrText('أدخل عنوانًا ورسالة صالحين','Enter a valid title and message'));
- if(!portalIsAdmin()||!portalAuth.currentUser)return lmDialog(hrText('غير مصرح بالإرسال','Not authorized'));
- if(essAuth.currentUser?.uid!==ESS_ADMIN_UID)return lmDialog(hrText('اربط حساب إدارة ESS أولًا من لوحة الطلبات','Connect the ESS admin account from the requests panel first'));
- let recipients=[];
- if(target==='all')recipients=allEmployees;
- else if(target==='department'){
-  const opts=[...new Set(allEmployees.map(e=>String(getEmployeeDept(e)||'').trim()).filter(x=>x&&x!=='--'))].sort();
-  const dept=opts[Number(document.getElementById('hr-notify-department')?.value)]||'';
-  if(!dept)return lmDialog(hrText('اختر الإدارة','Select department'));
-  recipients=allEmployees.filter(e=>String(getEmployeeDept(e)||'').trim()===dept);
- }else if(target==='employees')recipients=allEmployees.filter(e=>hrSelectedNotificationCodes.has(String(getEmployeeCode(e))));
- else return lmDialog('Invalid target');
- const codes=[...new Set(recipients.map(e=>String(getEmployeeCode(e)||'').trim()).filter(Boolean))];
- if(!codes.length)return lmDialog(hrText('لا يوجد مستلمون','No recipients'));
- const pilot=['2','102'];
- if(codes.some(c=>!pilot.includes(c)))return lmDialog(hrText('مرحلة الاختبار تسمح بالكودين 2 و102 فقط. اخترهما من الموظفين المحددين.','Pilot only permits codes 2 and 102. Select specific employees.'));
- const ack=!!document.getElementById('hr-notify-ack')?.checked;
- const ok=await lmDialog(hrText('تأكيد إرسال إشعار داخلي إلى ','Confirm internal message to ')+codes.join(', ')+' ؟',true);
- if(!ok)return;
- const btn=document.getElementById('hr-notify-send');if(btn)btn.disabled=true;
- try{
-  const senderUid=portalAuth.currentUser.uid;
-  const essUid=essAuth.currentUser.uid;
-  const batchId=essDb.ref('notification_audit').push().key;
-  const msg={title,body,requiresAcknowledgement:ack,createdAt:firebase.database.ServerValue.TIMESTAMP,senderUid:essUid,portalSenderUid:senderUid,batchId};
-  const updates={};
-  for(const code of codes)updates['notifications/'+code+'/'+batchId]=msg;
-  updates['notification_audit/'+batchId]={title,body,requiresAcknowledgement:ack,createdAt:firebase.database.ServerValue.TIMESTAMP,senderUid:essUid,portalSenderUid:senderUid,recipientCodes:codes,recipientCount:codes.length};
-  await essDb.ref().update(updates);
-  await lmDialog(hrText('تم حفظ الإشعار داخل ESS بنجاح لـ ','Internal ESS message saved for ')+codes.length+hrText(' موظف. لا يتضمن إرسال Push والهاتف مقفول.',' employees. No background push was sent.'));
- }catch(e){await lmDialog(hrText('فشل الإرسال: ','Sending failed: ')+(e.code||e.message));}
- finally{if(btn)btn.disabled=false;}
-}
-
-// CODE 2 PILOT: append-only payroll-grade approved event ledger. No writes to legacy attendance.
-const ESS_ATTENDANCE_PILOT_CODES=new Set(['2']);
-const ESS_PILOT_TTL=86400000;
-let essPilotSweepRunning=false;
-function essPilotReady(){return portalIsAdmin() && essAuth.currentUser?.uid===ESS_ADMIN_UID;}
-function essCairoDay(ts){const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(ts));const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));return `${p.year}-${p.month}-${p.day}`;}
-// Idempotent repair: a previously approved request is still copied to the immutable ledger.
-async function essFinalizeApproved(code,id){
- if(!essPilotReady()||String(code)!=='2'||!/^[-\w]+$/.test(id))throw Error('UNAUTHORIZED');
- const r=(await essDb.ref('attendance_requests/'+code+'/'+id).once('value')).val();
- if(!r||r.verificationStatus!=='APPROVED')throw Error('NOT_APPROVED');
- const ts=Number(r.createdAt);
- if(!Number.isFinite(ts)||ts<=0||!['IN','OUT'].includes(r.punchType))throw Error('INVALID_REQUEST');
- const event={requestId:id,code:'2',punchType:r.punchType,punchTimestamp:ts,dayKey:essCairoDay(ts),decisionMethod:r.decisionMethod,reviewedBy:r.reviewedBy,reviewedAt:r.reviewedAt};
- let out;try{out=await essDb.ref('approved_attendance/2/'+id).transaction(old=>old===null?event:undefined,undefined,false);}catch(e){console.error('[CODE2] LEDGER_WRITE_DENIED',{path:'approved_attendance/2/'+id,requestId:id,uid:essAuth.currentUser?.uid,event},e);throw Error('LEDGER_WRITE: '+(e.code||e.message));}
- return out.committed||out.snapshot.exists();
-}
-const essDecisionReasons={
- REJECTED:[['FACE_MISMATCH','الصورة لا تطابق الموظف','Photo does not match employee'],['PHOTO_UNCLEAR','الصورة غير واضحة','Photo is unclear'],['OUTSIDE_GEOFENCE','خارج نطاق العمل المسموح','Outside permitted work zone'],['GPS_UNVERIFIED','تعذر التحقق من الموقع','Location could not be verified'],['DUPLICATE','بصمة مكررة','Duplicate punch'],['INVALID_TIME','تاريخ أو وقت غير صحيح','Invalid timestamp'],['INCOMPLETE_EVIDENCE','بيانات التحقق غير مكتملة','Incomplete evidence'],['OTHER','سبب آخر','Other']],
- HELD:[['REVIEW_PHOTO','بانتظار مراجعة الصورة','Awaiting photo review'],['REVIEW_GPS','بانتظار مراجعة الموقع','Awaiting location review'],['EMPLOYEE_CLARIFICATION','بانتظار توضيح الموظف','Awaiting employee clarification'],['OTHER','سبب آخر','Other']]
-};
-function essReasonDialog(decision,count){
- return new Promise(resolve=>{
-  const overlay=document.createElement('div');overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#020617d9;display:grid;place-items:center;padding:18px';
-  const card=document.createElement('div');card.style.cssText='width:min(480px,95vw);background:#101d35;border:1px solid #316083;border-radius:18px;padding:22px;color:#e2e8f0;box-shadow:0 20px 50px #000a;direction:'+(currentLang==='ar'?'rtl':'ltr');card.setAttribute('role','dialog');card.setAttribute('aria-modal','true');
-  const title=document.createElement('h3');title.textContent=(decision==='REJECTED'?hrText('سبب الرفض','Rejection reason'):hrText('سبب التعليق','Hold reason'))+' ('+count+')';title.style.cssText='font-weight:800;font-size:20px;margin-bottom:12px';
-  const select=document.createElement('select');select.style.cssText='width:100%;background:#172b46;border:1px solid #48708d;border-radius:10px;padding:12px;color:white;margin-bottom:12px';
-  const options=essDecisionReasons[decision];options.forEach(([code,ar,en])=>{const o=document.createElement('option');o.value=code;o.textContent=hrText(ar,en);select.appendChild(o)});
-  const note=document.createElement('textarea');note.placeholder=hrText('ملاحظات إضافية (إلزامية عند اختيار سبب آخر)','Additional notes (required for Other)');note.style.cssText='width:100%;min-height:80px;padding:10px;background:#172b46;color:white;border:1px solid #48708d;border-radius:10px;margin-bottom:12px';
-  const err=document.createElement('p');err.style.cssText='color:#fda4af;font-size:13px';
-  const actions=document.createElement('div');actions.style.cssText='display:flex;gap:10px;margin-top:15px';
-  const cancel=document.createElement('button');cancel.textContent=hrText('إلغاء','Cancel');const ok=document.createElement('button');ok.textContent=hrText('تأكيد القرار','Confirm decision');
-  for(const b of [cancel,ok])b.style.cssText='border-radius:10px;padding:10px 16px;color:white;background:#24547c';
-  const finish=v=>{overlay.remove();document.removeEventListener('keydown',key,true);resolve(v)};
-  const key=e=>{if(e.key==='Escape'){e.preventDefault();finish(null)}};document.addEventListener('keydown',key,true);
-  cancel.onclick=()=>finish(null);ok.onclick=()=>{const reason=options.find(x=>x[0]===select.value);const extra=note.value.trim();if(select.value==='OTHER'&&extra.length<5){err.textContent=hrText('اكتب توضيحًا لا يقل عن 5 حروف','Please explain in at least 5 characters');return}finish(reason[0]+': '+hrText(reason[1],reason[2])+(extra?' — '+extra:''))};
-  actions.append(cancel,ok);card.append(title,select,note,err,actions);overlay.append(card);document.body.append(overlay);select.focus();
- });
-}
-async function essAttendanceDecision(code,id,decision,auto=false,reason=""){
- if(!essPilotReady()||String(code)!=='2'||!/^[-\w]+$/.test(id))throw Error('UNAUTHORIZED');
- if(!['APPROVED','REJECTED','HELD'].includes(decision))throw Error('INVALID_DECISION');
- if((decision==='REJECTED'||decision==='HELD')&&!reason.trim())throw Error('DECISION_REASON_REQUIRED');
- const ref=essDb.ref('attendance_requests/2/'+id);
- // Use server time offset for UI expiry estimate; the DB rules also enforce auto timing.
- const offsetSnap=await essDb.ref('.info/serverTimeOffset').once('value');
- const serverNow=Date.now()+Number(offsetSnap.val()||0);
- let result;try{result=await ref.transaction(old=>{
-  if(!old||!(old.verificationStatus==='PENDING_REVIEW'||(!auto&&old.verificationStatus==='HELD'&&decision!=='HELD')))return;
-  if(auto&&(decision!=='APPROVED'||serverNow-Number(old.createdAt||0)<ESS_PILOT_TTL))return;
-  return {...old,verificationStatus:decision,decisionMethod:auto?'AUTO_24H':'MANUAL',reviewedBy:ESS_ADMIN_UID,reviewedAt:firebase.database.ServerValue.TIMESTAMP,...(decision==='REJECTED'||decision==='HELD'?{decisionReason:reason}:{})};
- },undefined,false);}catch(e){console.error('[CODE2] REQUEST_UPDATE_DENIED',{path:'attendance_requests/2/'+id,requestId:id,uid:essAuth.currentUser?.uid,decision},e);throw Error('REQUEST_UPDATE: '+(e.code||e.message));}
- if(!result.committed)return false;
- if(decision==='APPROVED')await essFinalizeApproved(code,id);
- return true;
-}
-async function essPilotSweep(){
- if(essPilotSweepRunning||!essPilotReady())return;
- essPilotSweepRunning=true;
- try{
-  const offset=Number((await essDb.ref('.info/serverTimeOffset').once('value')).val()||0);
-  const serverNow=Date.now()+offset;
-  const snap=await essDb.ref('attendance_requests/2').once('value');
-  for(const [id,r] of Object.entries(snap.val()||{})){
-   if(!r||!Number.isFinite(Number(r.createdAt)))continue;
-   const expired=serverNow-Number(r.createdAt)>=ESS_PILOT_TTL;
-   if(expired&&r.verificationStatus==='PENDING_REVIEW'){
-    try{await essAttendanceDecision('2',id,'APPROVED',true);}catch(e){console.warn('Auto approval failed',id,e);}
-   }
-   const fresh=(await essDb.ref('attendance_requests/2/'+id).once('value')).val();
-   if(fresh?.verificationStatus==='APPROVED'){
-    try{await essFinalizeApproved('2',id);}catch(e){console.error('LEDGER REPAIR REQUIRED',id,e);}
-   }
-   // Do not remove held evidence; rejected/approved evidence expires after 24h.
-   if(expired&&fresh?.verificationStatus!=='HELD'&&fresh?.selfieData){
-    try{await essDb.ref('attendance_requests/2/'+id+'/selfieData').remove();}catch(e){console.warn('Evidence cleanup failed',id,e);}
-   }
-  }
- }finally{essPilotSweepRunning=false;}
-}
-// TEST ONLY: administrator resets one Code 2 attendance request and its derived ledger event.
-// A durable audit is written first; deletion is deliberately NOT available for legacy attendance.
-// Code 2 pilot: return structured results instead of silently swallowing Firebase failures.
-async function essDeletePilotRequest(id,alreadyConfirmed=false){
- let stage='VALIDATE';
- const result=(ok,reason='')=>({ok,id,stage,reason});
- if(!/^[-\w]+$/.test(id))return result(false,'INVALID_ID');
- if(!essPilotReady()){
-  if(!alreadyConfirmed)await lmDialog(hrText('يلزم اتصال إدارة ESS أولًا.','ESS admin sign-in required.'));
-  return result(false,'ESS_ADMIN_NOT_CONNECTED');
- }
- const requestRef=essDb.ref('attendance_requests/2/'+id);
- const ledgerRef=essDb.ref('approved_attendance/2/'+id);
- try{
-  stage='READ_REQUEST_AND_LEDGER';
-  const [requestSnap,ledgerSnap]=await Promise.all([requestRef.once('value'),ledgerRef.once('value')]);
-  const request=requestSnap.val();
-  if(!request)return result(false,'REQUEST_NOT_FOUND');
-  const expected=String(request.punchType||'');
-  if(!alreadyConfirmed && !await essConfirmDelete([id]))return result(false,'CANCELLED');
-  stage='RECHECK_REQUEST';
-  const fresh=(await requestRef.once('value')).val();
-  // Normalize optional legacy fields; do not mistake missing punchType for a changed request.
-  // Check immutable identity fields, not mutable review status / evidence cleanup.
-  if(!fresh)throw Error('REQUEST_REMOVED_DURING_DELETE');
-  const sameCreatedAt=String(fresh.createdAt??'')===String(request.createdAt??'');
-  const samePunchType=String(fresh.punchType??'')===String(request.punchType??'');
-  const sameCode=String(fresh.code??'')===String(request.code??'');
-  if(!sameCreatedAt||!samePunchType||!sameCode){
-   console.warn('[CODE2] DELETE_RECHECK_MISMATCH',{id,sameCreatedAt,samePunchType,sameCode});
-   throw Error('REQUEST_CHANGED_IDENTITY');
-  }
-  stage='WRITE_AUDIT';
-  const auditRef=essDb.ref('pilot_deletion_audit/2').push();
-  await auditRef.set({adminUid:ESS_ADMIN_UID,deletedAt:firebase.database.ServerValue.TIMESTAMP,code:'2',requestId:id,reason:'PILOT_RESET',punchType:expected||'UNKNOWN',verificationStatus:String(fresh.verificationStatus||'UNKNOWN'),hadLedger:ledgerSnap.exists()});
-  stage='DELETE_LEDGER';
-  if(ledgerSnap.exists())await ledgerRef.remove();
-  stage='DELETE_REQUEST';
-  await requestRef.remove();
-  stage='DONE';
-  return result(true);
- }catch(e){
-  const reason=String(e.code||e.message||'UNKNOWN_ERROR');
-  console.error('[CODE2] PILOT_DELETE_FAILED',{id,stage,reason},e);
-  return result(false,reason);
+ html[dir="ltr"] body.portal-signed-in:has(#portal-main-sidebar:hover) > div.flex.flex-1.overflow-hidden > main{
+   margin-left:326px!important;margin-right:0!important;
  }
 }
+#portal-main-sidebar{display:flex!important;flex-direction:column!important;height:100dvh!important;min-height:0!important;overflow:hidden!important}
+#portal-main-sidebar>div:first-child{flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;overflow-x:hidden!important;scrollbar-width:thin}
+#portal-main-sidebar .lm-sidebar-art{flex:0 0 clamp(110px,21dvh,175px)!important;height:clamp(110px,21dvh,175px)!important;min-height:110px!important;overflow:hidden!important;position:relative!important}
+#portal-main-sidebar .lm-factory-illustration{width:100%!important;height:100%!important;object-fit:contain!important;object-position:center bottom!important}
+#portal-main-sidebar>div:last-child{flex:0 0 auto!important;padding:6px!important}
+#portal-main-sidebar:after{height:75px!important;bottom:22px!important}
+@media (max-width:767px){#portal-main-sidebar .lm-sidebar-art{flex-basis:100px!important;height:100px!important}}
+#hr-dashboard-view .lm-speedometer #lm-speed-needle{transform-box:view-box;transform-origin:120px 116px}
+</style><style id="lm-final-three-visual-fixes">
+/* Final isolated visual corrections: gauge readout, centered nav icons, frameless logo. */
+#hr-dashboard-view .lm-speedometer{isolation:isolate!important}
+#hr-dashboard-view .lm-speed-center{position:absolute!important;top:47px!important;left:auto!important;right:5px!important;width:67px!important;display:flex!important;align-items:center!important;text-align:center!important;z-index:5!important;pointer-events:none!important;background:linear-gradient(90deg,transparent,#091d37cc 22%,#091d37ed)!important;border-radius:8px!important;padding:3px 1px!important}
+#hr-dashboard-view .lm-speed-center strong{font-size:20px!important;line-height:1.1!important;color:#fff!important;text-shadow:0 1px 5px #06152d!important}
+#hr-dashboard-view .lm-speed-center small{font-size:8px!important;line-height:1.15!important;color:#a9d8f4!important}
+#hr-dashboard-view .lm-speedometer svg{filter:brightness(.77) saturate(1.3)!important}
+#hr-dashboard-view .lm-orglogo{border:0!important;outline:0!important;border-radius:0!important;padding:0!important;background:transparent!important;box-shadow:none!important;object-fit:contain!important;filter:drop-shadow(0 3px 2px #0009) drop-shadow(0 0 7px #11bfff8a)!important;transform:perspective(400px) rotateY(-6deg) rotateX(3deg) translateZ(5px)!important}
+.sidebar-collapsed:not(:hover) .sidebar-item{display:flex!important;align-items:center!important;justify-content:center!important;grid-template-columns:none!important;padding:0!important;gap:0!important}
+.sidebar-collapsed:not(:hover) .sidebar-item .hr-side-icon{display:block!important;width:25px!important;height:25px!important;min-width:25px!important;flex:0 0 25px!important;margin:0 auto!important;transform:none!important;justify-self:center!important}
+.sidebar-collapsed:hover .sidebar-item{display:grid!important;grid-template-columns:44px minmax(0,1fr)!important;gap:12px!important}
+</style>
+<style id="lm-three-precise-corrections">
+/* Three precise corrections; dashboard cards, data and page layout unchanged. */
+/* Circular logo, not a rectangular bitmap: clip source corners without adding a frame. */
+#hr-dashboard-view .lm-orgcenter{position:relative!important;isolation:isolate!important}
+#hr-dashboard-view .lm-orgcenter:before{content:"";position:absolute!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;width:83px!important;height:83px!important;border-radius:50%!important;background:radial-gradient(circle at 34% 24%,#147bd8 0%,#0a2a54 65%,#07182d 100%)!important;box-shadow:0 4px 13px #000b,0 0 13px #11caff75!important;z-index:-1!important}
+#hr-dashboard-view .lm-orglogo{width:78px!important;height:78px!important;border:0!important;border-radius:50%!important;clip-path:circle(49% at 50% 50%)!important;object-fit:contain!important;object-position:center!important;padding:0!important;background:#f7fbff!important;box-shadow:none!important;filter:drop-shadow(0 2px 2px #001a36)!important;transform:perspective(360px) rotateY(-5deg) rotateX(2deg)!important}
+/* Gauge number outside the dial, never on top of its needle or face. */
+#hr-dashboard-view .lm-speedometer{width:min(100%,245px)!important;height:98px!important;min-height:98px!important;flex:0 0 98px!important;margin:0 auto!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;gap:4px!important;overflow:visible!important}
+#hr-dashboard-view .lm-speedometer svg{width:174px!important;max-width:calc(100% - 68px)!important;height:102px!important;flex:1 1 auto!important;display:block!important;overflow:visible!important;filter:brightness(.83) saturate(1.1)!important}
+#hr-dashboard-view .lm-speed-center{position:static!important;top:auto!important;left:auto!important;right:auto!important;bottom:auto!important;width:65px!important;min-width:65px!important;max-width:65px!important;flex:0 0 65px!important;transform:none!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:2px!important;text-align:center!important;background:transparent!important;padding:0!important;border:0!important;box-shadow:none!important;z-index:4!important;pointer-events:none!important}
+#hr-dashboard-view .lm-speed-center strong{font-size:22px!important;line-height:1.05!important;color:#f5fbff!important}
+#hr-dashboard-view .lm-speed-center small{font-size:9px!important;line-height:1.2!important;color:#9bd7fb!important}
+/* Sidebar icons exactly at the horizontal center of the collapsed rail. */
+#portal-main-sidebar.sidebar-collapsed:not(:hover) nav{padding-left:0!important;padding-right:0!important;align-items:stretch!important}
+#portal-main-sidebar.sidebar-collapsed:not(:hover) .sidebar-item{position:relative!important;display:flex!important;align-items:center!important;justify-content:center!important;width:100%!important;min-height:58px!important;height:58px!important;padding:0!important;margin:0!important;gap:0!important;grid-template-columns:none!important;transform:none!important}
+#portal-main-sidebar.sidebar-collapsed:not(:hover) .sidebar-item .hr-side-icon{position:absolute!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;margin:0!important;width:26px!important;height:26px!important;min-width:26px!important;display:block!important;flex:none!important}
+#portal-main-sidebar.sidebar-collapsed:not(:hover) .sidebar-item:hover .hr-side-icon{transform:translate(-50%,-50%) scale(1.07)!important}
+#portal-main-sidebar.sidebar-collapsed:not(:hover) .sidebar-item .nav-text{display:none!important}
+</style>
+<style id="lm-profile-calendar-alignment">
+/* Lacto Misr employee profile alignment — scoped, dashboard untouched */
+#fahd1-native .fahd-top{display:grid!important;grid-template-columns:116px minmax(0,1fr) auto;grid-template-areas:"photo identity actions";align-items:center!important;gap:20px!important;text-align:start;min-height:150px}
+#fahd1-native .fahd-photo-area{grid-area:photo;display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
+#fahd1-native .fahd-photo-area .fahd-photo{width:106px;height:106px;max-width:100%;object-fit:cover}
+#fahd1-native .fahd-photo-button{font-size:11px;padding:6px 8px;white-space:normal;width:100%;line-height:1.5}
+#fahd1-native .fahd-identity-block{grid-area:identity;min-width:0;flex:none!important}
+#fahd1-native #fahd-name{margin:6px 0 4px;line-height:1.45;overflow-wrap:anywhere}
+#fahd1-native #fahd-identity{line-height:1.8;overflow-wrap:anywhere}
+#fahd1-native .fahd-header-actions{grid-area:actions;display:flex;flex-direction:column;align-items:flex-end;gap:10px;min-width:145px}
+#fahd1-native #fahd-code{align-self:auto;order:0;white-space:nowrap}
+#fahd1-native #fahd-back{order:1!important;white-space:normal;text-align:center}
+#fahd1-native .fahd-fields .fahd-field{min-width:0;text-align:start}
+#fahd1-native .fahd-field input{min-width:0;box-sizing:border-box;text-align:start}
+#fahd1-native .fahd-actions{align-items:center}
+@media(max-width:780px){#fahd1-native .fahd-top{grid-template-columns:90px minmax(0,1fr);grid-template-areas:"photo identity" "actions actions";gap:12px!important}#fahd1-native .fahd-header-actions{flex-direction:row;align-items:center;justify-content:space-between;min-width:0}#fahd1-native .fahd-photo-area .fahd-photo{width:84px;height:84px}#fahd1-native #fahd-name{font-size:clamp(18px,4vw,25px)}}
+/* Custom calendar, never replaces the stored ISO date */
+.lm-date-shell{position:relative;display:flex;align-items:center;width:100%;min-width:0}
+.lm-date-shell>input{width:100%!important;padding-inline-end:40px!important;min-width:0}
+.lm-date-trigger{position:absolute;inset-inline-end:5px;top:50%;transform:translateY(-50%);width:33px;height:33px;border-radius:8px;background:#153d61;border:1px solid #377ba7;color:#a7e5ff;cursor:pointer;display:grid;place-items:center;font-size:17px}
+.lm-date-trigger:hover{background:#226393;color:white}
+.lm-date-pop{position:fixed;z-index:2147482000;width:min(318px,calc(100vw - 24px));background:linear-gradient(150deg,#122e4b,#071629);border:1px solid #3582b2;border-radius:17px;box-shadow:0 22px 65px #000a;padding:15px;color:#e5f5ff;font-family:Cairo,sans-serif;direction:rtl}
+.lm-date-pop[dir=ltr]{direction:ltr}
+.lm-date-top{display:flex;gap:7px;align-items:center;justify-content:space-between;margin-bottom:12px}
+.lm-date-top button,.lm-date-footer button{border:1px solid #2c668f;border-radius:9px;background:#143b5b;color:#d8f2ff;padding:7px 10px;cursor:pointer}
+.lm-date-top select{min-width:0;flex:1;background:#102c49;color:#e8f6ff;border:1px solid #36789d;border-radius:8px;padding:7px 3px;font-family:inherit}
+.lm-date-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;text-align:center}
+.lm-date-weekday{font-size:11px;color:#8ebbd7;padding:6px 0}
+.lm-date-day{border:1px solid transparent;background:transparent;color:#e2f2ff;border-radius:9px;min-height:34px;cursor:pointer;font:600 12px Cairo,sans-serif}
+.lm-date-day:hover{background:#174b73;border-color:#3282b0}
+.lm-date-day.is-today{border-color:#36b8ec}
+.lm-date-day.is-selected{background:#0284c7;color:#fff}
+.lm-date-footer{display:flex;justify-content:space-between;gap:8px;margin-top:12px}
+.lm-date-shell input[type=date]::-webkit-calendar-picker-indicator{opacity:0;pointer-events:none}
+</style>
+</head>
+<body class="min-h-screen flex flex-col">
 
-function essConfirmDelete(ids){
- return new Promise(resolve=>{
-  const overlay=document.createElement('div');
-  overlay.setAttribute('role','presentation');
-  overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(2,6,23,.84);display:grid;place-items:center;padding:20px';
-  const card=document.createElement('div');
-  card.setAttribute('role','dialog');card.setAttribute('aria-modal','true');card.setAttribute('aria-label',hrText('تأكيد حذف الاختبار','Confirm test deletion'));
-  card.style.cssText='width:min(460px,95vw);padding:26px;border-radius:20px;background:#101d35;color:#e2e8f0;border:1px solid #24547c;box-shadow:0 20px 60px #0009;text-align:center;direction:'+(currentLang==='ar'?'rtl':'ltr')+';font-family:inherit';
-  const title=document.createElement('h3');title.textContent=hrText('تأكيد حذف بصمات الاختبار','Confirm deletion of test punches');title.style.cssText='font-size:20px;font-weight:800;margin-bottom:12px;color:#fda4af';
-  const detail=document.createElement('p');detail.textContent=hrText('سيتم حذف ','Delete ')+ids.length+hrText(' طلب للكود 2 مع سجلات الاعتماد المرتبطة، وتسجيل عمليات الحذف في سجل التدقيق. لا يمكن التراجع.',' Code 2 request(s) and linked ledger entries. Deletions are audited and cannot be undone.');
-  detail.style.cssText='line-height:1.8;margin-bottom:20px';
-  const actions=document.createElement('div');actions.style.cssText='display:flex;gap:12px;justify-content:center';
-  const cancel=document.createElement('button');cancel.type='button';cancel.textContent=hrText('إلغاء','Cancel');
-  const confirm=document.createElement('button');confirm.type='button';confirm.textContent=hrText('تأكيد الحذف','Confirm delete');
-  for(const b of [cancel,confirm])b.style.cssText='padding:11px 20px;border-radius:12px;border:0;color:white;font-weight:700;cursor:pointer';
-  cancel.style.background='#475569';confirm.style.background='#be123c';
-  const close=result=>{overlay.remove();document.removeEventListener('keydown',onKey,true);resolve(result)};
-  const onKey=e=>{if(e.key==='Escape'){e.preventDefault();close(false)}};
-  document.addEventListener('keydown',onKey,true);
-  cancel.onclick=()=>close(false);confirm.onclick=()=>close(true);
-  actions.append(cancel,confirm);card.append(title,detail,actions);overlay.append(card);document.body.append(overlay);cancel.focus();
- });
-}
-let essDeletingBatch=false;
-async function essDeleteSelectedPilot(){
- if(essDeletingBatch)return;
- const ids=[...essSelectedPilotIds];
- if(!ids.length)return;
- if(!essPilotReady()){await lmDialog(hrText('اتصل بحساب إدارة ESS أولًا.','Sign in with the ESS admin account first.'));return;}
- if(!await essConfirmDelete(ids))return;
- essDeletingBatch=true;
- const results=[];
- try{
-  for(const id of ids){
-   const outcome=await essDeletePilotRequest(id,true);
-   results.push(outcome);
-   if(outcome.ok)essSelectedPilotIds.delete(id);
-  }
-  const ok=results.filter(x=>x.ok).length;
-  const failed=results.filter(x=>!x.ok);
-  console.table(results);
-  const summary=hrText('تم الحذف: ','Deleted: ')+ok+hrText(' | فشل: ',' | Failed: ')+failed.length;
-  if(failed.length){
-   await essShowDeletionReport(summary,failed);
-  }else await lmDialog(summary);
-  if(typeof essRenderRequestPanel==='function')essRenderRequestPanel();
- }finally{essDeletingBatch=false}
-}
-function essShowDeletionReport(summary,failed){
- return new Promise(resolve=>{
-  const overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#020617d9;display:grid;place-items:center;padding:16px';
-  const panel=document.createElement('section');panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');
-  panel.style.cssText='width:min(680px,96vw);max-height:85vh;overflow:auto;background:#101d35;color:#e2e8f0;border:1px solid #24547c;border-radius:18px;padding:24px;box-shadow:0 24px 65px #000a;direction:'+(currentLang==='ar'?'rtl':'ltr');
-  const title=document.createElement('h3');title.textContent=summary;title.style.cssText='font-weight:800;font-size:19px;margin-bottom:14px';panel.append(title);
-  const note=document.createElement('p');note.textContent=hrText('تفاصيل الطلبات التي لم تُحذف. لم تتم إعادة محاولة الحذف تلقائيًا.','Failed requests. No automatic retry was attempted.');note.style.cssText='color:#a8c1d8;margin-bottom:12px';panel.append(note);
-  const list=document.createElement('div');list.style.cssText='display:grid;gap:8px;max-height:45vh;overflow:auto';
-  failed.forEach(x=>{const row=document.createElement('div');row.style.cssText='background:#1b2e47;border:1px solid #34526e;border-radius:9px;padding:10px;overflow-wrap:anywhere';
-   const id=document.createElement('strong');id.textContent=x.id;const detail=document.createElement('div');detail.textContent=x.stage+' — '+x.reason;detail.style.cssText='font:12px monospace;color:#fda4af;margin-top:4px';row.append(id,detail);list.append(row)});panel.append(list);
-  const actions=document.createElement('div');actions.style.cssText='display:flex;gap:10px;margin-top:18px;justify-content:center';
-  const copy=document.createElement('button');copy.type='button';copy.textContent=hrText('نسخ التقرير','Copy report');
-  const close=document.createElement('button');close.type='button';close.textContent=hrText('حسنًا','OK');
-  [copy,close].forEach(b=>b.style.cssText='background:#1678b6;color:white;border:0;border-radius:9px;padding:10px 18px;cursor:pointer');
-  copy.onclick=async()=>{const content=summary+'\n'+failed.map(x=>x.id+' | '+x.stage+' | '+x.reason).join('\n');try{await navigator.clipboard.writeText(content)}catch(e){console.warn('Clipboard unavailable',e)}};
-  const done=()=>{document.removeEventListener('keydown',onKey,true);overlay.remove();resolve()};
-  const onKey=e=>{if(e.key==='Escape'){e.preventDefault();done()}};
-  document.addEventListener('keydown',onKey,true);close.onclick=done;
-  actions.append(copy,close);panel.append(actions);overlay.append(panel);document.body.append(overlay);close.focus();
- });
-}
+    <!-- ESS-style Intro -->
+    <div id="intro-screen">
+        <div class="intro-content-wrapper">
+            <div class="intro-title-container" id="introTitle"></div>
+            <div class="intro-subtitle" id="introSubtitle" data-ar="شركاء في رحلة نمو طفلك." data-en="Partners in your child's growth journey.">شركاء في رحلة نمو طفلك.</div>
+        </div>
+        <div id="introFooter">
+            <div id="copyrightText" data-ar="© 2026 جميع حقوق الإنشاء والطبع محفوظة" data-en="© 2026 All Creation & Copyrights Reserved">© 2026 جميع حقوق الإنشاء والطبع محفوظة</div>
+            <div style="font-family:'Great Vibes',cursive;font-size:1rem;color:#38bdf8;text-shadow:0 0 10px rgba(56,189,248,.6);">Powered by HR Department</div>
+        </div>
+    </div>
 
-document.addEventListener('click',event=>{
- if(event.target.closest?.('#ess-delete-selected')){event.preventDefault();essDeleteSelectedPilot();}
-});
-document.addEventListener('click',event=>{
- const btn=event.target.closest?.('.ess-pilot-delete');
- if(!btn)return;
- event.preventDefault();
- const id=btn.getAttribute('data-request-id');
- if(id)essDeletePilotRequest(id).then(outcome=>{if(outcome.ok){essSelectedPilotIds.delete(id);lmDialog(hrText('تم حذف بصمة الاختبار.','Test punch deleted.')).then(()=>essRenderRequestPanel());}else if(outcome.reason!=='CANCELLED')essShowDeletionReport(hrText('تعذر حذف الطلب','Request deletion failed'),[outcome]);});
-});
-async function essReviewAttendance(code,id,decision){
- const reason=decision==='REJECTED'||decision==='HELD'?await essReasonDialog(decision,1):'';
- if((decision==='REJECTED'||decision==='HELD')&&!reason)return;
- if(!await lmDialog(hrText('تأكيد القرار؟','Confirm decision?'),true))return;
- try{const done=await essAttendanceDecision(code,id,decision,false,reason);await lmDialog(done?hrText('تم القرار وتحديث السجل عند الموافقة','Decision saved; approved event added to ledger'):hrText('الطلب تم التعامل معه سابقًا','Already processed'));}
- catch(e){await lmDialog(hrText('فشل التنفيذ؛ راجع السجل: ','Action failed; check ledger: ')+(e.code||e.message));}
-}
-let essSelectionBusy=false;
-async function essApplySelectedDecision(decision){
- if(essSelectionBusy||!['APPROVED','HELD','REJECTED'].includes(decision))return;
- if(!essPilotReady()){await lmDialog(hrText('يلزم اتصال إدارة ESS أولًا.','ESS admin login required.'));return;}
- const ids=[...essSelectedPilotIds];if(!ids.length)return;
- const snap=await essDb.ref('attendance_requests/2').once('value');
- const values=snap.val()||{};
- const pending=ids.filter(id=>values[id]?.verificationStatus==='PENDING_REVIEW'||(decision!=='HELD'&&values[id]?.verificationStatus==='HELD'));
- const skipped=ids.length-pending.length;
- if(!pending.length){await lmDialog(hrText('الطلبات المحددة ليست معلقة للمراجعة.','Selected requests are not pending review.'));return;}
- const names={APPROVED:hrText('اعتماد','Approve'),HELD:hrText('تعليق','Hold'),REJECTED:hrText('رفض','Reject')};
- const reason=(decision==='REJECTED'||decision==='HELD')?await essReasonDialog(decision,pending.length):'';
- if((decision==='REJECTED'||decision==='HELD')&&!reason)return;
- if(!await lmDialog(names[decision]+' '+pending.length+' '+hrText('طلب محدد؟','selected request(s)?'),true))return;
- essSelectionBusy=true;let ok=0,fail=0;
- try{
-  for(const id of pending){
-   try{if(await essAttendanceDecision('2',id,decision,false,reason)){ok++;essSelectedPilotIds.delete(id)}else fail++}
-   catch(e){fail++;console.error('[CODE2] SELECTED_DECISION_FAILED',id,e)}
-  }
-  await lmDialog(hrText('نجح: ','Succeeded: ')+ok+hrText(' | فشل: ',' | Failed: ')+fail+hrText(' | غير معلق: ',' | Not pending: ')+skipped);
-  essUpdateSelectionUI();
- }finally{essSelectionBusy=false}
-}
-document.addEventListener('click',event=>{
- const button=event.target.closest?.('[data-ess-selection-action]');
- if(button){event.preventDefault();essApplySelectedDecision(button.dataset.essSelectionAction)}
-});
-async function essBulkCode2(decision){
- if(decision==='REJECTED'||decision==='HELD')return lmDialog(hrText('استخدم غرفة التحكم لتحديد الطلبات وسبب القرار.','Use the control room to select requests and provide a reason.'));
- if(!essPilotReady()||!['APPROVED','HELD','REJECTED'].includes(decision))return;
- const snap=await essDb.ref('attendance_requests/2').once('value');
- const ids=Object.entries(snap.val()||{}).filter(([,r])=>r?.verificationStatus==='PENDING_REVIEW').map(([id])=>id);
- if(!ids.length){await lmDialog(hrText('لا توجد طلبات معلقة','No pending requests'));return;}
- if(!await lmDialog(hrText('تطبيق '+decision+' على '+ids.length+' طلب؟','Apply '+decision+' to '+ids.length+' requests?'),true))return;
- let ok=0,failed=0;
- for(const id of ids){try{if(await essAttendanceDecision('2',id,decision))ok++;else failed++;}catch(e){failed++;console.error('Bulk failure',id,e);}}
- await lmDialog(hrText('نجح: ','Succeeded: ')+ok+hrText(' | فشل: ',' | Failed: ')+failed);
-}
-// Trigger sweep after admin authentication and while the notifications view remains open.
-let essPilotInterval=null;
-function essStartPilotTimer(){if(essPilotInterval)clearInterval(essPilotInterval);essPilotInterval=setInterval(()=>{if(essPilotReady()&&document.getElementById('ess-requests-content'))essPilotSweep();},60000);}
-document.addEventListener('DOMContentLoaded',essStartPilotTimer);
+    <!-- New borderless login experience -->
+    <div id="login-modal" class="fixed inset-0 z-50 flex flex-col items-center justify-center">
+        <div id="login-lang-switcher">
+            <button class="ess-lang-btn" onclick="toggleLoginLangMenu(event)">
+                🌐 <span id="login-lang-short">AR</span> ▼
+            </button>
+            <div id="login-lang-menu" class="ess-lang-menu">
+                <button class="ess-lang-option" onclick="setLanguage('ar')">🇪🇬 AR</button>
+                <button class="ess-lang-option" onclick="setLanguage('en')">🇬🇧 EN</button>
+            </div>
+        </div>
 
-// Keyboard support: native buttons already activate with Enter; form fields need explicit actions.
-document.addEventListener('keydown',event=>{
- if(event.key!=='Enter'||event.isComposing||event.repeat||event.defaultPrevented)return;
- const target=event.target;
- if(!target||target.closest?.('[role="dialog"]'))return;
- if(target.matches?.('textarea,[contenteditable="true"]'))return;
- if(target.matches?.('#login-emp-code,#login-password')){
-  event.preventDefault();
-  if(typeof handleLogin==='function')handleLogin();
-  return;
- }
- if(target.matches?.('#search-input')){
-  event.preventDefault();
-  if(typeof lmCommitEmployeeSearch==='function')lmCommitEmployeeSearch();
-  return;
- }
- // For custom clickable elements only; do not double-fire native button/link behavior.
- const clickable=target.closest?.('[role="button"][tabindex], [data-keyboard-activate="true"]');
- if(clickable&&!clickable.matches('button,a,input,select,textarea')){
-  event.preventDefault();clickable.click();
- }
-});
+        <div id="login-brand-stage">
+            <div id="login-brand">
+                <img src="logo.png" alt="Lacto Misr Logo" class="login-brand-logo">
+                <div id="login-brand-name" class="login-brand-name">Lacto Misr</div>
+                <div id="login-brand-slogan" class="login-brand-slogan">شركاء في رحلة نمو طفلك</div>
+            </div>
+        </div>
 
-// Control-room design uses the portal's slate / sky palette, with raised 3D controls.
-(function essInjectControlRoomStyles(){
- if(document.getElementById('ess-control-room-styles'))return;
- const style=document.createElement('style');style.id='ess-control-room-styles';
- style.textContent=`
- .ess-command-bar{padding:16px 18px;border:1px solid #294460;border-radius:18px;background:linear-gradient(155deg,#182d47,#0c192e);box-shadow:0 12px 28px #02061770,inset 0 1px #ffffff18;position:relative}
- .ess-command-title{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;color:#dbeafe;font-weight:750;margin-bottom:12px}
- .ess-command-count{font-size:13px;background:#0f2743;border:1px solid #34526e;border-radius:20px;padding:5px 12px}
- .ess-command-actions{display:flex;gap:10px;flex-wrap:wrap}
- .ess-command-btn{font:inherit;font-size:13px;font-weight:750;padding:11px 16px;border-radius:11px;border:1px solid #47617a;color:#e2e8f0;background:linear-gradient(180deg,#324b66,#1b304a);box-shadow:0 4px 0 #071426,0 8px 14px #0005,inset 0 1px #ffffff2b;cursor:pointer;transition:background .16s,transform .16s,box-shadow .16s,border-color .16s}
- .ess-command-btn:not(:disabled):hover{transform:translateY(-2px);background:linear-gradient(180deg,#42749e,#234c75);border-color:#6bb6ec;box-shadow:0 6px 0 #071426,0 12px 18px #0006,inset 0 1px #ffffff45}
- .ess-command-btn:not(:disabled):active{transform:translateY(2px);box-shadow:0 1px 0 #071426,inset 0 2px 7px #0007}
- .ess-command-btn:focus-visible,.ess-choice:focus-visible{outline:2px solid #7dd3fc;outline-offset:3px}
- .ess-command-btn:disabled{opacity:.4;cursor:not-allowed}
- .ess-command-help{font-size:12px;color:#94a3b8;margin-top:12px}
- .ess-selection-col{width:56px;text-align:center;vertical-align:middle;background:#12253a66}
- .ess-choice{appearance:none;width:19px;height:19px;border:2px solid #6382a0;border-radius:6px;background:#0b1b30;cursor:pointer;vertical-align:middle;position:relative}
- .ess-choice:checked{background:#2778b2;border-color:#7dd3fc;box-shadow:0 0 0 3px #0ea5e922}
- .ess-choice:checked:after{content:'✓';position:absolute;left:3px;top:-3px;color:white;font-size:16px;font-weight:800}
- @media(max-width:650px){.ess-command-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.ess-command-btn{padding:11px 7px;font-size:12px}.ess-command-bar{padding:12px}}
- `;
- document.head.appendChild(style);
-})();
+        <div id="login-panel">
+            <div class="login-inner">
+                <div class="text-center mb-5">
+                    <h3 class="text-xl font-extrabold text-white" data-translate="login_title">تسجيل الدخول</h3>
+                    <p class="text-xs text-slate-400 mt-1" data-translate="login_subtitle">أدخل كود الموظف وكلمة المرور</p>
+                </div>
 
-// Secure-ish in-session preview: retrieve selfie only from already loaded ESS request state; do not persist in browser storage.
-document.addEventListener('click',e=>{const btn=e.target.closest?.('.ess-selfie-open');if(!btn)return;const id=btn.dataset.selfieId;const r=essRequestState.attendance_requests?.['2']?.[id];if(!r||typeof r.selfieData!=='string'||!/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(r.selfieData))return;const overlay=document.createElement('div');overlay.className='ess-selfie-overlay';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');const img=document.createElement('img');img.src=r.selfieData;img.alt=hrText('صورة التحقق مكبرة','Enlarged verification selfie');img.style.cssText='max-width:min(92vw,850px);max-height:85vh;object-fit:contain;border-radius:15px';const close=document.createElement('button');close.type='button';close.textContent='✕';close.style.cssText='position:absolute;top:20px;right:20px;width:48px;height:48px;background:#172b46;color:white;border:1px solid #5a83a5;border-radius:12px';const dismiss=()=>{overlay.remove();document.removeEventListener('keydown',esc,true)};const esc=k=>{if(k.key==='Escape')dismiss()};document.addEventListener('keydown',esc,true);close.onclick=dismiss;overlay.onclick=k=>{if(k.target===overlay)dismiss()};overlay.append(img,close);document.body.append(overlay);close.focus()});
-(function(){const st=document.createElement('style');st.textContent='.ess-selfie-open{border:0;background:transparent;cursor:zoom-in;padding:3px;border-radius:12px}.ess-selfie-thumb{width:72px;height:72px;object-fit:cover;border-radius:10px;transition:transform .2s,box-shadow .2s}.ess-selfie-open:hover .ess-selfie-thumb,.ess-selfie-open:focus-visible .ess-selfie-thumb{transform:scale(2.3);box-shadow:0 12px 35px #000a;position:relative;z-index:10}.ess-selfie-overlay{position:fixed;inset:0;z-index:2147483647;background:#020617ee;display:flex;align-items:center;justify-content:center;padding:20px}';document.head.append(st)})();
+                <div class="space-y-3.5">
+                    <input type="text" id="login-emp-code" data-translate-placeholder="code_placeholder" placeholder="كود الموظف" autocomplete="username" class="w-full px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200 placeholder-slate-500">
+                    <div class="password-field">
+                        <input type="password" id="login-password" data-translate-placeholder="pass_placeholder" placeholder="كلمة المرور" autocomplete="current-password" class="password-input">
+                        <button type="button" id="password-toggle" class="password-toggle" onclick="togglePasswordVisibility()" aria-label="Show password" title="Show password">
+                            <span id="eye-icon"></span>
+                        </button>
+                    </div>
 
+                    <div id="first-password-setup" class="hidden rounded-xl border border-sky-400/30 bg-sky-400/5 p-3 space-y-3">
+                        <p id="first-password-note" class="text-xs text-sky-200 leading-relaxed">الموظف مسجل لكن لا توجد كلمة مرور. أنشئ كلمة مرور للمتابعة.</p>
+                        <input type="password" id="confirm-new-password" autocomplete="new-password" data-translate-placeholder="confirm_password_placeholder" placeholder="تأكيد كلمة المرور" class="w-full px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200 placeholder-slate-500">
+                        <button type="button" id="create-password-btn" onclick="createFirstPassword()" class="portal-action-btn w-full py-3 font-bold rounded-xl transition">إنشاء كلمة المرور والدخول</button>
+                    </div>
 
-/* FAHD 1 v8 - native, single-page Employee 360. No iframe, no separate HTML. */
-const FAHD_FIELDS=[
- ['name','الاسم / Name',['اسم الموظف ','اسم الموظف','name','emp_name _en']],
- ['department','الإدارة / Department',['الإدارة ','الإدارة','department','department ','dept']],
- ['jobTitle','الوظيفة / Job title',['الوظيفة','الوظيفة ','jobTitle','job title ','job']],
- ['directManager','المدير المباشر / Manager',['المدير المباشر ','المدير المباشر','directManager','direct manager ']],
- ['hireDate','تاريخ التعيين / Hire date',['تاريخ التعيين ','تاريخ التعيين','hireDate','date_of_hiring ']],
- ['qualification','المؤهل / Qualification',['المؤهل','qualification']],
- ['dob','تاريخ الميلاد / Date of birth',['تاريخ الميلاد','dob']],
- ['insuranceStatus','الحالة التأمينية / Insurance',['الحالة التأمينية ','الحالة التأمينية','insuranceStatus','insurance status ']],
- ['pob','مكان الميلاد / Birthplace',['مكان الميلاد','pob']],
- ['phone','الهاتف / Phone',['phone','الهاتف']],
- ['address','العنوان / Address',['address','العنوان']],
- ['governorate','المحافظة / Governorate',['governorate','المحافظة']]
-];
-let fahdEditing=null, fahdBusy=false, fahdIsEditing=false;
-const FAHD_TAB_NAMES={overview:['نظرة عامة','Overview'],personal:['البيانات الشخصية والوظيفية','Personal & Job'],financial:['المالية','Financial'],attendance:['الحضور','Attendance'],leaves:['الإجازات','Leaves'],performance:['الأداء','Performance']};
-function fahdTranslateUI(){
- const tabIds=['overview','personal','financial','attendance','leaves','performance'];
- document.querySelectorAll('.fahd-tabs button').forEach((b,i)=>{const svg=b.querySelector('svg');b.replaceChildren();if(svg)b.append(svg);b.append(document.createTextNode(' '+fahdLang(...FAHD_TAB_NAMES[tabIds[i]])));});
- const buttons={'fahd-edit':['تعديل البيانات','Edit details'],'fahd-cancel':['إلغاء','Cancel'],'fahd-save':['حفظ التعديلات','Save changes'],'fahd-add':['إضافة حقل جديد','Add custom field'],'fahd-photo-change':['تغيير الصورة','Change photo'],'fahd-delete':['أرشفة الموظف','Archive employee']};
- for(const [id,pair] of Object.entries(buttons)){const b=document.getElementById(id);if(b)b.textContent=fahdLang(...pair);}
- const back=document.getElementById('fahd-back');if(back)back.textContent=fahdLang('← العودة للقائمة','← Back to list');
- document.querySelectorAll('.fahd-create-tabs button').forEach((b,i)=>{const key=['personal','financial','attendance','leaves','performance'][i];b.textContent=fahdLang(...FAHD_TAB_NAMES[key]);});
- const title=document.getElementById('fahd-create-title');if(title)title.textContent=fahdLang('إضافة موظف جديد','Add employee');
- const footer=document.querySelector('.fahd-create-footer');if(footer){const btns=footer.querySelectorAll('button');if(btns[0])btns[0].textContent=fahdLang('إلغاء','Cancel');if(btns[1])btns[1].textContent=fahdLang('حفظ الموظف','Save employee');}
-}
-function fahdTab(tab,button){document.querySelectorAll('.fahd-pane').forEach(x=>x.hidden=x.id!=='fahd-tab-'+tab);document.querySelectorAll('.fahd-tabs button').forEach(x=>x.classList.toggle('selected',x===button));}
+                    <div class="flex items-center justify-between text-xs text-slate-300 pt-1 gap-3">
+                        <label class="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="remember-me" class="rounded bg-slate-900 border-sky-500/30 text-sky-600 focus:ring-0">
+                            <span data-translate="remember_me">تذكرني</span>
+                        </label>
+                        <a href="#" onclick="openForgotPassModal(); return false;" class="text-sky-400 hover:text-sky-300 hover:underline" data-translate="forgot_pass">نسيت كلمة المرور؟</a>
+                    </div>
 
-// Complete employee profile: show every available spreadsheet/database field.
-// Names are kept verbatim to preserve the live Firebase schema.
-const FAHD_ALL_PROFILE_KEYS = ["اسم الموظف ", "emp_name _en", "الإدارة ", "department ", "الوظيفة", "job title ", "المدير المباشر ", "direct manager ", "تاريخ التعيين ", "date_of_hiring ", "المؤهل", "qualification", "جهة المؤهل ", "qulification issuing authority", "تاريخ الحصول على المؤهل ", "qualification date ", "تاريخ الميلاد", "dob", "السن حتى تاريخه ", "age to date", "النوع", "gender", "الحالة الإجتماعية ", "marital status ", "الحالة التأمينية ", "insurance status ", "الرقم التأمينى", "insurance number", "الرقم القومى ", "n_id", "سنوات الخدمة ", "years of service", "الأجر الشامل", "comprehensiveSalary", "أجر الاشتراك التأميني", "insuranceContributionWage", "رصيد الاجازات ", "annual leave balance", "العنوان ", "address", "المحافظة ", "governorate", "مكان الميلاد", "pob", "phone", "qualAuth"];
-function fahdProfileKeyLabel(key){
- const labels={'n_id':'National ID','الرقم القومى ':'الرقم القومي','الرقم التأمينى':'الرقم التأميني','insurance number':'Insurance number','comprehensiveSalary':'Comprehensive salary','insuranceContributionWage':'Insurance contribution wage','annual leave balance':'Annual leave balance','emp_name _en':'Employee name','date_of_hiring ':'Hire date','age to date':'Age','dob':'Date of birth','years of service':'Years of service','direct manager ':'Direct manager','job title ':'Job title','insurance status ':'Insurance status','qualification date ':'Qualification date','qulification issuing authority':'Qualification authority','n_id':'National ID','address':'Address','governorate':'Governorate'};
- return labels[key]||key.trim().replace(/_/g,' ');
-}
-function fahdProfileLanguage(key){return /[\u0600-\u06FF]/.test(key)?'ar':'en';}
-function fahdActualKey(emp,key){return Object.prototype.hasOwnProperty.call(emp,key)?key:Object.keys(emp).find(k=>k.trim()===key.trim())||key;}
-function fahdIsMojibake(value){
- if(typeof value!=='string')return false;
- return /(?:ط§|ط¨|ط±|طھ|ط®|ظ„|ظ‚|ظ…|Ø|Ù|Ã|â€)/.test(value);
-}
-function fahdHasUnsavedChanges(){
- if(!fahdIsEditing||!fahdEditing)return false;
- return Array.from(document.querySelectorAll('#fahd-fields [data-fahd-key]')).some(input=>input.value!==(fahdEditing.original[input.dataset.fahdKey]??'')) || Array.from(document.querySelectorAll('#fahd-fields [data-lm-custom-key]')).some(input=>input.value!==(input.dataset.initialValue||''));
-}
-// Styled three-choice dialog, created in JS so no HTML changes are needed.
-function fahdUnsavedDialog(){
- return new Promise(resolve=>{
-  const old=document.getElementById('fahd-unsaved-overlay');if(old)old.remove();
-  const overlay=document.createElement('div');overlay.id='fahd-unsaved-overlay';
-  overlay.setAttribute('role','presentation');
-  overlay.style.cssText='position:fixed;inset:0;z-index:2147483000;background:rgba(2,10,23,.72);backdrop-filter:blur(7px);display:flex;align-items:center;justify-content:center;padding:18px;';
-  const card=document.createElement('section');card.setAttribute('role','dialog');card.setAttribute('aria-modal','true');card.setAttribute('aria-labelledby','fahd-unsaved-title');
-  card.dir=currentLang==='ar'?'rtl':'ltr';
-  card.style.cssText='width:min(100%,470px);border-radius:20px;padding:28px;background:var(--card-bg,var(--surface,#15243a));color:var(--text-primary,#f8fafc);border:1px solid rgba(125,165,205,.35);box-shadow:0 24px 70px rgba(0,0,0,.45);font-family:inherit;';
-  // Detect light theme from the page rather than hard-coding a dark dialog.
-  const bg=getComputedStyle(document.body).backgroundColor;const rgb=bg.match(/\d+/g);const light=rgb&&rgb.length>=3&&(+rgb[0]*.299 + +rgb[1]*.587 + +rgb[2]*.114)>165;
-  if(light){card.style.background='#ffffff';card.style.color='#17243a';card.style.borderColor='#dbe5ef';}
-  const icon=document.createElement('div');icon.textContent='✎';icon.style.cssText='width:44px;height:44px;display:grid;place-items:center;border-radius:12px;background:rgba(14,165,233,.14);color:#38bdf8;font-size:25px;margin-bottom:16px;';
-  const title=document.createElement('h2');title.id='fahd-unsaved-title';title.textContent=fahdLang('تعديلات غير محفوظة','Unsaved changes');title.style.cssText='font-size:21px;font-weight:750;margin:0 0 10px;';
-  const msg=document.createElement('p');msg.textContent=fahdLang('لقد عدّلت بيانات الموظف. ماذا تريد أن تفعل قبل الخروج؟','You have edited employee details. What would you like to do before leaving?');msg.style.cssText='font-size:14px;line-height:1.9;opacity:.85;margin:0 0 24px;';
-  const buttons=document.createElement('div');buttons.style.cssText='display:flex;flex-wrap:wrap;gap:9px;';
-  let done=false;const finish=value=>{if(done)return;done=true;document.removeEventListener('keydown',onKey,true);overlay.remove();resolve(value);};
-  const make=(label,value,css)=>{const btn=document.createElement('button');btn.type='button';btn.textContent=label;btn.style.cssText='border-radius:11px;padding:11px 15px;font:600 14px inherit;cursor:pointer;flex:1 1 125px;'+css;btn.onclick=()=>finish(value);buttons.append(btn);return btn;};
-  const save=make(fahdLang('حفظ وخروج','Save & leave'),'save','background:#0284c7;color:white;border:1px solid #0284c7;');
-  make(fahdLang('خروج دون حفظ','Discard & leave'),'discard','background:transparent;color:inherit;border:1px solid #d97706;');
-  make(fahdLang('متابعة التعديل','Keep editing'),'stay','background:transparent;color:inherit;border:1px solid rgba(130,150,175,.55);');
-  card.append(icon,title,msg,buttons);overlay.append(card);document.body.append(overlay);
-  const onKey=e=>{if(e.key==='Escape'){e.preventDefault();finish('stay');}};document.addEventListener('keydown',onKey,true);save.focus();
- });
-}
-async function fahdGuardNavigation(continueNavigation){
- if(window.fahdGuardActive)return;
- if(!fahdHasUnsavedChanges()){continueNavigation();return;}
- window.fahdGuardActive=true;
- try{
-  const choice=await fahdUnsavedDialog();
-  if(choice==='stay')return;
-  if(choice==='save'){const saved=await fahdSave(true);if(!saved)return;}
-  if(choice==='discard'){fahdIsEditing=false;}
-  window.fahdNavigationApproved=true;
-  try{continueNavigation();}finally{window.fahdNavigationApproved=false;}
- }finally{window.fahdGuardActive=false;}
-}
-window.addEventListener('beforeunload',event=>{
- if(fahdHasUnsavedChanges()){event.preventDefault();event.returnValue='';}
-});
-function fahdRenderCompleteFields(emp,fields){
- const shown=new Set();
- for(const schemaKey of [...FAHD_ALL_PROFILE_KEYS,...Object.keys(emp)]){
-  if(['code','الكود','photoUrl','photo','password','authUid','hr_custom_fields','_firebasePath'].includes(schemaKey)||schemaKey.startsWith('_')||Object.hasOwn(lmCustomFieldDefinitions,schemaKey))continue;
-  const key=fahdActualKey(emp,schemaKey);
-  if(shown.has(key)||typeof emp[key]==='object'&&emp[key]!==null)continue;
-  shown.add(key);
-  const lang=fahdProfileLanguage(key);
-  const card=document.createElement('div');card.className='fahd-field';card.dataset.fieldLanguage=lang;
-  const label=document.createElement('label');label.textContent=fahdProfileKeyLabel(key)+' ('+lang.toUpperCase()+')';
-  const input=document.createElement('input');input.type='text';input.dataset.fahdKey=key;
-  input.value=fahdIsMojibake(emp[key])?'':String(emp[key]??'');input.disabled=true;input.maxLength=2000;
-  if(/(?:^n_id$|الرقم القومى|الرقم التأمينى|insurance number)/.test(key))input.autocomplete='off';
-  card.append(label,input);fields.append(card);fahdEditing.original[key]=input.value;
- }
-}
-function fahdRender(emp){
- const root=document.getElementById('fahd1-native');if(!root||!emp)return;
- const code=getEmployeeCode(emp);fahdEditing={code,path:emp._firebasePath,keys:{},original:{}};
- const name=getEmployeeName(emp),dept=getEmployeeDept(emp),job=getEmployeeJob(emp);
- document.getElementById('fahd-name').textContent=name||'Employee 360°';document.getElementById('fahd-identity').textContent=[dept,job].filter(Boolean).join(' · ');document.getElementById('fahd-code').textContent='# '+code;
- const photo=document.getElementById('fahd-photo');const image=getField(emp,'photoUrl','photo','رابط الصورة','PHOTO URL');photo.src=typeof image==='string' && (/^data:image\//.test(image)||/^https:\/\//.test(image))?image:'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><rect width="120" height="120" fill="#102a46"/><circle cx="60" cy="44" r="23" fill="#5a9bc2"/><path d="M15 120c0-58 90-58 90 0" fill="#5a9bc2"/></svg>');
- fahdTranslateUI();
- const summary=document.getElementById('fahd-summary');summary.replaceChildren();
- for(const [label,value] of [[fahdLang('الكود','Employee code'),code],[fahdLang('الموظف','Employee'),name],[fahdLang('الإدارة','Department'),dept],[fahdLang('الوظيفة','Job title'),job],[fahdLang('تاريخ التعيين','Hire date'),getHireDate(emp)],[fahdLang('الحالة التأمينية','Insurance'),currentLang==='ar'?(emp['الحالة التأمينية ']??emp['الحالة التأمينية']):emp['insurance status ']]]){
-  const tile=document.createElement('div');tile.className='fahd-tile';const l=document.createElement('span'),v=document.createElement('strong');l.textContent=label;v.textContent=String(value??'—')||'—';tile.append(l,v);summary.append(tile);
- }
- const fields=document.getElementById('fahd-fields');fields.replaceChildren();
- fahdRenderCompleteFields(emp,fields);
- lmRenderGlobalCustomFields(emp,fields);
- fahdRefreshFieldVisibility();fahdEnableDropdowns();
- const fin=document.getElementById('fahd-financial');fin.replaceChildren();const financial=emp.financial;
- if(financial&&typeof financial==='object'){for(const [k,v] of Object.entries(financial)){if(v===null||typeof v==='object')continue;const tile=document.createElement('div');tile.className='fahd-tile';const l=document.createElement('span'),strong=document.createElement('strong');l.textContent=k;strong.textContent=String(v);tile.append(l,strong);fin.append(tile);}fin.className='fahd-summary';}
- else {fin.className='fahd-empty';fin.textContent=fahdLang('لا توجد بيانات مالية متصلة بعد.','No connected financial data yet.');}
- fahdSetEditing(false);document.getElementById('fahd-status').textContent='';
- fahdTab('overview',document.querySelector('.fahd-tabs button'));
-}
-function fahdRefreshFieldVisibility(){
- document.querySelectorAll('#fahd-fields [data-field-language]').forEach(w=>{
-  const lang=w.dataset.fieldLanguage;w.hidden=!fahdIsEditing&&lang!=='common'&&lang!==currentLang;
-  const label=w.querySelector('label[data-label-ar]');if(label)label.textContent=fahdLang(label.dataset.labelAr,label.dataset.labelEn);
- });
-}
-async function fahdSave(skipConfirm=false){
- if(fahdBusy||!fahdEditing)return;const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(fahdEditing.code));const status=document.getElementById('fahd-status');
- if(!emp||!fahdEditing.path||emp._firebasePath!==fahdEditing.path||!fahdEditing.path.startsWith('employees_v2/')){status.textContent=fahdLang('تعذر تحديد السجل','Employee record unavailable');return false;}
- const updates=lmCustomValueInputs();document.querySelectorAll('#fahd-fields [data-fahd-key]').forEach(input=>{
-  const key=input.dataset.fahdKey;if(input.value===fahdEditing.original[key])return;
-  const value=input.type==='date'?fahdStoredDate(input.value):input.value.trim();updates[key]=value;
-  // Each translated field is independent; never overwrite its counterpart.
- });
- const dob=updates['تاريخ الميلاد'];if(dob){const age=fahdAge(dob);if(age){updates['السن حتى تاريخه ']=age;updates['age to date']=age;}}
- if(!Object.keys(updates).length){status.textContent=fahdLang('لا توجد تغييرات للحفظ','No changes to save');return true;}
- if(!skipConfirm && !await fahdDialog(fahdLang('حفظ التعديلات','Save changes'),fahdLang('هل تريد حفظ التغييرات؟','Save these changes?')))return false;
- fahdBusy=true;document.getElementById('fahd-save').disabled=true;
- try{await db.ref(fahdEditing.path).update(updates);for(const [key,value] of Object.entries(updates)){if(key.startsWith('hr_custom_fields/')){const [,field,prop]=key.split('/');emp.hr_custom_fields??={};emp.hr_custom_fields[field]??={};emp.hr_custom_fields[field][prop]=value;}else emp[key]=value;}renderTable(allEmployees);fahdRender(emp);status.textContent=fahdLang('✓ تم الحفظ','✓ Changes saved');if(!skipConfirm)await fahdDialog(fahdLang('تم الحفظ','Saved'),fahdLang('تم حفظ التعديلات بنجاح','Changes saved successfully'),'notice');return true;}
- catch(err){status.textContent=fahdLang('فشل الحفظ: ','Save failed: ')+(err?.message||'Permission denied');return false;}
- finally{fahdBusy=false;document.getElementById('fahd-save').disabled=false;}
-}
-function fahdSetEditing(on){fahdIsEditing=on;document.querySelectorAll('#fahd-fields [data-fahd-key],#fahd-fields [data-lm-custom-key]').forEach(el=>el.disabled=!on);fahdRefreshFieldVisibility();for(const [id,visible] of [['fahd-edit',!on],['fahd-save',on],['fahd-cancel',on]]){const el=document.getElementById(id);if(el)el.hidden=!visible;}}
-function fahdStartEdit(){fahdSetEditing(true)}
-async function fahdCancelEdit(){
- if(fahdHasUnsavedChanges()){
-  const choice=await fahdUnsavedDialog();
-  if(choice==='stay')return;
-  if(choice==='save'){await fahdSave(true);return;}
- }
- document.querySelectorAll('#fahd-fields [data-fahd-key]').forEach(el=>el.value=fahdEditing?.original[el.dataset.fahdKey]??'');document.querySelectorAll('#fahd-fields [data-lm-custom-key]').forEach(el=>el.value=el.dataset.initialValue||'');fahdSetEditing(false);
-}
-function fahdDialog(title,message,mode='confirm',fields=[]){return new Promise(resolve=>{const dialog=document.getElementById('fahd-dialog'),box=document.getElementById('fahd-dialog-inputs'),yes=document.getElementById('fahd-dialog-yes'),no=document.getElementById('fahd-dialog-no');document.getElementById('fahd-dialog-title').textContent=title;document.getElementById('fahd-dialog-message').textContent=message;box.replaceChildren();const inputs=fields.map(f=>{const el=document.createElement('input');el.placeholder=f;el.maxLength=1000;box.append(el);return el});no.hidden=mode==='notice';yes.textContent=mode==='notice'?fahdLang('حسنًا','OK'):fahdLang('تأكيد','Confirm');no.textContent=fahdLang('إلغاء','Cancel');dialog.hidden=false;const finish=ok=>{dialog.hidden=true;yes.onclick=null;no.onclick=null;document.removeEventListener('keydown',esc);resolve(ok?(inputs.length?inputs.map(x=>x.value):true):null)};const esc=e=>{if(e.key==='Escape')finish(false)};yes.onclick=()=>finish(true);no.onclick=()=>finish(false);document.addEventListener('keydown',esc);(inputs[0]||yes).focus()})}
-function lmCustomSlug(label){
- const normalized=String(label||'').normalize('NFKD').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
- return normalized ? 'cf_'+normalized.slice(0,42) : 'cf_'+Date.now().toString(36);
-}
-function lmCustomValueInputs(){
- const rows=document.querySelectorAll('#fahd-fields [data-lm-custom-key]');
- const updates={};
- rows.forEach(el=>{if(el.value===el.dataset.initialValue)return;const key=el.dataset.lmCustomKey,lang=el.dataset.lmCustomLang;updates['hr_custom_fields/'+key+'/'+(lang==='ar'?'valueAr':'valueEn')]=el.value.trim();});
- return updates;
-}
-function lmRenderGlobalCustomFields(emp,fields){
- for(const [key,def] of Object.entries(lmCustomFieldDefinitions)){
-  if(!/^cf_[a-z0-9_]{1,50}$/.test(key)||!def||typeof def!=='object')continue;
-  const value=emp.hr_custom_fields?.[key]||{};
-  for(const lang of ['ar','en']){
-   const card=document.createElement('div');card.className='fahd-field';card.dataset.fieldLanguage=lang;
-   const label=document.createElement('label');label.textContent=(lang==='ar'?def.labelAr:def.labelEn)||key;
-   const input=document.createElement('input');input.type=def.type==='date'?'date':def.type==='number'?'number':'text';
-   input.dataset.lmCustomKey=key;input.dataset.lmCustomLang=lang;
-   const raw=(lang==='ar'?value.valueAr:value.valueEn)||'';input.value=raw;input.dataset.initialValue=input.value;input.disabled=true;input.maxLength=2000;
-   card.append(label,input);fields.append(card);
-  }
- }
-}
-async function fahdAddField(){
- if(fahdBusy||!fahdEditing?.path||!portalIsAdmin())return;
- if(fahdHasUnsavedChanges()){await fahdDialog(fahdLang('تعديلات غير محفوظة','Unsaved changes'),fahdLang('احفظ تعديلات الموظف أولًا قبل إنشاء حقل عام.','Save employee edits before creating a global field.'),'notice');return;}
- const a=await fahdDialog(fahdLang('حقل عام لكل الموظفين','Global field for all employees'),fahdLang('سيُنشأ الحقل في Firebase لكل الموظفين، والقيم تخص الموظف الحالي فقط.','The field will be added to every employee in Firebase; values belong only to this employee.'),'confirm',[fahdLang('اسم الحقل بالعربية','Arabic field label'), 'English field label',fahdLang('القيمة العربية للموظف الحالي (اختياري)','Arabic value for current employee (optional)'),'English value (optional)']);
- if(!a)return;
- const [labelAr,labelEn,valueAr,valueEn]=a.map(s=>String(s||'').trim());
- if(!labelAr||!labelEn||labelAr.length>100||labelEn.length>100){await fahdDialog(fahdLang('بيانات ناقصة','Missing labels'),fahdLang('أدخل اسم الحقل بالعربية والإنجليزية (100 حرف كحد أقصى).','Enter both labels (max 100 characters).'),'notice');return;}
- const duplicate=Object.values(lmCustomFieldDefinitions).some(d=>d&&[d.labelAr,d.labelEn].some(x=>x&&[labelAr,labelEn].some(y=>x.trim().toLowerCase()===y.trim().toLowerCase())));
- if(duplicate){await fahdDialog(fahdLang('حقل مكرر','Duplicate field'),fahdLang('الحقل موجود بالفعل.','This field already exists.'),'notice');return;}
- const key=lmCustomSlug(labelEn);if(!/^cf_[a-z0-9_]{1,50}$/.test(key)||lmCustomFieldDefinitions[key]){await fahdDialog(fahdLang('اسم غير صالح','Invalid field'),fahdLang('اسم الحقل الإنجليزي يجب أن يحتوي على حروف لاتينية لتوليد مفتاح آمن.','Use Latin letters for the English label.'),'notice');return;}
- const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(fahdEditing.code));if(!emp)return;
- const count=allEmployees.length;
- const confirmed=await fahdDialog(fahdLang('تأكيد إضافة عامة','Confirm global field'),fahdLang(`سيُضاف الحقل إلى ${count} سجل موظف في Firebase. هل توافق؟`,`This will update ${count} employee records in Firebase. Continue?`));if(!confirmed)return;
- const actor=portalAuth.currentUser?.uid||'';
- const now=Date.now();const value={labelAr,labelEn,type:'text',createdAt:now,createdBy:actor};
- const updates={['employee_field_definitions/'+key]:value};
- for(const record of allEmployees){
-  const code=getEmployeeCode(record);if(!/^\d+$/.test(code))continue;
-  // Existing custom data must never be overwritten.
-  if(Object.prototype.hasOwnProperty.call(record.hr_custom_fields||{},key))continue;
-  updates['employees_v2/'+code+'/hr_custom_fields/'+key]={valueAr:code===fahdEditing.code?valueAr:'',valueEn:code===fahdEditing.code?valueEn:''};
- }
- const auditKey=db.ref('hr_imports').push().key;
- updates['hr_imports/'+auditKey]={type:'GLOBAL_CUSTOM_FIELD_CREATED',fieldKey:key,labelAr,labelEn,employeeCount:count,actorUid:actor,createdAt:now};
- fahdBusy=true;const btn=document.getElementById('fahd-add');if(btn)btn.disabled=true;
- try{
-  // A single root multi-location update commits schema + employee fields + audit together.
-  await db.ref().update(updates);
-  lmCustomFieldDefinitions[key]=value;
-  for(const record of allEmployees){record.hr_custom_fields??={};if(!Object.hasOwn(record.hr_custom_fields,key))record.hr_custom_fields[key]={valueAr:getEmployeeCode(record)===fahdEditing.code?valueAr:'',valueEn:getEmployeeCode(record)===fahdEditing.code?valueEn:''};}
-  fahdRender(emp);
-  await fahdDialog(fahdLang('تم الحفظ','Saved'),fahdLang('تم إنشاء الحقل عند جميع الموظفين في Firebase.','Field created for all employees in Firebase.'),'notice');
- }catch(error){await fahdDialog(fahdLang('فشل الحفظ','Save failed'),String(error?.message||error),'notice');}
- finally{fahdBusy=false;if(btn)btn.disabled=false;}
-}
+                    <button onclick="handleLogin()" class="portal-action-btn w-full py-3 font-bold rounded-xl transition" data-translate="login_btn">دخول للنظام</button>
+                    <div id="login-error" class="login-error"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-// FAHD v13: desktop-only image upload, preserving existing record fields.
-async function fahdUploadPhoto(file,forNew=false){
- if(!file)return;
- if(!/^image\/(jpeg|png|webp)$/.test(file.type)){await fahdDialog(fahdLang('نوع ملف غير مدعوم','Unsupported image'),fahdLang('اختر JPG أو PNG أو WebP','Choose JPG, PNG or WebP'),'notice');return;}
- const img=new Image();const url=URL.createObjectURL(file);
- try{await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=url;});
-  const canvas=document.createElement('canvas'),scale=Math.min(1,360/Math.max(img.naturalWidth,img.naturalHeight));canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-  const data=canvas.toDataURL('image/jpeg',.72);if(data.length>160000)throw new Error('Image exceeds safe size');
-  if(forNew){window.fahdNewPhoto=data;const preview=document.getElementById('fahd-create-photo-preview');if(preview)preview.src=data;return;}
-  const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(fahdEditing?.code));if(!emp||!fahdEditing?.path)throw new Error('Employee record unavailable');
-  const confirmed=await fahdDialog(fahdLang('تغيير صورة الموظف','Change employee photo'),fahdLang('هل تريد حفظ الصورة الجديدة؟','Save the new photo?'));if(!confirmed)return;
-  const key=Object.hasOwn(emp,'photoUrl')?'photoUrl':Object.hasOwn(emp,'photo')?'photo':'photoUrl';
-  await db.ref(fahdEditing.path).update({[key]:data});emp[key]=data;fahdRender(emp);
- }catch(e){await fahdDialog(fahdLang('تعذر حفظ الصورة','Photo not saved'),String(e.message||e),'notice');}finally{URL.revokeObjectURL(url);}
-}
-function fahdPickPhoto(forNew=false){const input=document.createElement('input');input.type='file';input.accept='image/jpeg,image/png,image/webp';input.addEventListener('change',()=>fahdUploadPhoto(input.files?.[0],forNew),{once:true});input.click();}
-function fahdNewExtraField(){const root=document.getElementById('fahd-new-custom');if(!root)return;const n=root.children.length+1;const card=document.createElement('div');card.className='fahd-entry';card.innerHTML=`<label>${fahdLang('حقل مخصص','Custom field')} ${n}</label><input data-custom-name placeholder="${fahdLang('اسم المفتاح بالإنجليزية','English field key')}" maxlength="50"><input data-custom-ar placeholder="${fahdLang('القيمة العربية','Arabic value')}" maxlength="1000"><input data-custom-en placeholder="English value" maxlength="1000">`;root.append(card);}
-function fahdSelectOptions(id,language){const values=[...new Set(allEmployees.map(e=>String(id==='department'?(language==='ar'?(e['الإدارة ']??e['الإدارة']):(e['department ']??e.department)):(language==='ar'?e['الوظيفة']:(e['job title ']??e.jobTitle))||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,language==='ar'?'ar':'en'));return values;}
-function fahdEnableDropdowns(){document.querySelectorAll('#add-employee-fields input[data-add-key],#fahd-fields input[data-fahd-key]').forEach(input=>{const key=input.dataset.addKey||input.dataset.fahdKey;const id=['الإدارة ','department '].includes(key)?'department':['الوظيفة','job title '].includes(key)?'job':null;if(!id||input.dataset.dropdownReady)return;input.dataset.dropdownReady='1';const lang=/[\u0600-\u06ff]/.test(key)?'ar':'en';const listId='fahd-options-'+id+'-'+lang;let dl=document.getElementById(listId);if(!dl){dl=document.createElement('datalist');dl.id=listId;document.body.append(dl);}dl.replaceChildren();fahdSelectOptions(id,lang).forEach(v=>{const o=document.createElement('option');o.value=v;dl.append(o)});input.setAttribute('list',listId);input.title=fahdLang('اختر من القائمة أو اكتب قيمة جديدة','Select an option or type a new value');});}
+    <!-- Top Header -->
+    <header class="glass-card shadow-xl px-6 py-4 flex justify-between items-center border-b z-30">
+        <div class="flex items-center space-x-4 space-x-reverse">
+            <div class="w-10 h-10 flex items-center justify-center">
+                <img src="logo.png" alt="Company Logo" class="w-full h-full object-contain logo-soft-3d">
+            </div>
+            <span id="hr-header-brand" class="text-2xl font-bold text-sky-400 tracking-wider" data-ar="لاكتو مصر - الموارد البشرية" data-en="Lacto Misr HR">لاكتو مصر - الموارد البشرية</span>
+        </div>
+        
+        <div class="flex items-center gap-3 relative">
+            <div class="relative">
+                <button onclick="toggleLangDropdown(event)" class="ess-lang-btn">
+                    🌐 <span id="lang-code">AR</span> ▼
+                </button>
+                <div id="lang-dropdown" class="ess-lang-menu">
+                    <button onclick="setLanguage('ar')" class="ess-lang-option">🇪🇬 AR</button>
+                    <button onclick="setLanguage('en')" class="ess-lang-option">🇬🇧 EN</button>
+                </div>
+            </div>
+<div class="lm-header-identity"><div class="lm-header-avatar"><img id="lm-header-photo" alt="" hidden><span class="lm-avatar-fallback">●</span></div><div class="lm-header-names"><b id="lm-header-name">مسؤول النظام</b><small id="lm-header-job">مدير النظام</small></div><svg id="lm-role-flag" viewBox="0 0 24 24" width="25" height="25" aria-label="Role"><path d="M5 21V3m0 1q5-3 9 0t7 0v11q-5 3-9 0t-7 0" stroke="currentColor" stroke-width="2" fill="currentColor" fill-opacity=".22" stroke-linejoin="round"/></svg></div><button type="button" class="lm-header-bell" onclick="showHRPage('notifications')" aria-label="طلبات ESS والإشعارات"><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 9h18c0-1-3-2-3-9M10 21h4"/></svg><b id="lm-header-badge" hidden></b></button>
+            <span id="current-user-label" class="font-semibold text-slate-300 text-sm hidden md:inline" data-translate="admin">مسؤول النظام</span>
+            <button onclick="handleLogout()" class="portal-danger-btn px-3 py-2 rounded-xl text-xs font-bold transition" data-translate="logout_btn">تسجيل الخروج</button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="flex flex-1 overflow-hidden">
+        
+        <!-- Sidebar -->
+        <aside id="portal-main-sidebar" class="sidebar-collapsed glass-card flex flex-col justify-between border-l z-20 overflow-hidden shadow-2xl">
+            <div class="p-4 space-y-6">
+                <div class="text-sm font-bold text-sky-300 text-center border-b border-sky-500/20 pb-3 truncate">
+                    <span class="sidebar-title" data-translate="control_panel">غرفة التحكم</span>
+                </div>
+                <nav class="space-y-3 text-sm" aria-label="HR navigation">
+                    <button type="button" onclick="showHRPage('dashboard')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="dashboard"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="nav-text" data-ar="لوحة التحكم" data-en="Dashboard">لوحة التحكم</span></button>
+                    <button type="button" onclick="showHRPage('employees')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="employees"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="nav-text" data-ar="الموظفون" data-en="Employees">الموظفون</span></button>
+                    <button type="button" onclick="showHRPage('payroll')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="payroll"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9h.01M18 15h.01"/></svg><span class="nav-text" data-ar="المرتبات" data-en="Payroll">المرتبات</span></button>
+                    <button type="button" onclick="showHRPage('notifications')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="notifications"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span class="nav-text" data-ar="الإشعارات والطلبات" data-en="Notifications">الإشعارات والطلبات</span></button>
+<button type="button" onclick="showHRPage('attendance')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="attendance"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg><span class="nav-text" data-ar="الحضور والانصراف" data-en="Attendance">الحضور والانصراف</span></button>
+<button type="button" onclick="showHRPage('leave-balances')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="leave-balances"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></svg><span class="nav-text" data-ar="أرصدة الإجازات" data-en="Leave balances">أرصدة الإجازات</span></button>
+<button type="button" onclick="showHRPage('permissions')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="permissions"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v5a2 2 0 0 0 0 4v5H4v-5a2 2 0 0 0 0-4V5Z"/><path d="M12 5v14" stroke-dasharray="2 2"/></svg><span class="nav-text" data-ar="الأذون الشخصية" data-en="Personal permissions">الأذون الشخصية</span></button>
+<button type="button" onclick="showHRPage('bradford')" class="sidebar-item hr-nav w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-200 hover:bg-sky-600/20" data-page="bradford"><svg class="hr-side-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l6-6 4 3 8-9"/><path d="M3 21h18"/></svg><span class="nav-text" data-ar="Bradford Factor" data-en="Bradford Factor">Bradford Factor</span></button>
+                </nav>
+            </div>
+            <div class="lm-sidebar-art" aria-hidden="true"><img class="lm-factory-illustration" src="data:image/png;base64,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" alt=""></div>
+            <div class="p-4 border-t border-sky-500/20 text-[10px] text-slate-400 text-center truncate">
+                <span class="nav-text">Portal v5.2 - Pro Edition</span>
+            </div>
+        </aside>
+
+        <!-- Content Area -->
+        <main class="flex-1 p-6 overflow-y-auto">
+            
+            <section id="hr-dashboard-view" class="hidden"></section>
+            <section id="hr-payroll-view" class="hidden"></section>
+            <section id="hr-notifications-view" class="hidden"></section>
+<section id="hr-attendance-view" class="hidden"></section>
+<section id="hr-leave-balances-view" class="hidden"></section>
+<section id="hr-permissions-view" class="hidden"></section>
+<section id="hr-bradford-view" class="hidden"></section>
+            <!-- جدول القائمة الرئيسية -->
+            <div id="employees-list-view">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div class="glass-card p-5 rounded-2xl border-r-4 border-sky-500 shadow-xl">
+                        <p class="text-xs text-slate-400 font-semibold" data-translate="total_emp">إجمالي العاملين</p>
+                        <h3 id="total-employees-count" class="text-3xl font-bold mt-1 text-sky-300">352</h3>
+                    </div>
+                    <div class="glass-card p-5 rounded-2xl border-r-4 border-sky-500 shadow-xl">
+                        <p class="text-xs text-slate-400 font-semibold" data-translate="active_depts">الإدارات النشطة</p>
+                        <h3 class="text-3xl font-bold mt-1 text-sky-300">12</h3>
+                    </div>
+                    <div class="glass-card p-5 rounded-2xl border-r-4 border-sky-500 shadow-xl">
+                        <p class="text-xs text-slate-400 font-semibold" data-translate="system_status">حالة النظام</p>
+                        <h3 class="text-3xl font-bold mt-1 text-sky-300" data-translate="connected">مستقر (متصل بـ Firebase)</h3>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-2xl overflow-hidden shadow-2xl">
+                    <div class="p-4 border-b border-sky-500/20 flex flex-col md:flex-row justify-between items-center gap-4">
+                        <h2 class="font-bold text-lg text-sky-200" data-translate="emp_list">قائمة العاملين بالقاعدة</h2>
+                        <div class="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+                            <input type="text" id="search-input" oninput="lmEmployeeSearchInputChanged(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();lmCommitEmployeeSearch();}" data-translate-placeholder="search_placeholder" placeholder="بحث بالاسم أو الكود..." class="px-4 py-2 bg-slate-900/80 border border-sky-500/30 rounded-xl text-sm w-full md:w-72 focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-200 placeholder-slate-500">
+                            <button type="button" onclick="lmCommitEmployeeSearch()" class="portal-ghost-btn px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition" data-ar="بحث" data-en="Search">بحث</button>
+                            <button type="button" onclick="lmOpenMassHiring()" class="portal-ghost-btn px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap" data-ar="استيراد جماعي" data-en="Mass Hiring">استيراد جماعي</button>
+                            <button onclick="openAddEmployeeModal()" class="portal-action-btn px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition" data-translate="add_employee_btn">+ إضافة موظف</button>
+                        </div>
+                    </div>
+                    <!-- Employee filters are INLINE: no popup -->
+                    <section id="lm-employee-filters" class="lm-filter-panel" aria-label="Employee filters">
+                      <div class="lm-filter-heading"><strong data-ar="البحث المتقدم عن الموظفين" data-en="Advanced employee search">البحث المتقدم عن الموظفين</strong><span id="lm-filter-count" aria-live="polite"></span></div>
+                      <div class="lm-filter-grid">
+                        <label><span data-ar="الإدارة" data-en="Department">الإدارة</span><select id="lm-filter-dept" multiple size="4" onchange="lmPopulateEmployeeFilters();filterEmployees()"></select></label>
+                        <label><span data-ar="الوظائف (اختيار متعدد)" data-en="Job titles (multiple)">الوظائف (اختيار متعدد)</span><select id="lm-filter-job" multiple size="5" onchange="filterEmployees()" aria-describedby="lm-job-multi-hint"></select><small id="lm-job-multi-hint" data-ar="Ctrl + نقر لاختيار أكثر من قيمة، وShift لتحديد نطاق" data-en="Ctrl + click for multiple choices; Shift for a range">Ctrl + نقر لاختيار أكثر من قيمة، وShift لتحديد نطاق</small></label>
+                        <label><span data-ar="المؤهل" data-en="Qualification">المؤهل</span><select id="lm-filter-qual" multiple size="4" onchange="filterEmployees()"></select></label>
+                        <label><span data-ar="النوع" data-en="Gender">النوع</span><select id="lm-filter-gender" multiple size="4" onchange="filterEmployees()"></select></label>
+                        <label><span data-ar="المحافظة" data-en="Governorate">المحافظة</span><select id="lm-filter-gov" multiple size="4" onchange="filterEmployees()"></select></label>
+                        <label><span data-ar="الحالة الاجتماعية" data-en="Marital status">الحالة الاجتماعية</span><select id="lm-filter-marital" multiple size="4" onchange="filterEmployees()"></select></label>
+                        <label><span data-ar="تعيين من" data-en="Hired from">تعيين من</span><input type="date" id="lm-filter-hire-from" onchange="filterEmployees()"></label>
+                        <label><span data-ar="تعيين حتى" data-en="Hired to">تعيين حتى</span><input type="date" id="lm-filter-hire-to" onchange="filterEmployees()"></label>
+                      </div>
+                      <div class="lm-filter-actions"><button type="button" onclick="lmClearEmployeeFilters()" data-ar="مسح الفلاتر" data-en="Clear filters">مسح الفلاتر</button><button type="button" onclick="lmExportFilteredEmployees()" data-ar="تصدير جميع بيانات النتائج (Excel CSV)" data-en="Export all matching fields (Excel CSV)">تصدير جميع بيانات النتائج (Excel CSV)</button></div>
+                    </section>
+                    <div class="overflow-x-auto">
+                        <table id="main-employees-table" class="w-full border-collapse glass-table">
+                            <thead>
+                                <tr class="bg-slate-900/60 text-sky-400 border-b text-xs uppercase tracking-wider">
+                                    <th class="p-3.5" data-translate="th_code">الكود</th>
+                                    <th class="p-3.5" data-translate="th_name">اسم الموظف</th>
+                                    <th class="p-3.5" data-translate="th_dept">الإدارة</th>
+                                    <th class="p-3.5" data-translate="th_job">الوظيفة</th>
+                                    <th class="p-3.5" data-translate="th_hire">تاريخ التعيين</th>
+                                    <th class="p-3.5 text-center" data-translate="th_actions">الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody id="employees-table-body" class="divide-y divide-sky-500/10 text-sm">
+                                <tr>
+                                    <td colspan="6" class="p-6 text-center text-slate-400" data-translate="loading">جاري جلب البيانات من القاعدة...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- صفحة الملف الوظيفي (للعرض الافتراضي، وتفتح للتعديل عند الضغط على زرار التعديل) -->
+            <div id="employee-profile-view" class="hidden space-y-6">
+<section id="fahd1-native" class="fahd-native" dir="auto">
+<div class="fahd-top"><div class="fahd-photo-area"><img id="fahd-photo" class="fahd-photo" alt="Employee photo"><button type="button" class="fahd-photo-button" id="fahd-photo-change" onclick="fahdPickPhoto(false)">Change photo</button></div><div class="fahd-header-actions"><button type="button" id="fahd-back" onclick="backToEmployeesList()">← العودة للقائمة / Back</button><span id="fahd-code"></span></div><div class="fahd-identity-block"><small>LACTO MISR · EMPLOYEE 360°</small><h2 id="fahd-name">ملف الموظف</h2><p id="fahd-identity"></p></div></div>
+<div class="fahd-tabs" role="tablist"><button class="selected" type="button" onclick="fahdTab('overview',this)"><svg class="fahd-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> Overview · نظرة عامة</button><button type="button" onclick="fahdTab('personal',this)"><svg class="fahd-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg> Personal & Job · البيانات</button><button type="button" onclick="fahdTab('financial',this)"><svg class="fahd-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="16" rx="2"/><path d="M2 9h20"/><circle cx="17" cy="15" r="1"/></svg> Financial · المالية</button><button type="button" onclick="fahdTab('attendance',this)"><svg class="fahd-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg> Attendance · الحضور</button><button type="button" onclick="fahdTab('leaves',this)"><svg class="fahd-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 2v6M17 2v6M3 10h18"/></svg> Leaves · الإجازات</button><button type="button" onclick="fahdTab('performance',this)"><svg class="fahd-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18l6-6 4 3 8-9"/><path d="M16 6h5v5"/></svg> Performance · الأداء</button></div>
+<div class="fahd-content"><div id="fahd-tab-overview" class="fahd-pane"><div id="fahd-summary" class="fahd-summary"></div></div><div id="fahd-tab-personal" class="fahd-pane" hidden><div id="fahd-fields" class="fahd-fields"></div><div class="fahd-actions"><button type="button" onclick="fahdStartEdit()" id="fahd-edit">تعديل البيانات</button><button type="button" onclick="fahdCancelEdit()" id="fahd-cancel" hidden>إلغاء</button><button type="button" onclick="fahdSave()" id="fahd-save" hidden>حفظ التعديلات</button><button type="button" onclick="fahdAddField()" id="fahd-add">＋ إضافة حقل جديد</button></div></div><div id="fahd-tab-financial" class="fahd-pane" hidden><div id="fahd-financial"></div></div><div id="fahd-tab-attendance" class="fahd-pane" hidden><div class="fahd-empty">يتم عرض بيانات الحضور عند ربط مصدرها الفعلي — لا توجد أرقام تجريبية.</div></div><div id="fahd-tab-leaves" class="fahd-pane" hidden><div class="fahd-empty">بانتظار ملف أرصدة الإجازات الفعلي.</div></div><div id="fahd-tab-performance" class="fahd-pane" hidden><div class="fahd-empty">بانتظار بيانات تقييم الأداء الفعلية.</div></div><p id="fahd-status" role="status"></p></div></section>
+                <div class="flex justify-between items-center glass-card p-4 rounded-2xl">
+                    <button onclick="backToEmployeesList()" class="px-4 py-2 bg-sky-600/30 hover:bg-sky-600 text-sky-200 rounded-xl text-sm border border-sky-400/30 transition shadow-lg" data-translate="back_btn">← العودة للقائمة</button>
+                    <div class="flex gap-3">
+                        <button type="button" onclick="openAddCustomFieldModal()" class="portal-ghost-btn px-4 py-2 rounded-xl text-sm font-bold" data-ar="+ إضافة بيانات" data-en="+ Add field">+ إضافة بيانات</button>
+                        <button id="btn-edit" onclick="enableEditing()" class="px-5 py-2 bg-sky-600/40 hover:bg-sky-600 text-white font-bold rounded-xl text-sm border border-sky-400/30 transition shadow-lg" data-translate="edit_btn">تعديل البيانات</button>
+                        <button id="btn-save" onclick="confirmSave()" class="hidden px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition shadow-lg" data-translate="save_btn">حفظ</button>
+                    </div>
+                </div>
+
+                <section id="hr-custom-fields" class="glass-card rounded-2xl p-5" aria-label="Additional employee fields"></section>
+
+                <!-- بيانات الموظف والصورة (افتراضياً disabled للعرض فقط) -->
+                <div class="glass-card p-6 rounded-3xl shadow-2xl grid grid-cols-1 lg:grid-cols-4 gap-6 items-center">
+                    <div class="flex flex-col items-center justify-center space-y-3">
+                        <div class="w-36 h-36 rounded-2xl overflow-hidden border-2 border-sky-500/50 shadow-xl bg-slate-900">
+                            <img id="profile-img" src="default-avatar.png" alt="Employee Photo" class="w-full h-full object-cover">
+                        </div>
+                        <input type="file" id="photo-upload-input" accept="image/*" class="hidden" onchange="uploadEmployeePhoto(event)">
+                        <button id="btn-photo" onclick="document.getElementById('photo-upload-input').click()" class="hidden px-3 py-1.5 bg-sky-600/20 hover:bg-sky-600 text-sky-300 rounded-lg text-xs border border-sky-400/30 transition" data-translate="change_photo">تعديل الصورة</button>
+                    </div>
+
+                    <div class="lg:col-span-3 space-y-4">
+                        <div>
+                            <label class="text-xs text-sky-400 font-semibold" data-translate="th_name">اسم الموظف</label>
+                            <input type="text" id="prof-name" disabled class="w-full mt-1 px-4 py-2.5 bg-slate-900/50 border border-slate-700 rounded-xl text-white font-bold disabled:opacity-80">
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-xs text-slate-400" data-translate="th_code">الكود</label>
+                                <input type="text" id="prof-code" disabled class="w-full mt-1 px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-sky-400 font-mono">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-400" data-translate="th_dept">الإدارة</label>
+                                <input type="text" id="prof-dept" disabled class="w-full mt-1 px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 disabled:opacity-80">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- باقي التفاصيل -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="glass-card p-5 rounded-2xl space-y-4">
+                        <h3 class="text-sm font-bold text-sky-400 border-b border-sky-500/20 pb-2" data-translate="sec_job">البيانات الوظيفية</h3>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="th_job">الوظيفة</label>
+                            <input type="text" id="prof-job" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="manager_label">المدير المباشر</label>
+                            <input type="text" id="prof-manager" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="th_hire">تاريخ التعيين</label>
+                            <input type="text" id="prof-hire" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm font-mono disabled:opacity-80">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="service_years">سنوات الخدمة</label>
+                            <input type="text" id="prof-service" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                    </div>
+
+                    <div class="glass-card p-5 rounded-2xl space-y-4">
+                        <h3 class="text-sm font-bold text-sky-400 border-b border-sky-500/20 pb-2" data-translate="sec_qual">المؤهل العلمي</h3>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="qual_label">المؤهل</label>
+                            <input type="text" id="prof-qual" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="qual_auth">جهة المؤهل</label>
+                            <input type="text" id="prof-qual-auth" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                    </div>
+
+                    <div class="glass-card p-5 rounded-2xl space-y-4">
+                        <h3 class="text-sm font-bold text-sky-400 border-b border-sky-500/20 pb-2" data-translate="sec_personal">البيانات الشخصية</h3>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="dob_label">تاريخ الميلاد</label>
+                            <input type="text" id="prof-dob" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm font-mono disabled:opacity-80">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="age_label">السن حتى تاريخه</label>
+                            <input type="text" id="prof-age" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="insurance_label">الحالة التأمينية</label>
+                            <input type="text" id="prof-insurance" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400" data-translate="pob_label">مكان الميلاد</label>
+                            <input type="text" id="prof-pob" disabled class="w-full mt-1 px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 text-sm disabled:opacity-80">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+    </div>
 
 
-// NEON V7: approved visual composition, strictly computed from loaded employees_v2.
-// Base dashboard is explicitly named to prevent recursive function hoisting.
+<style id="lm-mass-style">
+#lm-mass-workspace{z-index:105;overflow:hidden}#lm-mass-workspace:not(.hidden){display:flex;flex-direction:column}
+.lm-mass-body{padding:22px 26px;overflow:auto;flex:1;min-height:0;color:#e6f5ff}.lm-mass-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px}.lm-mass-toolbar button,.lm-mass-file-label{padding:11px 17px;border-radius:12px;font-weight:700;cursor:pointer}.lm-mass-file-label{background:#103b62;border:1px solid #2786b8;color:#dcf7ff}.lm-mass-file-label input{display:none}.lm-mass-hint{color:#a6cce5;font-size:13px;margin:15px 0}.lm-mass-summary{background:#0c2844;border:1px solid #28638a;border-radius:14px;padding:15px;margin:12px 0}.lm-mass-errors{color:#ff9eab;white-space:pre-line;max-height:160px;overflow:auto}.lm-mass-preview{overflow:auto;max-height:52vh;border-radius:12px;margin:15px 0}.lm-mass-preview table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}.lm-mass-preview th,.lm-mass-preview td{padding:10px;border:1px solid #23506c;text-align:start}.lm-mass-preview th{background:#17446b;position:sticky;top:0}.lm-mass-preview tr:nth-child(even){background:#102c49}#lm-mass-commit:disabled{opacity:.45;cursor:not-allowed}#lm-mass-status{color:#9fd8f6;flex:1}#lm-mass-progress{color:#80e8ca;font-weight:700}
+</style>
+
+    <!-- Employee creation is a full-screen native portal workspace -->
+    <div id="add-employee-modal" class="hidden fahd-create-workspace" role="dialog" aria-modal="true" aria-labelledby="fahd-create-title">
+      <div class="fahd-create-top">
+        <div><small>LACTO MISR · EMPLOYEE 360°</small><h2 id="fahd-create-title">إضافة موظف جديد · Add Employee</h2><p>ملف جديد باللغتين العربية والإنجليزية · Bilingual employee profile</p></div>
+        <button type="button" onclick="closeAddEmployeeModal()">✕ &nbsp; إغلاق / Close</button>
+      </div>
+      <div class="fahd-create-tabs" role="tablist">
+        <button type="button" class="selected" onclick="fahdCreateTab('personal',this)">♙ Personal & Job · البيانات</button>
+        <button type="button" onclick="fahdCreateTab('financial',this)">▣ Financial · المالية</button>
+        <button type="button" onclick="fahdCreateTab('attendance',this)">◷ Attendance · الحضور</button>
+        <button type="button" onclick="fahdCreateTab('leaves',this)">▦ Leaves · الإجازات</button>
+        <button type="button" onclick="fahdCreateTab('performance',this)">↗ Performance · الأداء</button>
+      </div>
+      <div class="fahd-create-body">
+        <div id="fahd-create-personal" class="fahd-create-pane"><div id="add-employee-fields"></div></div>
+        <div id="fahd-create-financial" class="fahd-create-pane" hidden><div class="fahd-empty">البيانات المالية تُضاف بعد إنشاء السجل من تبويب المالية · Financial fields are available after creating the employee.</div></div>
+        <div id="fahd-create-attendance" class="fahd-create-pane" hidden><div class="fahd-empty">Attendance records are connected after employee creation.</div></div>
+        <div id="fahd-create-leaves" class="fahd-create-pane" hidden><div class="fahd-empty">Leave balances will be connected from the approved leave sheet.</div></div>
+        <div id="fahd-create-performance" class="fahd-create-pane" hidden><div class="fahd-empty">Performance records can be added after creation.</div></div>
+      </div>
+      <div class="fahd-create-footer"><span id="add-employee-error" role="alert"></span><button type="button" onclick="closeAddEmployeeModal()">إلغاء / Cancel</button><button type="button" data-save-new onclick="saveNewEmployee()">حفظ الموظف · Save employee</button></div>
+    </div>
 
 
-// Dashboard 2026-10-28: one renderer, no sample employee counts.
-function renderRichDashboard(){
- const root=document.getElementById('hr-dashboard-view');if(!root)return;
- const T=(a,b)=>currentLang==='ar'?a:b;
- const E=x=>escapeHtml(String(x??''));
- const emp=allEmployees||[],total=emp.length;
- const field=(o,...names)=>{for(const n of names){const v=Object.entries(o||{}).find(([k])=>k.trim().toLowerCase()===n.trim().toLowerCase());if(v&&String(v[1]??'').trim())return v[1]}return ''};
- const group=fn=>{const map=new Map();emp.forEach(e=>{const k=String(fn(e)||'').trim();if(k&&k!=='--')map.set(k,(map.get(k)||0)+1)});return [...map].sort((a,b)=>b[1]-a[1])};
- const departments=group(getEmployeeDept),qual=group(e=>currentLang==='en'?(field(e,'qualification','qualification_en','qualification english')||field(e,'المؤهل')):(field(e,'المؤهل')||field(e,'qualification')));
- const sex=e=>String(field(e,'النوع','الجنس','gender','gender_en','Gender')).trim().toLowerCase();
- const male=emp.filter(e=>/^(ذكر|male|m|man)$/.test(sex(e))).length,female=emp.filter(e=>/^(أنثى|انثى|female|f|woman)$/.test(sex(e))).length,sexKnown=male+female;
- const years=e=>{const raw=field(e,'سنوات الخدمة','years of service','yearsService');const n=Number(raw);if(String(raw).trim()&&Number.isFinite(n)&&n>=0&&n<80)return n;const date=new Date(getHireDate(e));return Number.isFinite(date.getTime())?(Date.now()-date.getTime())/31557600000:null};
- const tenure=emp.map(years).filter(x=>x!==null&&x>=0&&x<80),avgTenure=tenure.length?(tenure.reduce((a,b)=>a+b,0)/tenure.length).toFixed(1):'—';
- const ages=emp.map(e=>{const raw=field(e,'تاريخ الميلاد','date of birth','birthDate','dob');const dt=typeof raw==='number'?new Date((raw-25569)*86400000):new Date(raw);return Number.isFinite(dt.getTime())?(Date.now()-dt.getTime())/31557600000:null}).filter(n=>n!==null&&n>16&&n<100);
- const avgAge=ages.length?Math.round(ages.reduce((a,b)=>a+b,0)/ages.length):'—';
- const dates=group(e=>{const d=getHireDate(e);return String(d).match(/(?:19|20)\d{2}/)?.[0]||''}).sort((a,b)=>a[0].localeCompare(b[0]));
- const governorates=hrGovernorates.map((g,i)=>({name:currentLang==='ar'?g[1]:g[0],n:emp.filter(e=>hrGovIndex(hrGeoField(e))===i).length,i}));const mapped=governorates.reduce((a,b)=>a+b.n,0);
- const insurance=group(e=>field(e,'الحالة التأمينية','insurance status','insuranceStatus'));
- const marital=group(e=>field(e,'الحالة الاجتماعية','marital status','maritalStatus'));
- const serviceBins=[[T('0–5 سنوات','0–5 years'),0],[T('6–10','6–10'),0],[T('11–15','11–15'),0],[T('16–20','16–20'),0],[T('21–25','21–25'),0],[T('26–30','26–30'),0],[T('30+','30+'),0]];
- tenure.forEach(n=>serviceBins[Math.min(6,Math.floor(Math.max(0,n)/5))][1]++);
- const recent=[...emp].filter(e=>{const d=new Date(getHireDate(e));return Number.isFinite(d.getTime())}).sort((a,b)=>new Date(getHireDate(b))-new Date(getHireDate(a))).slice(0,5);
- const icon=(name)=>hrSvgIcon(name,'lm-kpi-icon');
- const card=(ar,en,body,cl='')=>`<section class="lm-card ${cl}"><div class="lm-heading">${E(T(ar,en))}<small>${E(en)}</small></div>${body}</section>`;
- const stat=(ar,en,n,unit,ic)=>`<section class="lm-card"><div class="lm-stathead">${icon(ic)}<div class="lm-heading">${E(T(ar,en))}<small>${E(en)}</small></div></div><div class="lm-value">${E(n)}</div><div class="lm-unit">${E(unit)}</div></section>`;
- const bar=(rows,limit=12)=>{const items=rows.slice(0,limit),max=Math.max(1,...items.map(x=>x[1]));return `<div class="lm-bars">${items.map(([label,n])=>`<div class="lm-bar" title="${E(label)}: ${n}"><b>${n}</b><i style="height:${Math.max(3,n/max*105)}px"></i><small>${E(label)}</small></div>`).join('')}</div>`};
- const person=`<svg class="lm-person" viewBox="0 0 16 26" aria-hidden="true"><circle cx="8" cy="3.5" r="3"/><path d="M5 8h6l2 8-2.5 1-1-5V25h-3v-8H6V25H3V12l-1 5-2-1 2-8z"/></svg>`;
- const genderDots=[];
- // Orthographic sphere: curved latitude bands, perspective scale and shading.
- for(let row=0;row<13;row++){
-  const lat=(row-6)*Math.PI/14, ry=112-Math.sin(lat)*93;
-  const width=Math.cos(lat)*96;
-  const count=Math.max(3,Math.round(12*Math.cos(lat)));
-  for(let col=0;col<count;col++){
-   const lon=(col-(count-1)/2)/Math.max(1,count-1)*Math.PI*.94;
-   const x=114+Math.sin(lon)*width;
-   const depth=Math.max(.25,Math.cos(lon)*Math.cos(lat));
-   genderDots.push({x,y:ry,depth,row,col});
-  }
- }
- const femDots=Math.round(genderDots.length*female/Math.max(1,sexKnown));
- const genderSvg=`<svg class="lm-gender-orb" viewBox="0 0 228 228" aria-label="${T('توزيع النوع','Gender distribution')}"><defs><radialGradient id="lmSphereShade" cx="33%" cy="24%" r="76%"><stop stop-color="#134e78" stop-opacity=".44"/><stop offset=".68" stop-color="#071b37" stop-opacity=".12"/><stop offset="1" stop-color="#031126" stop-opacity=".65"/></radialGradient></defs><circle cx="114" cy="112" r="103" fill="url(#lmSphereShade)" opacity=".65"/>${genderDots.map(({x,y,depth},i)=>`<g transform="translate(${(x-8*depth).toFixed(1)} ${(y-12*depth).toFixed(1)}) scale(${(.36+depth*.38).toFixed(2)})" opacity="${(.5+depth*.5).toFixed(2)}" fill="${i<femDots?'#fb4bdc':'#05caff'}" style="filter:drop-shadow(0 0 2px ${i<femDots?'#fb4bdc':'#05caff'})"><circle cx="8" cy="3.5" r="3"/><path d="M5 8h6l2 8-2.5 1-1-5V25h-3v-8H6V25H3V12l-1 5-2-1 2-8z"/></g>`).join('')}</svg>`;
- const gender=sexKnown?`<div class="lm-gender-body">${genderSvg}<div class="lm-gender-stats"><strong class="female">${Math.round(female/sexKnown*100)}%</strong>${T('إناث','Female')} · ${female}<strong>${Math.round(male/sexKnown*100)}%</strong>${T('ذكور','Male')} · ${male}</div></div>`:`<div class="lm-blank">${T('بيانات النوع غير متاحة','Gender data unavailable')}</div>`;
- const palette=['#00c7fa','#7767ff','#ffae45','#ee39d4','#21d7bc'];
- const ring=(rows,known)=>{const shown=rows.slice(0,5);let pos=0;const gradient=shown.map(([_,n],i)=>{const start=pos;pos+=n/Math.max(1,known)*100;return `${palette[i]} ${start}% ${pos}%`}).join(',');return `<div class="lm-ringwrap"><div class="lm-ring" style="background:conic-gradient(${gradient||'#203552 0% 100%'},#203552 ${pos}% 100%)"><b title="${E(rows[0]?.[0]||'')}">${known?Math.round(rows[0][1]/known*100):0}%<small>${E(rows[0]?.[0]||'')}</small></b></div><div class="lm-legend">${shown.map(([label,n],i)=>`<div><i style="background:${palette[i]}"></i><span title="${E(label)}">${E(label)}</span><b>${n}</b></div>`).join('')}</div></div>`};
- const qualChoices=group(e=>currentLang==='en'?(field(e,'qualification','qualification_en','qualification english')||field(e,'المؤهل')):(field(e,'المؤهل')||field(e,'qualification')));
- const qualificationGauge=`<div class="lm-qual-gauge"><label for="lm-qual-select">${T('اختر المؤهل العلمي','Select qualification')}</label><select id="lm-qual-select" onchange="lmUpdateQualGauge(this.value)"><option value="">${T('بدون اختيار','None selected')}</option>${qualChoices.map(([label,n],i)=>`<option value="${i}">${E(label)} (${n})</option>`).join('')}</select><div class="lm-speedometer" role="meter" aria-label="${T('نسبة المؤهل المختار','Selected qualification percentage')}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><svg viewBox="0 0 240 137" aria-hidden="true"><defs><linearGradient id="lmRpmGradient" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#9bdfff"/><stop offset="32%" stop-color="#26cfff"/><stop offset="68%" stop-color="#0874ff"/><stop offset="100%" stop-color="#a54aff"/></linearGradient><filter id="lmRpmGlow"><feGaussianBlur stdDeviation="2" result="glow"/><feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><path d="M 20 116 A 100 100 0 0 1 220 116" fill="none" stroke="#243a5c" stroke-width="13" stroke-linecap="round"/><path id="lm-speed-arc" d="M 20 116 A 100 100 0 0 1 220 116" fill="none" stroke="url(#lmRpmGradient)" stroke-width="13" stroke-linecap="round" stroke-dasharray="314.159 314.159" stroke-dashoffset="314.159" filter="url(#lmRpmGlow)"/><g id="lm-rpm-ticks">${Array.from({length:11},(_,i)=>{const a=Math.PI-i*Math.PI/10;const x1=120+80*Math.cos(a),y1=116-80*Math.sin(a),x2=120+89*Math.cos(a),y2=116-89*Math.sin(a);return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#87a9d3" stroke-width="1.5"/>`}).join('')}</g><g id="lm-speed-needle" transform="rotate(0 120 116)" style="transition:transform .65s cubic-bezier(.18,.78,.2,1)"><path d="M 31 116 L 111 111 L 124 116 L 111 121 Z" fill="#ffbd48" stroke="#fff0a5" stroke-width="1.1" filter="url(#lmRpmGlow)"/><path d="M 47 115 L 112 114" stroke="#fff5ce" stroke-width="1" opacity=".85"/><circle cx="120" cy="116" r="9" fill="#102c4e" stroke="#f4c46c" stroke-width="2.5"/><circle cx="120" cy="116" r="3.5" fill="#e6f6ff"/></g><text x="13" y="135" fill="#92bce2" font-size="10">0</text><text x="215" y="135" fill="#92bce2" font-size="10">100</text></svg><div class="lm-speed-center"><strong id="lm-speed-pct">0%</strong><small id="lm-speed-count">${T('اختر مؤهلًا','Select a qualification')}</small></div></div><div class="lm-qual-foot">${T('النسبة من إجمالي الموظفين ذوي المؤهل المسجل','Share of employees with a recorded qualification')}</div></div>`;
- window.lmQualChoices=qualChoices;window.lmQualKnown=qualChoices.reduce((n,x)=>n+x[1],0);
- const orgRows=departments.slice(0,12),left=orgRows.filter((_,i)=>i%2===0),right=orgRows.filter((_,i)=>i%2===1);
- const orgSide=(rows,side)=>`<div class="lm-orgside ${side}">${rows.map(([name,n])=>`<div class="lm-orgitem" title="${E(name)}"><span>${E(name)}</span><b>${n}</b></div>`).join('')}</div>`;
- const orgCurves=Array.from({length:6},(_,i)=>{const y=19+i*40;return `<path d="M 44 121 Q 39 ${y} 35 ${y}"/><path class="r" d="M 56 121 Q 61 ${y} 65 ${y}"/>`}).join('');
- const org=`<div class="lm-org">${orgSide(left,'left')}<div class="lm-orgcenter"><img class="lm-orglogo" src="logo.png" alt="Lacto Misr"></div>${orgSide(right,'right')}<svg class="lm-orgsvg" viewBox="0 0 100 242" preserveAspectRatio="none">${orgCurves}</svg></div>`;
- const hire=dates.slice(-12),maxH=Math.max(1,...hire.map(x=>x[1]));const pts=hire.map(([_,n],i)=>[18+i*560/Math.max(1,hire.length-1),155-n/maxH*118]);const line=pts.map(p=>p.join(',')).join(' ');
- const trend=hire.length>1?`<svg class="lm-spark" viewBox="0 0 600 175" preserveAspectRatio="none"><defs><linearGradient id="lmGrad" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#8c4bff" stop-opacity=".4"/><stop offset="1" stop-color="#004ad5" stop-opacity="0"/></linearGradient></defs><path d="M ${pts.map(p=>p.join(' ')).join(' L ')} L 578 165 L 18 165 Z" fill="url(#lmGrad)"/><polyline points="${line}" fill="none" stroke="#13d8ff" stroke-width="3"/>${pts.map((p,i)=>`<g><title>${E(hire[i][0])}: ${hire[i][1]} ${T('تعيين','hires')}</title><circle cx="${p[0]}" cy="${p[1]}" r="4" fill="#fff"/><text x="${p[0]}" y="${Math.max(13,p[1]-10)}" text-anchor="middle" fill="#d7f6ff" font-size="13" font-weight="bold">${hire[i][1]}</text></g>`).join('')}</svg><div class="lm-trend-axis">${hire.map(([year,n])=>`<span title="${year}: ${n}"><b>${year}</b><small>${n}</small></span>`).join('')}</div><div class="lm-note">${T('عدد التعيينات حسب سنة التعيين (وليس إجمالي الموظفين التاريخي)','Hires by hiring year (not historical headcount)')}</div>`:`<div class="lm-blank">${T('بيانات التعيين غير كافية','Insufficient hiring data')}</div>`;
- const egypt=`<div class="lm-geo-controls"><label for="lm-gov-slicer">${T('المحافظة','Governorate')}</label><select id="lm-gov-slicer" onchange="lmFilterGovernorate(this.value)"><option value="">${T('كل المحافظات','All governorates')}</option>${governorates.map(g=>`<option value="${g.i}">${E(g.name)} (${g.n})</option>`).join('')}</select></div><div class="lm-mapbody lm-egypt-real"><svg id="hr-real-egypt-map" viewBox="0 0 540 500" role="img" aria-label="${T('خريطة محافظات مصر','Egypt governorates map')}"><text x="270" y="245" text-anchor="middle" fill="#8fdcff" font-size="17">${T('جار تحميل المحافظات','Loading governorates')}</text></svg><div class="lm-geo-tooltip" id="hr-geo-tooltip">${T('مرر المؤشر على المحافظة لمعرفة عدد الموظفين','Hover over a governorate to see employee count')} · ${mapped}/${total}</div></div>`;
- const world=`<div class="lm-mapbody lm-world-real"><img src="world-map.svg" alt="${T('خريطة العالم','World map')}" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><p class="lm-map-missing" hidden>${T('ملف world-map.svg غير موجود بجانب البورتال — ضعه بجانب index.html','world-map.svg is missing — place it beside index.html')}</p><div class="lm-geo-tooltip">${T('جميع الموظفين المسجلين في مصر؛ لا توجد بيانات توزيع دولي','Recorded employees are in Egypt; no international distribution available')}</div></div>`;
- const notifications=`<div class="lm-notifications"><div class="lm-notify-head"><strong id="lm-notification-count">—</strong><span id="lm-notification-label">${T('يلزم اتصال إدارة ESS لقراءة الطلبات المعلقة','Connect ESS admin to read pending requests')}</span></div><div class="lm-notify-list" id="lm-notification-list" aria-live="polite"></div><button type="button" onclick="showHRPage('notifications')">${T('عرض جميع الطلبات','View all requests')} ↗</button></div>`;
- root.innerHTML=`<div class="lm-board"><div class="lm-row lm-top">${stat('إجمالي الموظفين','Total Employees',total,T('موظف','Employees'),'users')}${stat('عدد الإدارات','Total Departments',departments.length,T('إدارة','Departments'),'building')}${stat('متوسط سنوات الخدمة','Average Service Years',avgTenure,T('سنة','Years'),'clock')}${stat('متوسط العمر','Average Age',avgAge,T('سنة','Years'),'users')}<section class="lm-card lm-attendance"><div class="lm-heading">${T('معدل الحضور العام','Attendance Rate')}<small>Attendance Rate</small></div><div class="lm-blank">${T('بانتظار ربط بيانات الحضور الفعلية','Awaiting verified attendance data')}</div></section></div><div class="lm-row lm-middle">${card('توزيع الموظفين حسب النوع','Employees by Gender',gender)}${card('توزيع الموظفين حسب الإدارات','Employees by Departments',org)}${card('التوزيع الجغرافي (العالم)','Employees by Country',world)}${card('التوزيع الجغرافي في مصر','Employees in Egypt',egypt)}</div><div class="lm-row lm-charts">${card('عدد الموظفين حسب الإدارات','Employees by Department',bar(departments))}${card('تطور عدد الموظفين','Employees Trend',trend)}${card('المؤهلات العلمية','Qualifications',qualificationGauge)}</div><div class="lm-row lm-bottom">${card('حالة التأمين','Insurance Status',ring(insurance,insurance.reduce((s,x)=>s+x[1],0)))}${card('الحالة الاجتماعية','Marital Status',ring(marital,marital.reduce((s,x)=>s+x[1],0)))}${card('سنوات الخدمة','Years of Service',bar(serviceBins,7))}${card('ملخص الإشعارات والطلبات','Requests & Notifications',notifications)}</div><div class="lm-note">${T('جميع الأرقام من بيانات الموظفين الحالية؛ الخرائط توضيحية وتظهر المحافظات المسجلة فقط.','All counts from current employee records; maps are illustrative and governorate markers use recorded values only.')}</div></div>`;
- if(typeof hrRenderGeographicEgypt==='function')hrRenderGeographicEgypt(governorates.map(g=>g.n));
- lmRefreshNotificationUI();
-}
+<!-- Mass Hiring: isolated employee-only workspace; no dashboard markup changed. -->
+<div id="lm-mass-workspace" class="hidden fahd-create-workspace" role="dialog" aria-modal="true" aria-labelledby="lm-mass-title">
+ <div class="fahd-create-top"><div><small>LACTO MISR · EMPLOYEE 360°</small><h2 id="lm-mass-title">Mass Hiring · التعيين الجماعي</h2><p id="lm-mass-subtitle">مراجعة كاملة قبل إنشاء أي موظف · Preview before writing</p></div><button type="button" onclick="lmCloseMassHiring()">✕ &nbsp; إغلاق / Close</button></div>
+ <div class="lm-mass-body">
+  <div class="lm-mass-toolbar"><button type="button" class="portal-action-btn" onclick="lmDownloadHiringTemplate()">↓ Excel Template · تنزيل القالب</button><label class="lm-mass-file-label">↑ Excel / CSV · رفع الملف<input type="file" id="lm-mass-file" accept=".xlsx,.xls,.csv" onchange="lmReadMassHiring(this)"></label><span id="lm-mass-filename"></span></div>
+  <p class="lm-mass-hint" id="lm-mass-hint">القالب يستخدم أسماء الحقول الفعلية من Firebase. يتم إنشاء موظفين جدد فقط؛ لا استبدال ولا تعديل للسجلات الموجودة. راجع المعاينة أولًا.</p>
+  <div id="lm-mass-summary" class="lm-mass-summary">حمّل القالب واملأ بيانات الموظفين، ثم ارفع الملف للمعاينة.</div>
+  <div id="lm-mass-errors" class="lm-mass-errors" role="alert"></div>
+  <div id="lm-mass-preview" class="lm-mass-preview"></div>
+  <div id="lm-mass-progress" role="status" aria-live="polite"></div>
+ </div>
+ <div class="fahd-create-footer"><span id="lm-mass-status"></span><button type="button" onclick="lmCloseMassHiring()">إغلاق / Close</button><button type="button" id="lm-mass-commit" class="portal-action-btn" disabled onclick="lmCommitMassHiring()">تأكيد إنشاء الموظفين · Confirm import</button></div>
+</div>
 
-// Read-only ESS pending request badge; no new Firebase writes or authentication bypass.
-let lmEssBadgeRefs=[];let lmEssBadgeValues={};let lmEssBadgeErrors=new Set();
-function lmPendingStatus(path,req){const s=String(req?.verificationStatus??req?.status??'').toUpperCase();return path==='attendance_requests'?(s==='PENDING_REVIEW'||s==='HELD'):(s==='PENDING'||s==='PENDING_REVIEW');}
-function lmRefreshNotificationUI(){
- const connected=typeof essPilotReady==='function'&&essPilotReady();
- const badge=document.getElementById('lm-header-badge'),count=document.getElementById('lm-notification-count'),label=document.getElementById('lm-notification-label'),list=document.getElementById('lm-notification-list');
- if(!connected){if(badge)badge.hidden=true;if(count)count.textContent='—';if(label)label.textContent=hrText('اتصل بإدارة ESS لعرض الطلبات','Connect ESS admin to view requests');if(list)list.textContent='';return;}
- const pending=[];
- for(const [path,ar,en] of essPaths){
-  const byCode=lmEssBadgeValues[path]||{};
-  for(const [code,requests] of Object.entries(byCode)){
-   if(!requests||typeof requests!=='object')continue;
-   for(const [id,req] of Object.entries(requests)){
-    if(!req||typeof req!=='object'||!lmPendingStatus(path,req))continue;
-    pending.push({path,code,id,req,type:hrText(ar,en),time:Number(req.timestamp||req.createdAt||0)});
-   }
-  }
- }
- pending.sort((a,b)=>b.time-a.time);
- const total=pending.length;
- if(badge){badge.hidden=total===0;badge.textContent=total>99?'99+':String(total);}
- if(count)count.textContent=lmEssBadgeErrors.size?'—':String(total);
- if(label)label.textContent=lmEssBadgeErrors.size?hrText('تعذر قراءة بعض مصادر الطلبات','Some request sources unavailable'):hrText('طلبات معلقة للمراجعة','Pending requests for review');
- if(list){
-  if(lmEssBadgeErrors.size){list.innerHTML=`<div class="lm-notify-empty">${hrText('الملخص غير مكتمل: تعذر قراءة بعض المسارات','Summary incomplete: some sources could not be read')}</div>`;}
-  else if(!total){list.innerHTML=`<div class="lm-notify-empty">${hrText('لا توجد طلبات معلقة حاليًا','No pending requests right now')}</div>`;}
-  else list.innerHTML=pending.slice(0,4).map(r=>{
-   const employee=(allEmployees||[]).find(e=>String(getEmployeeCode(e))===String(r.code));
-   const nameAr=employee?lmArabicField(employee,'اسم الموظف','الاسم بالعربية','الاسم','employee_name_ar','name_ar'):'';
-   const nameEn=employee?lmEnglishField(employee,'emp_name _en','employee_name_en','name_en','english name','full_name_en','full name en'):'';
-   const preferred=currentLang==='en'?nameEn:nameAr;
-   const displayName=preferred||hrText('موظف','Employee')+' '+r.code;
-   const rawPhoto=employee?getField(employee,'photoUrl','photo','رابط الصورة','الصورة'):'';
-   // Only trusted image schemes; employee data is rendered as escaped text/attributes.
-   const photo=typeof rawPhoto==='string'&&/^(https:\/\/|data:image\/(?:png|jpeg|webp);base64,)/i.test(rawPhoto.trim())?rawPhoto.trim():'';
-   const avatar=photo?`<img class="lm-notify-avatar" src="${essEscape(photo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="lm-notify-avatar-fallback" hidden aria-hidden="true">♙</span>`:`<span class="lm-notify-avatar-fallback" aria-hidden="true">♙</span>`;
-   return `<button type="button" class="lm-notify-item" onclick="showHRPage('notifications')" title="${essEscape(r.type)} — ${essEscape(displayName)}"><span class="lm-notify-person">${avatar}</span><span class="lm-notify-info"><b class="lm-notify-who" dir="auto">${essEscape(displayName)}</b><small class="lm-notify-type">${essEscape(r.type)}</small></span><span class="lm-notify-pending" title="${hrText('بانتظار المراجعة','Pending review')}">●</span></button>`;
-  }).join('')+(total>4?`<div class="lm-notify-more">+${total-4} ${hrText('طلبات أخرى','more requests')}</div>`:'');
- }
-}
-function lmStartESSBadge(){
- lmEssBadgeRefs.forEach(([ref,cb])=>ref.off('value',cb));lmEssBadgeRefs=[];lmEssBadgeValues={};lmEssBadgeErrors.clear();
- if(typeof essPilotReady!=='function'||!essPilotReady()){lmRefreshNotificationUI();return;}
- for(const [path] of essPaths){const ref=essDb.ref(path);const cb=s=>{lmEssBadgeValues[path]=s.val()||{};lmEssBadgeErrors.delete(path);lmRefreshNotificationUI()};ref.on('value',cb,()=>{lmEssBadgeErrors.add(path);lmRefreshNotificationUI()});lmEssBadgeRefs.push([ref,cb]);}
-}
-essAuth.onAuthStateChanged(()=>lmStartESSBadge());
+    <!-- Add Custom Field Modal -->
+    <div id="custom-field-modal" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
+        <div class="glass-card p-6 rounded-3xl w-full max-w-md border border-sky-500/35 shadow-2xl">
+            <div class="flex items-center justify-between mb-5">
+                <h3 class="text-lg font-extrabold text-white" data-translate="custom_field_title">إضافة خانة إضافية</h3>
+                <button onclick="closeAddCustomFieldModal()" class="portal-ghost-btn w-9 h-9 rounded-full">✕</button>
+            </div>
+            <label class="text-xs text-slate-400" data-translate="field_name_label">اسم الخانة</label>
+            <input id="custom-field-name" list="hr-field-suggestions" class="w-full mt-1 px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-white" placeholder="مثال: الرقم التأميني">
+            <datalist id="hr-field-suggestions"><option value="address"><option value="governorate"><option value="phone"><option value="emergency_contact"><option value="national_id"></datalist>
+            <p class="text-xs text-slate-400 mt-2" data-ar="استخدم مفتاح ثابت بالإنجليزية (مثال: address). الاسم العربي والإنجليزي للعرض فقط." data-en="Use a stable English key (e.g. address). Labels are only for display.">استخدم مفتاح ثابت بالإنجليزية (مثال: address).</p>
+            <label class="text-xs text-slate-400 block mt-4" data-translate="field_value_label">القيمة</label>
+            <input id="custom-field-value" class="w-full mt-1 px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-white" placeholder="القيمة">
+            <div id="custom-field-error" class="min-h-5 text-center text-xs text-red-400 mt-3"></div>
+            <div class="flex justify-end gap-2 mt-4">
+                <button onclick="closeAddCustomFieldModal()" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300" data-translate="cancel_btn">إلغاء</button>
+                <button onclick="saveCustomField()" class="portal-action-btn px-5 py-2 rounded-xl text-xs font-bold" data-translate="save_btn">حفظ</button>
+            </div>
+        </div>
+    </div>
 
-function lmEnglishField(emp,...keys){
- const norm=s=>String(s).trim().toLowerCase().replace(/\s+/g,' ').replace(/[_-]+/g,' ');
- for(const key of keys){const match=Object.entries(emp||{}).find(([k,v])=>norm(k)===norm(key)&&String(v??'').trim());if(match)return String(match[1]).trim();}
- return '';
-}
-function lmArabicField(emp,...keys){
- for(const key of keys){const match=Object.entries(emp||{}).find(([k,v])=>k.trim()===key.trim()&&String(v??'').trim());if(match)return String(match[1]).trim();}
- return '';
-}
-function lmUpdateHeaderIdentity(){
- const emp=(allEmployees||[]).find(e=>String(getEmployeeCode(e))===String(currentUserData?.code||PORTAL_ADMIN_CODE));
- const name=document.getElementById('lm-header-name'),job=document.getElementById('lm-header-job'),photo=document.getElementById('lm-header-photo'),flag=document.getElementById('lm-role-flag');
- if(name){const record=emp||currentUserData||{};name.textContent=(currentLang==='en'?(lmEnglishField(record,'emp_name _en','employee_name_en','name_en','english name','full_name_en','full name en','الاسم بالإنجليزي')||lmEnglishField(currentUserData||{},'name_en','english_name')):(lmArabicField(record,'اسم الموظف','الاسم بالعربية','الاسم','employee_name_ar','name_ar')||lmArabicField(currentUserData||{},'name_ar')))|| (emp?getEmployeeName(emp):hrText('مسؤول النظام','System Admin'));name.dir=currentLang==='ar'?'rtl':'ltr';}
- if(job)job.textContent=emp?(currentLang==='en'?(lmEnglishField(emp,'job title ','job_title_en','jobTitleEn','jobTitle')||'—'):(lmArabicField(emp,'الوظيفة','المسمى الوظيفي')||getEmployeeJob(emp))):hrText('مدير النظام','System Administrator');
- const url=emp?getField(emp,'photoUrl','photo','الصورة','رابط الصورة'):'';
- if(photo){if(typeof url==='string'&&(/^(https:\/\/|data:image\/(png|jpeg|webp);base64,)/i).test(url)){photo.src=url;photo.hidden=false;photo.parentElement?.classList.add('has-photo')}else{photo.hidden=true;photo.parentElement?.classList.remove('has-photo');}}
- // Flag represents server-verified Portal role only. No client-controlled privilege escalation.
- if(flag){flag.style.color=portalIsAdmin()?'#ff4268':'#3aa8ff';flag.title=portalIsAdmin()?hrText('صلاحية مدير النظام','System administrator role'):hrText('صلاحية المستخدم','User role');}
-}
+    <!-- Forgot Password Modal -->
+    <div id="forgot-pass-modal" class="hidden fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
+        <div class="glass-card p-6 rounded-3xl w-full max-w-md border border-sky-500/35 shadow-2xl">
+            <div class="flex items-center justify-between mb-5">
+                <div>
+                    <h3 class="text-lg font-extrabold text-white" data-translate="forgot_title">استعادة كلمة المرور</h3>
+                    <p class="text-xs text-slate-400 mt-1" data-translate="forgot_hint">سيتم إرسال رابط إعادة تعيين كلمة المرور إلى بريد الإدارة.</p>
+                </div>
+                <button onclick="closeForgotPassModal()" class="portal-ghost-btn w-9 h-9 rounded-full">✕</button>
+            </div>
+            <div class="space-y-3">
+                <input id="forgot-emp-code" class="w-full px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-white" data-translate-placeholder="forgot_code_placeholder" placeholder="كود الموظف">
+                <input id="forgot-email" type="email" style="display:none" class="w-full px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-white" data-translate-placeholder="forgot_email_placeholder" placeholder="البريد الإلكتروني (يُطلب فقط إذا لم يكن مسجلاً)">
+                <div id="forgot-code-step" class="hidden space-y-3" style="display:none!important">
+                    <input id="forgot-verification-code" inputmode="numeric" maxlength="6" class="w-full px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-white text-center tracking-[.5em]" data-translate-placeholder="verification_placeholder" placeholder="رمز التحقق">
+                    <input id="forgot-new-password" type="password" class="w-full px-4 py-3 bg-slate-950/70 border border-sky-500/30 rounded-xl text-sm text-white" data-translate-placeholder="new_password_placeholder" placeholder="كلمة المرور الجديدة">
+                    <button onclick="verifyAndResetPassword()" class="portal-action-btn w-full py-3 rounded-xl text-xs font-bold" data-translate="verify_reset_btn">تحقق وتغيير كلمة المرور</button>
+                </div>
+                <button id="forgot-send-btn" onclick="sendPasswordVerificationCode()" class="portal-action-btn w-full py-3 rounded-xl text-xs font-bold" data-translate="send_code_btn">إرسال رابط إعادة تعيين كلمة المرور</button>
+                <div id="forgot-message" class="min-h-5 text-center text-xs font-bold"></div>
+                <p class="text-[10px] text-slate-500 text-center" data-translate="forgot_email_note">يجب تفعيل خدمة البريد في Firebase (Trigger Email/Cloud Function) لكي يصل الرمز فعلياً إلى البريد.</p>
+            </div>
+        </div>
+    </div>
 
-// Read-only governorate slicer: highlights an existing map feature, never edits records.
-function lmFilterGovernorate(value){
- const svg=document.getElementById('hr-real-egypt-map');if(!svg)return;
- const idx=value===''?-1:Number(value);const selected=idx<0?'':hrNormalize(currentLang==='ar'?hrGovernorates[idx]?.[1]:hrGovernorates[idx]?.[0]);
- let count=0;svg.querySelectorAll('.hr-egypt-region').forEach(path=>{
-  const match=idx<0||hrGovIndex(path.dataset.geoName)===idx;path.style.opacity=match?'1':'.14';
-  if(idx>=0&&match)count=Number(path.dataset.geoCount||0);
- });
- const label=document.getElementById('hr-geo-tooltip');
- if(label&&idx>=0)label.textContent=(currentLang==='ar'?hrGovernorates[idx][1]:hrGovernorates[idx][0])+' — '+count+' '+hrText('موظف','employees');
- if(label&&idx<0)label.textContent=hrText('اختر محافظة أو مرر المؤشر لعرض عدد الموظفين','Select or hover over a governorate to view employee count');
-}
+    <!-- نافذة تأكيد الحفظ (Modal) بنفس تصميم السايت بدون ألوان فرح -->
+    <div id="confirm-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+        <div class="glass-card p-6 rounded-2xl max-w-sm w-full border border-sky-500/30 text-center space-y-4">
+            <h3 id="confirm-title" class="text-lg font-bold text-white">هل ترغب في حفظ التعديلات؟</h3>
+            <div class="flex justify-center gap-3 pt-2">
+                <button onclick="executeSave()" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-xs transition" data-translate="yes_btn">نعم</button>
+                <button onclick="closeConfirmModal()" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition" data-translate="cancel_btn">إلغاء</button>
+            </div>
+        </div>
+    </div>
 
-// Dashboard-only, read-only qualification slicer. No data writes.
-function lmUpdateQualGauge(value){
- const pct=document.getElementById('lm-speed-pct'),count=document.getElementById('lm-speed-count'),needle=document.getElementById('lm-speed-needle'),arc=document.getElementById('lm-speed-arc');
- if(!pct||!count||!needle||!arc)return;
- const row=value===''?null:(window.lmQualChoices||[])[Number(value)];
- const n=row?row[1]:0,percent=row&&window.lmQualKnown?Math.min(100,Math.max(0,Math.round(n/window.lmQualKnown*100))):0;
- pct.textContent=percent+'%';count.textContent=row?(n+' '+(currentLang==='ar'?'موظف':'employees')):(currentLang==='ar'?'اختر مؤهلًا':'Select a qualification');
- const a=Math.PI*(1-percent/100);
- needle.style.transform='rotate('+(180*percent/100).toFixed(2)+'deg)';
- arc.style.strokeDashoffset=String(314.159*(1-percent/100));
- const meter=pct.closest('[role="meter"]');if(meter)meter.setAttribute('aria-valuenow',String(percent));
-}
+    <!-- Toast Notification (رسالة اتمام الحفظ الشيك) -->
+    <div id="toast-notification" class="fixed bottom-6 left-6 md:left-6 z-50 transform translate-y-32 opacity-0 transition-all duration-300 glass-card px-6 py-3 rounded-2xl border border-sky-500/40 shadow-2xl flex items-center gap-3">
+        <span class="text-sky-400 text-lg">✓</span>
+        <span id="toast-message" class="text-sm font-bold text-white">تم الحفظ بنجاح</span>
+    </div>
 
 
-/* Lacto Misr date picker: presentation-only; input values remain YYYY-MM-DD */
-(function(){
- let active=null;
- const iso=v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?String(v):'';
- function dateCandidate(key){return /(?:تاريخ|date|dob|birth|hire|joining|expiry|expiration)/i.test(key)&&!/(?:تاريخ.*(رقم|عدد)|update|created|modified|timestamp)/i.test(key);}
- function close(){if(active){active.remove();active=null;}}
- function show(input){
-  if(input.disabled||input.readOnly)return;
-  close();const pop=document.createElement('div');pop.className='lm-date-pop';pop.dir=typeof currentLang!=='undefined'&&currentLang==='en'?'ltr':'rtl';pop.setAttribute('role','dialog');pop.setAttribute('aria-label',pop.dir==='rtl'?'اختيار التاريخ':'Choose date');
-  const chosen=iso(input.value);const now=new Date();let year=chosen?+chosen.slice(0,4):now.getFullYear(),month=chosen?+chosen.slice(5,7)-1:now.getMonth();
-  const ar=pop.dir==='rtl';const months=ar?['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']:['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const week=ar?['ح','ن','ث','ر','خ','ج','س']:['Su','Mo','Tu','We','Th','Fr','Sa'];
-  function draw(){pop.replaceChildren();const top=document.createElement('div');top.className='lm-date-top';
-   const prev=document.createElement('button');prev.type='button';prev.textContent='‹';prev.setAttribute('aria-label',ar?'الشهر السابق':'Previous month');prev.onclick=()=>{month--;if(month<0){month=11;year--;}draw();};
-   const next=document.createElement('button');next.type='button';next.textContent='›';next.setAttribute('aria-label',ar?'الشهر التالي':'Next month');next.onclick=()=>{month++;if(month>11){month=0;year++;}draw();};
-   const m=document.createElement('select');months.forEach((name,i)=>{const o=document.createElement('option');o.value=i;o.textContent=name;o.selected=i===month;m.append(o);});m.onchange=()=>{month=+m.value;draw();};
-   const y=document.createElement('select');for(let n=1900;n<=2100;n++){const o=document.createElement('option');o.value=n;o.textContent=n;o.selected=n===year;y.append(o);}y.onchange=()=>{year=+y.value;draw();};
-   top.append(prev,m,y,next);pop.append(top);
-   const grid=document.createElement('div');grid.className='lm-date-grid';week.forEach(w=>{const el=document.createElement('span');el.className='lm-date-weekday';el.textContent=w;grid.append(el);});
-   const first=new Date(year,month,1).getDay(),total=new Date(year,month+1,0).getDate();for(let i=0;i<first;i++)grid.append(document.createElement('span'));
-   for(let day=1;day<=total;day++){const b=document.createElement('button');b.type='button';b.className='lm-date-day';b.textContent=day;const val=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;if(val===chosen)b.classList.add('is-selected');if(year===now.getFullYear()&&month===now.getMonth()&&day===now.getDate())b.classList.add('is-today');b.onclick=()=>{input.value=val;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));close();};grid.append(b);}pop.append(grid);
-   const footer=document.createElement('div');footer.className='lm-date-footer';const today=document.createElement('button');today.type='button';today.textContent=ar?'اليوم':'Today';today.onclick=()=>{const d=new Date(),v=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;input.value=v;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));close();};const clear=document.createElement('button');clear.type='button';clear.textContent=ar?'مسح':'Clear';clear.onclick=()=>{input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));close();};footer.append(clear,today);pop.append(footer);
-  }
-  draw();document.body.append(pop);active=pop;const r=input.getBoundingClientRect();let left=Math.min(Math.max(12,r.left),window.innerWidth-pop.offsetWidth-12),top=r.bottom+6;if(top+pop.offsetHeight>window.innerHeight-8)top=Math.max(8,r.top-pop.offsetHeight-6);pop.style.left=left+'px';pop.style.top=top+'px';
- }
- function attach(input){if(input.dataset.lmDateReady)return;const key=input.dataset.fahdKey||input.name||input.id||'';if(input.type!=='date'&&!(input.closest('#fahd-fields')&&dateCandidate(key)))return;
-  // Do not change the type of legacy profile fields: they may hold Excel serials or display strings.
-  if(input.type!=='date'&&input.value&&!iso(input.value))return;
-  input.dataset.lmDateReady='1';const wrap=document.createElement('span');wrap.className='lm-date-shell';input.parentNode.insertBefore(wrap,input);wrap.append(input);const btn=document.createElement('button');btn.type='button';btn.className='lm-date-trigger';btn.textContent='▦';btn.setAttribute('aria-label','Choose date / اختيار التاريخ');btn.onclick=()=>show(input);wrap.append(btn);
-  if(input.type==='date')input.addEventListener('click',e=>{if(e.target===input){e.preventDefault();show(input);}});
- }
- function scan(){document.querySelectorAll('input[type="date"],#fahd-fields input[data-fahd-key]').forEach(attach);}
- document.addEventListener('click',e=>{if(active&&!active.contains(e.target)&&!e.target.closest('.lm-date-trigger')&&!e.target.closest('.lm-date-shell>input'))close();},true);
- document.addEventListener('keydown',e=>{if(e.key==='Escape')close();});window.addEventListener('resize',close);window.addEventListener('scroll',close,true);
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{scan();new MutationObserver(scan).observe(document.body,{childList:true,subtree:true});});else{scan();new MutationObserver(scan).observe(document.body,{childList:true,subtree:true});}
-})();
+    <!-- Independent startup recovery: never leave the portal trapped behind intro -->
+    <script>
+    (function () {
+      function recoverIntro() {
+        var intro = document.getElementById('intro-screen');
+        if (intro && !intro.classList.contains('fade-out')) {
+          intro.classList.add('fade-out');
+          intro.style.pointerEvents = 'none';
+          intro.style.visibility = 'hidden';
+        }
+        var brand = document.getElementById('login-brand');
+        var panel = document.getElementById('login-panel');
+        if (brand) brand.classList.add('intro-ready', 'compact');
+        if (panel) panel.classList.add('visible', 'compact-mode');
+      }
+      window.addEventListener('load', function () { setTimeout(recoverIntro, 11500); });
+      document.addEventListener('DOMContentLoaded', function () {
+        setTimeout(recoverIntro, 13000);
+      });
+      window.addEventListener('error', function (event) {
+        if (event.target && event.target.tagName === 'SCRIPT') recoverIntro();
+      }, true);
+    }());
+    </script>
 
+    <!-- ربط ملف الـ JS -->
+    <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+    <script src="app.js?v=20261028-avatars-1"></script>
+    
+<div id="fahd-dialog" class="fahd-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="fahd-dialog-title"><div class="fahd-dialog-card"><h3 id="fahd-dialog-title"></h3><p id="fahd-dialog-message"></p><div id="fahd-dialog-inputs"></div><div class="fahd-dialog-actions"><button type="button" id="fahd-dialog-no">إلغاء</button><button type="button" id="fahd-dialog-yes">تأكيد</button></div></div></div></body>
+</html>
+<style id="lm-pending-summary-only">
+#hr-dashboard-view .lm-notifications{height:140px}
 
-// MASS HIRING phase 1: employee-only, schema-aligned, create-only with row-level audit.
-const lmMass={rows:[],errors:[],file:'',busy:false,valid:false};
-const lmMassReserved=new Set(['password','authUid','photo','photoUrl','_firebasePath','_firebaseKey','hr_custom_fields']);
-function lmMassMessage(ar,en){return currentLang==='ar'?ar:en;}
-function lmMassCode(x){const s=String(x??'').trim();return /^\d{1,12}$/.test(s)?s:'';}
-function lmMassSchema(){
- const fields=new Set(['code','الكود','اسم الموظف ','emp_name _en']);
- // Preserve actual Firebase keys including trailing spaces; never guess translations.
- for(const emp of allEmployees)for(const k of Object.keys(emp))if(!k.startsWith('_')&&!lmMassReserved.has(k)&&typeof emp[k]!=='object')fields.add(k);
- for(const [, , ,ar,en] of FAHD_PAIRS) {fields.add(ar);fields.add(en);}
- for(const [, , ,ar,en] of FAHD_COMMON){fields.add(ar);fields.add(en);}
- return ['code',...Array.from(fields).filter(k=>k!=='code'&&k!=='الكود'),...Object.keys(lmCustomFieldDefinitions).filter(k=>/^cf_[a-z0-9_]{1,50}$/.test(k)).flatMap(k=>['hr_custom_fields/'+k+'/valueAr','hr_custom_fields/'+k+'/valueEn'])];
-}
-function lmOpenMassHiring(){
- if(!portalIsAdmin()){showToast(lmMassMessage('هذه العملية تتطلب حساب الإدارة','Admin account required'),true);return;}
- document.getElementById('lm-mass-workspace')?.classList.remove('hidden');
- document.getElementById('lm-mass-hint').textContent=lmMassMessage('القالب يستخدم مفاتيح Firebase الفعلية. كل صف يمثل موظفًا جديدًا. لا استبدال ولا تعديل للسجلات الحالية.','Template uses actual Firebase field keys. Each row is a new employee. Existing records are never replaced or edited.');
-}
-function lmCloseMassHiring(){if(lmMass.busy)return;document.getElementById('lm-mass-workspace')?.classList.add('hidden');}
-function lmMassSafeText(id,value){const el=document.getElementById(id);if(el)el.textContent=value;}
-function lmDownloadHiringTemplate(){
- if(!window.XLSX){lmMassSafeText('lm-mass-errors','Excel library unavailable');return;}
- const keys=lmMassSchema();
- const sheet=XLSX.utils.aoa_to_sheet([keys]);sheet['!cols']=keys.map(k=>({wch:Math.min(38,Math.max(15,k.length+5))}));
- const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,sheet,'Employees');
- const defs=Object.entries(lmCustomFieldDefinitions).filter(([k])=>/^cf_[a-z0-9_]{1,50}$/.test(k));
- if(defs.length){const help=[['Field Key','Arabic label','English label'],...defs.map(([k,v])=>[k,v.labelAr||'',v.labelEn||''])];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(help),'Custom Fields Guide');}
- XLSX.writeFile(wb,'LactoMisr_Mass_Hiring_Template.xlsx');
-}
-function lmMassNormalized(s){return String(s??'').trim().replace(/\s+/g,' ').toLowerCase();}
-function lmMassDate(v){
- if(typeof v==='number'&&window.XLSX){const d=XLSX.SSF.parse_date_code(v);return d?`${d.d}/${d.m}/${d.y}`:String(v);}
- if(v instanceof Date&&!Number.isNaN(v.getTime()))return `${v.getDate()}/${v.getMonth()+1}/${v.getFullYear()}`;
- return String(v??'').trim();
-}
-function lmMassRows(raw,keys){
- const normKeys=new Map();keys.forEach(k=>{const n=lmMassNormalized(k);if(!normKeys.has(n))normKeys.set(n,[]);normKeys.get(n).push(k);});
- const issues=[];for(const [n,list] of normKeys)if(list.length>1)issues.push('Ambiguous duplicate columns: '+list.join(' / '));
- const allowed=lmMassSchema(),schema=new Map();for(const k of allowed){const n=lmMassNormalized(k);if(!schema.has(n))schema.set(n,[]);schema.get(n).push(k);}
- const mapping={};for(const header of keys){const n=lmMassNormalized(header);if(!n)continue;
-  if(n==='الكود'||n==='code'){mapping[header]='code';continue;}
-  if(/^hr_custom_fields\/(cf_[a-z0-9_]{1,50})\/(valueAr|valueEn)$/.test(header)){
-   const match=header.match(/^hr_custom_fields\/(cf_[a-z0-9_]{1,50})\/(valueAr|valueEn)$/);
-   if(Object.hasOwn(lmCustomFieldDefinitions,match[1]))mapping[header]=header;else issues.push('Unknown custom field: '+header);
-   continue;
-  }
-  if(lmMassReserved.has(header)||header.startsWith('_')){issues.push('Protected column: '+header);continue;}
-  const matches=schema.get(n)||[];if(matches.length===1)mapping[header]=matches[0];else if(matches.length>1)issues.push('Ambiguous field: '+header);else issues.push('Unknown column: '+header);
- }
- const codes=new Set(allEmployees.map(e=>lmMassCode(getEmployeeCode(e))));const seen=new Set();const parsed=[];
- raw.forEach((row,i)=>{const data={};const rowIssues=[];
-  for(const [h,k] of Object.entries(mapping)){let v=row[h];if(v===null||v===undefined||v==='')continue;v=/تاريخ|date|dob/i.test(k)?lmMassDate(v):String(v).trim();if(!v)continue;
-   if(k.startsWith('hr_custom_fields/')){const [,field,prop]=k.split('/');data.hr_custom_fields??={};data.hr_custom_fields[field]??={valueAr:'',valueEn:''};data.hr_custom_fields[field][prop]=v;}
-   else data[k]=v;
-  }
-  const code=lmMassCode(data.code);if(!code)rowIssues.push('Invalid numeric employee code');
-  if(code&&codes.has(code))rowIssues.push('Employee code already exists');
-  if(code&&seen.has(code))rowIssues.push('Duplicate employee code in file');
-  if(code)seen.add(code);
-  if(!data['اسم الموظف ']||!data['emp_name _en'])rowIssues.push('Arabic and English employee names are required');
-  if(code){data.code=code;data['الكود']=code;}
-  for(const k of Object.keys(lmCustomFieldDefinitions))if(/^cf_[a-z0-9_]{1,50}$/.test(k)){data.hr_custom_fields??={};data.hr_custom_fields[k]??={valueAr:'',valueEn:''};}
-  const age=fahdAge(data['تاريخ الميلاد']);if(age){data['السن حتى تاريخه ']=age;data['age to date']=age;}
-  parsed.push({line:i+2,code,data,issues:rowIssues});
- });
- return {parsed,issues,mapping};
-}
-async function lmReadMassHiring(input){
- const file=input.files?.[0];lmMass.valid=false;lmMass.rows=[];document.getElementById('lm-mass-commit').disabled=true;
- if(!file)return;if(!window.XLSX){lmMassSafeText('lm-mass-errors','Excel parser unavailable');return;}
- if(file.size>5*1024*1024){lmMassSafeText('lm-mass-errors','File exceeds 5 MB');return;}
- lmMassSafeText('lm-mass-filename',file.name);
- try{
-  const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false});const sheet=wb.Sheets[wb.SheetNames[0]];
-  const grid=XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:true,blankrows:false});
-  if(grid.length<2)throw Error('Sheet contains no employee rows');if(grid.length>501)throw Error('Maximum 500 employee rows per import');
-  const keys=grid[0].map(v=>String(v??''));if(keys.some(k=>!k.trim()))throw Error('Blank column header');
-  const records=grid.slice(1).filter(r=>r.some(v=>String(v??'').trim()!==''));
-  const rows=records.map(r=>Object.fromEntries(keys.map((k,i)=>[k,r[i]??''])));
-  const {parsed,issues}=lmMassRows(rows,keys);lmMass.rows=parsed;lmMass.errors=issues;lmMass.file=file.name;
-  const invalid=parsed.filter(r=>r.issues.length);lmMass.valid=issues.length===0&&invalid.length===0&&parsed.length>0;
-  lmMassSafeText('lm-mass-summary',`${lmMassMessage('إجمالي الصفوف','Total rows')}: ${parsed.length} · ${lmMassMessage('صالحة','Valid')}: ${parsed.length-invalid.length} · ${lmMassMessage('مرفوضة','Rejected')}: ${invalid.length} · ${lmMassMessage('أخطاء الأعمدة','Column issues')}: ${issues.length}`);
-  lmMassSafeText('lm-mass-errors',[...issues,...invalid.slice(0,25).map(r=>`Row ${r.line} (${r.code||'?'}): ${r.issues.join('; ')}`)].join('\n'));
-  const preview=parsed.slice(0,30);const cols=['code','اسم الموظف ','emp_name _en','الإدارة ','department ','الوظيفة','job title '];
-  const table=document.createElement('table'),thead=document.createElement('thead'),tr=document.createElement('tr');
-  for(const k of ['Row',...cols,'Status']){const th=document.createElement('th');th.textContent=k;tr.append(th);}thead.append(tr);table.append(thead);
-  const tbody=document.createElement('tbody');for(const row of preview){const t=document.createElement('tr');for(const v of [row.line,...cols.map(k=>row.data[k]||''),row.issues.length?row.issues.join('; '):'✓']){const td=document.createElement('td');td.textContent=v;t.append(td);}tbody.append(t);}table.append(tbody);
-  document.getElementById('lm-mass-preview').replaceChildren(table);
-  lmMassSafeText('lm-mass-status',lmMass.valid?lmMassMessage('جاهز للتأكيد بعد المراجعة','Ready for review and confirmation'):lmMassMessage('أصلح الأخطاء ثم أعد رفع الملف','Fix errors and upload again'));
-  document.getElementById('lm-mass-commit').disabled=!lmMass.valid;
- }catch(e){lmMassSafeText('lm-mass-errors',e.message);lmMassSafeText('lm-mass-status','');document.getElementById('lm-mass-preview').replaceChildren();}
-}
-async function lmCommitMassHiring(){
- if(!lmMass.valid||lmMass.busy||!portalIsAdmin())return;
- const rows=lmMass.rows;if(!confirm(lmMassMessage(`تأكيد إنشاء ${rows.length} موظف جديد؟ لن يتم تعديل أي سجل موجود.`,`Create ${rows.length} new employees? Existing records will not be changed.`)))return;
- lmMass.busy=true;document.getElementById('lm-mass-commit').disabled=true;
- const batchId=db.ref('hr_imports').push().key;let created=0,skipped=0;const failures=[],createdCodes=[];
- try{
-  // Fresh DB check: prevents using a stale employee list as an overwrite decision.
-  const latest=await db.ref(PORTAL_EMPLOYEE_COLLECTION).once('value');const present=new Set(Object.keys(latest.val()||{}));
-  for(const row of rows){
-   if(present.has(row.code)){skipped++;failures.push(row.code+': already exists');continue;}
-   try{
-    // Firebase transaction commits only if no employee record exists at this exact key.
-    const ref=db.ref(PORTAL_EMPLOYEE_COLLECTION+'/'+row.code);
-    const result=await ref.transaction(old=>old===null?row.data:undefined,undefined,false);
-    if(!result.committed){skipped++;failures.push(row.code+': record created concurrently');continue;}
-    present.add(row.code);created++;createdCodes.push(row.code);
-    allEmployees.push({...row.data,_firebasePath:PORTAL_EMPLOYEE_COLLECTION+'/'+row.code,_firebaseKey:row.code});
-   }catch(e){failures.push(row.code+': '+e.message);}
-   lmMassSafeText('lm-mass-progress',`${lmMassMessage('تم إنشاء','Created')}: ${created} / ${rows.length} · ${lmMassMessage('تجاوز','Skipped')}: ${skipped}`);
-  }
-  try{await db.ref('hr_imports/'+batchId).set({type:'MASS_HIRING',actorUid:portalAuth.currentUser?.uid||'',createdAt:firebase.database.ServerValue.TIMESTAMP,filename:lmMass.file,requestedCount:rows.length,createdCount:created,skippedCount:skipped,errorCount:failures.length,createdCodes,errors:failures.slice(0,100)});}catch(e){failures.push('Audit log: '+e.message);}
-  renderTable(allEmployees);updateDashboardStats();
-  lmMassSafeText('lm-mass-status',`${lmMassMessage('تم إنشاء','Created')} ${created} · ${lmMassMessage('تجاوز','Skipped')} ${skipped} · ${lmMassMessage('أخطاء','Errors')} ${failures.length}`);
-  lmMassSafeText('lm-mass-errors',failures.join('\n'));
-  lmMass.valid=false;
- }catch(e){lmMassSafeText('lm-mass-errors','Import failed: '+e.message);}
- finally{lmMass.busy=false;lmMassSafeText('lm-mass-progress','');}
-}
+#hr-dashboard-view .lm-notifications{height:140px;min-height:0;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:4px;text-align:start;overflow:hidden}
+#hr-dashboard-view .lm-notify-head{display:flex;align-items:baseline;justify-content:center;gap:9px;min-height:25px}
+#hr-dashboard-view .lm-notify-head strong{font:700 25px Arial;color:#2fe2ff}
+#hr-dashboard-view .lm-notify-head span{font-size:10px;color:#c0dbf5}
+#hr-dashboard-view .lm-notify-list{flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#2377a5 transparent}
+#hr-dashboard-view .lm-notify-item{display:grid;grid-template-columns:1fr 1.3fr auto;align-items:center;gap:5px;width:100%;background:transparent;border:0;border-bottom:1px solid #204567;color:#d4efff;padding:4px 2px;font-size:10px;text-align:start;cursor:pointer}
+#hr-dashboard-view .lm-notify-item:hover{background:#123b68}
+#hr-dashboard-view .lm-notify-type{color:#5fd9ff;font-weight:bold;white-space:nowrap}
+#hr-dashboard-view .lm-notify-who{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#hr-dashboard-view .lm-notify-item time{font-size:9px;color:#9ab9d3;white-space:nowrap}
+#hr-dashboard-view .lm-notify-empty,#hr-dashboard-view .lm-notify-more{font-size:10px;color:#a8c6dd;text-align:center;padding:8px 0}
+#hr-dashboard-view .lm-notifications>button{flex:none;align-self:center;font-size:10px;padding:3px 9px}
+/* Request summary: employee photo, localized name, and request type. */
+#hr-dashboard-view .lm-notify-item{display:flex;align-items:center;gap:8px;min-height:38px;padding:3px 5px;text-align:start;direction:inherit}
+#hr-dashboard-view .lm-notify-person{flex:0 0 30px;width:30px;height:30px;border-radius:50%;overflow:hidden;border:1px solid #2a8dbb;background:#123455;display:grid;place-items:center}
+#hr-dashboard-view .lm-notify-avatar{width:100%;height:100%;object-fit:cover;display:block}
+#hr-dashboard-view .lm-notify-avatar[hidden],#hr-dashboard-view .lm-notify-avatar-fallback[hidden]{display:none}
+#hr-dashboard-view .lm-notify-avatar-fallback{font-size:19px;line-height:1;color:#73c9ff}
+#hr-dashboard-view .lm-notify-info{display:flex;flex:1;min-width:0;flex-direction:column;gap:2px;line-height:1.15}
+#hr-dashboard-view .lm-notify-who{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:700;color:#eaf8ff}
+#hr-dashboard-view .lm-notify-type{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px;font-weight:400;color:#60d9ff}
+#hr-dashboard-view .lm-notify-pending{flex:0 0 auto;color:#ffbd58;font-size:13px}
+
+</style>
