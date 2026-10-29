@@ -1933,3 +1933,125 @@ function lmUpdateQualGauge(value){
  document.addEventListener('keydown',e=>{if(e.key==='Escape')close();});window.addEventListener('resize',close);window.addEventListener('scroll',close,true);
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{scan();new MutationObserver(scan).observe(document.body,{childList:true,subtree:true});});else{scan();new MutationObserver(scan).observe(document.body,{childList:true,subtree:true});}
 })();
+
+
+// MASS HIRING phase 1: employee-only, schema-aligned, create-only with row-level audit.
+const lmMass={rows:[],errors:[],file:'',busy:false,valid:false};
+const lmMassReserved=new Set(['password','authUid','photo','photoUrl','_firebasePath','_firebaseKey','hr_custom_fields']);
+function lmMassMessage(ar,en){return currentLang==='ar'?ar:en;}
+function lmMassCode(x){const s=String(x??'').trim();return /^\d{1,12}$/.test(s)?s:'';}
+function lmMassSchema(){
+ const fields=new Set(['code','الكود','اسم الموظف ','emp_name _en']);
+ // Preserve actual Firebase keys including trailing spaces; never guess translations.
+ for(const emp of allEmployees)for(const k of Object.keys(emp))if(!k.startsWith('_')&&!lmMassReserved.has(k)&&typeof emp[k]!=='object')fields.add(k);
+ for(const [, , ,ar,en] of FAHD_PAIRS) {fields.add(ar);fields.add(en);}
+ for(const [, , ,ar,en] of FAHD_COMMON){fields.add(ar);fields.add(en);}
+ return ['code',...Array.from(fields).filter(k=>k!=='code'&&k!=='الكود'),...Object.keys(lmCustomFieldDefinitions).filter(k=>/^cf_[a-z0-9_]{1,50}$/.test(k)).flatMap(k=>['hr_custom_fields/'+k+'/valueAr','hr_custom_fields/'+k+'/valueEn'])];
+}
+function lmOpenMassHiring(){
+ if(!portalIsAdmin()){showToast(lmMassMessage('هذه العملية تتطلب حساب الإدارة','Admin account required'),true);return;}
+ document.getElementById('lm-mass-workspace')?.classList.remove('hidden');
+ document.getElementById('lm-mass-hint').textContent=lmMassMessage('القالب يستخدم مفاتيح Firebase الفعلية. كل صف يمثل موظفًا جديدًا. لا استبدال ولا تعديل للسجلات الحالية.','Template uses actual Firebase field keys. Each row is a new employee. Existing records are never replaced or edited.');
+}
+function lmCloseMassHiring(){if(lmMass.busy)return;document.getElementById('lm-mass-workspace')?.classList.add('hidden');}
+function lmMassSafeText(id,value){const el=document.getElementById(id);if(el)el.textContent=value;}
+function lmDownloadHiringTemplate(){
+ if(!window.XLSX){lmMassSafeText('lm-mass-errors','Excel library unavailable');return;}
+ const keys=lmMassSchema();
+ const sheet=XLSX.utils.aoa_to_sheet([keys]);sheet['!cols']=keys.map(k=>({wch:Math.min(38,Math.max(15,k.length+5))}));
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,sheet,'Employees');
+ const defs=Object.entries(lmCustomFieldDefinitions).filter(([k])=>/^cf_[a-z0-9_]{1,50}$/.test(k));
+ if(defs.length){const help=[['Field Key','Arabic label','English label'],...defs.map(([k,v])=>[k,v.labelAr||'',v.labelEn||''])];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(help),'Custom Fields Guide');}
+ XLSX.writeFile(wb,'LactoMisr_Mass_Hiring_Template.xlsx');
+}
+function lmMassNormalized(s){return String(s??'').trim().replace(/\s+/g,' ').toLowerCase();}
+function lmMassDate(v){
+ if(typeof v==='number'&&window.XLSX){const d=XLSX.SSF.parse_date_code(v);return d?`${d.d}/${d.m}/${d.y}`:String(v);}
+ if(v instanceof Date&&!Number.isNaN(v.getTime()))return `${v.getDate()}/${v.getMonth()+1}/${v.getFullYear()}`;
+ return String(v??'').trim();
+}
+function lmMassRows(raw,keys){
+ const normKeys=new Map();keys.forEach(k=>{const n=lmMassNormalized(k);if(!normKeys.has(n))normKeys.set(n,[]);normKeys.get(n).push(k);});
+ const issues=[];for(const [n,list] of normKeys)if(list.length>1)issues.push('Ambiguous duplicate columns: '+list.join(' / '));
+ const allowed=lmMassSchema(),schema=new Map();for(const k of allowed){const n=lmMassNormalized(k);if(!schema.has(n))schema.set(n,[]);schema.get(n).push(k);}
+ const mapping={};for(const header of keys){const n=lmMassNormalized(header);if(!n)continue;
+  if(n==='الكود'||n==='code'){mapping[header]='code';continue;}
+  if(/^hr_custom_fields\/(cf_[a-z0-9_]{1,50})\/(valueAr|valueEn)$/.test(header)){
+   const match=header.match(/^hr_custom_fields\/(cf_[a-z0-9_]{1,50})\/(valueAr|valueEn)$/);
+   if(Object.hasOwn(lmCustomFieldDefinitions,match[1]))mapping[header]=header;else issues.push('Unknown custom field: '+header);
+   continue;
+  }
+  if(lmMassReserved.has(header)||header.startsWith('_')){issues.push('Protected column: '+header);continue;}
+  const matches=schema.get(n)||[];if(matches.length===1)mapping[header]=matches[0];else if(matches.length>1)issues.push('Ambiguous field: '+header);else issues.push('Unknown column: '+header);
+ }
+ const codes=new Set(allEmployees.map(e=>lmMassCode(getEmployeeCode(e))));const seen=new Set();const parsed=[];
+ raw.forEach((row,i)=>{const data={};const rowIssues=[];
+  for(const [h,k] of Object.entries(mapping)){let v=row[h];if(v===null||v===undefined||v==='')continue;v=/تاريخ|date|dob/i.test(k)?lmMassDate(v):String(v).trim();if(!v)continue;
+   if(k.startsWith('hr_custom_fields/')){const [,field,prop]=k.split('/');data.hr_custom_fields??={};data.hr_custom_fields[field]??={valueAr:'',valueEn:''};data.hr_custom_fields[field][prop]=v;}
+   else data[k]=v;
+  }
+  const code=lmMassCode(data.code);if(!code)rowIssues.push('Invalid numeric employee code');
+  if(code&&codes.has(code))rowIssues.push('Employee code already exists');
+  if(code&&seen.has(code))rowIssues.push('Duplicate employee code in file');
+  if(code)seen.add(code);
+  if(!data['اسم الموظف ']||!data['emp_name _en'])rowIssues.push('Arabic and English employee names are required');
+  if(code){data.code=code;data['الكود']=code;}
+  for(const k of Object.keys(lmCustomFieldDefinitions))if(/^cf_[a-z0-9_]{1,50}$/.test(k)){data.hr_custom_fields??={};data.hr_custom_fields[k]??={valueAr:'',valueEn:''};}
+  const age=fahdAge(data['تاريخ الميلاد']);if(age){data['السن حتى تاريخه ']=age;data['age to date']=age;}
+  parsed.push({line:i+2,code,data,issues:rowIssues});
+ });
+ return {parsed,issues,mapping};
+}
+async function lmReadMassHiring(input){
+ const file=input.files?.[0];lmMass.valid=false;lmMass.rows=[];document.getElementById('lm-mass-commit').disabled=true;
+ if(!file)return;if(!window.XLSX){lmMassSafeText('lm-mass-errors','Excel parser unavailable');return;}
+ if(file.size>5*1024*1024){lmMassSafeText('lm-mass-errors','File exceeds 5 MB');return;}
+ lmMassSafeText('lm-mass-filename',file.name);
+ try{
+  const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false});const sheet=wb.Sheets[wb.SheetNames[0]];
+  const grid=XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:true,blankrows:false});
+  if(grid.length<2)throw Error('Sheet contains no employee rows');if(grid.length>501)throw Error('Maximum 500 employee rows per import');
+  const keys=grid[0].map(v=>String(v??''));if(keys.some(k=>!k.trim()))throw Error('Blank column header');
+  const records=grid.slice(1).filter(r=>r.some(v=>String(v??'').trim()!==''));
+  const rows=records.map(r=>Object.fromEntries(keys.map((k,i)=>[k,r[i]??''])));
+  const {parsed,issues}=lmMassRows(rows,keys);lmMass.rows=parsed;lmMass.errors=issues;lmMass.file=file.name;
+  const invalid=parsed.filter(r=>r.issues.length);lmMass.valid=issues.length===0&&invalid.length===0&&parsed.length>0;
+  lmMassSafeText('lm-mass-summary',`${lmMassMessage('إجمالي الصفوف','Total rows')}: ${parsed.length} · ${lmMassMessage('صالحة','Valid')}: ${parsed.length-invalid.length} · ${lmMassMessage('مرفوضة','Rejected')}: ${invalid.length} · ${lmMassMessage('أخطاء الأعمدة','Column issues')}: ${issues.length}`);
+  lmMassSafeText('lm-mass-errors',[...issues,...invalid.slice(0,25).map(r=>`Row ${r.line} (${r.code||'?'}): ${r.issues.join('; ')}`)].join('\n'));
+  const preview=parsed.slice(0,30);const cols=['code','اسم الموظف ','emp_name _en','الإدارة ','department ','الوظيفة','job title '];
+  const table=document.createElement('table'),thead=document.createElement('thead'),tr=document.createElement('tr');
+  for(const k of ['Row',...cols,'Status']){const th=document.createElement('th');th.textContent=k;tr.append(th);}thead.append(tr);table.append(thead);
+  const tbody=document.createElement('tbody');for(const row of preview){const t=document.createElement('tr');for(const v of [row.line,...cols.map(k=>row.data[k]||''),row.issues.length?row.issues.join('; '):'✓']){const td=document.createElement('td');td.textContent=v;t.append(td);}tbody.append(t);}table.append(tbody);
+  document.getElementById('lm-mass-preview').replaceChildren(table);
+  lmMassSafeText('lm-mass-status',lmMass.valid?lmMassMessage('جاهز للتأكيد بعد المراجعة','Ready for review and confirmation'):lmMassMessage('أصلح الأخطاء ثم أعد رفع الملف','Fix errors and upload again'));
+  document.getElementById('lm-mass-commit').disabled=!lmMass.valid;
+ }catch(e){lmMassSafeText('lm-mass-errors',e.message);lmMassSafeText('lm-mass-status','');document.getElementById('lm-mass-preview').replaceChildren();}
+}
+async function lmCommitMassHiring(){
+ if(!lmMass.valid||lmMass.busy||!portalIsAdmin())return;
+ const rows=lmMass.rows;if(!confirm(lmMassMessage(`تأكيد إنشاء ${rows.length} موظف جديد؟ لن يتم تعديل أي سجل موجود.`,`Create ${rows.length} new employees? Existing records will not be changed.`)))return;
+ lmMass.busy=true;document.getElementById('lm-mass-commit').disabled=true;
+ const batchId=db.ref('hr_imports').push().key;let created=0,skipped=0;const failures=[],createdCodes=[];
+ try{
+  // Fresh DB check: prevents using a stale employee list as an overwrite decision.
+  const latest=await db.ref(PORTAL_EMPLOYEE_COLLECTION).once('value');const present=new Set(Object.keys(latest.val()||{}));
+  for(const row of rows){
+   if(present.has(row.code)){skipped++;failures.push(row.code+': already exists');continue;}
+   try{
+    // Firebase transaction commits only if no employee record exists at this exact key.
+    const ref=db.ref(PORTAL_EMPLOYEE_COLLECTION+'/'+row.code);
+    const result=await ref.transaction(old=>old===null?row.data:undefined,undefined,false);
+    if(!result.committed){skipped++;failures.push(row.code+': record created concurrently');continue;}
+    present.add(row.code);created++;createdCodes.push(row.code);
+    allEmployees.push({...row.data,_firebasePath:PORTAL_EMPLOYEE_COLLECTION+'/'+row.code,_firebaseKey:row.code});
+   }catch(e){failures.push(row.code+': '+e.message);}
+   lmMassSafeText('lm-mass-progress',`${lmMassMessage('تم إنشاء','Created')}: ${created} / ${rows.length} · ${lmMassMessage('تجاوز','Skipped')}: ${skipped}`);
+  }
+  try{await db.ref('hr_imports/'+batchId).set({type:'MASS_HIRING',actorUid:portalAuth.currentUser?.uid||'',createdAt:firebase.database.ServerValue.TIMESTAMP,filename:lmMass.file,requestedCount:rows.length,createdCount:created,skippedCount:skipped,errorCount:failures.length,createdCodes,errors:failures.slice(0,100)});}catch(e){failures.push('Audit log: '+e.message);}
+  renderTable(allEmployees);updateDashboardStats();
+  lmMassSafeText('lm-mass-status',`${lmMassMessage('تم إنشاء','Created')} ${created} · ${lmMassMessage('تجاوز','Skipped')} ${skipped} · ${lmMassMessage('أخطاء','Errors')} ${failures.length}`);
+  lmMassSafeText('lm-mass-errors',failures.join('\n'));
+  lmMass.valid=false;
+ }catch(e){lmMassSafeText('lm-mass-errors','Import failed: '+e.message);}
+ finally{lmMass.busy=false;lmMassSafeText('lm-mass-progress','');}
+}
