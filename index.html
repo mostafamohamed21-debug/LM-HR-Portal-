@@ -687,6 +687,41 @@ body.portal-signed-in:has(#portal-main-sidebar:hover)>header{padding-inline-star
 #portal-main-sidebar.sidebar-collapsed:not(:hover) .sidebar-item:hover .hr-side-icon{transform:translate(-50%,-50%) scale(1.07)!important}
 #portal-main-sidebar.sidebar-collapsed:not(:hover) .sidebar-item .nav-text{display:none!important}
 </style>
+<style id="lm-profile-calendar-alignment">
+/* Lacto Misr employee profile alignment — scoped, dashboard untouched */
+#fahd1-native .fahd-top{display:grid!important;grid-template-columns:116px minmax(0,1fr) auto;grid-template-areas:"photo identity actions";align-items:center!important;gap:20px!important;text-align:start;min-height:150px}
+#fahd1-native .fahd-photo-area{grid-area:photo;display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
+#fahd1-native .fahd-photo-area .fahd-photo{width:106px;height:106px;max-width:100%;object-fit:cover}
+#fahd1-native .fahd-photo-button{font-size:11px;padding:6px 8px;white-space:normal;width:100%;line-height:1.5}
+#fahd1-native .fahd-identity-block{grid-area:identity;min-width:0;flex:none!important}
+#fahd1-native #fahd-name{margin:6px 0 4px;line-height:1.45;overflow-wrap:anywhere}
+#fahd1-native #fahd-identity{line-height:1.8;overflow-wrap:anywhere}
+#fahd1-native .fahd-header-actions{grid-area:actions;display:flex;flex-direction:column;align-items:flex-end;gap:10px;min-width:145px}
+#fahd1-native #fahd-code{align-self:auto;order:0;white-space:nowrap}
+#fahd1-native #fahd-back{order:1!important;white-space:normal;text-align:center}
+#fahd1-native .fahd-fields .fahd-field{min-width:0;text-align:start}
+#fahd1-native .fahd-field input{min-width:0;box-sizing:border-box;text-align:start}
+#fahd1-native .fahd-actions{align-items:center}
+@media(max-width:780px){#fahd1-native .fahd-top{grid-template-columns:90px minmax(0,1fr);grid-template-areas:"photo identity" "actions actions";gap:12px!important}#fahd1-native .fahd-header-actions{flex-direction:row;align-items:center;justify-content:space-between;min-width:0}#fahd1-native .fahd-photo-area .fahd-photo{width:84px;height:84px}#fahd1-native #fahd-name{font-size:clamp(18px,4vw,25px)}}
+/* Custom calendar, never replaces the stored ISO date */
+.lm-date-shell{position:relative;display:flex;align-items:center;width:100%;min-width:0}
+.lm-date-shell>input{width:100%!important;padding-inline-end:40px!important;min-width:0}
+.lm-date-trigger{position:absolute;inset-inline-end:5px;top:50%;transform:translateY(-50%);width:33px;height:33px;border-radius:8px;background:#153d61;border:1px solid #377ba7;color:#a7e5ff;cursor:pointer;display:grid;place-items:center;font-size:17px}
+.lm-date-trigger:hover{background:#226393;color:white}
+.lm-date-pop{position:fixed;z-index:2147482000;width:min(318px,calc(100vw - 24px));background:linear-gradient(150deg,#122e4b,#071629);border:1px solid #3582b2;border-radius:17px;box-shadow:0 22px 65px #000a;padding:15px;color:#e5f5ff;font-family:Cairo,sans-serif;direction:rtl}
+.lm-date-pop[dir=ltr]{direction:ltr}
+.lm-date-top{display:flex;gap:7px;align-items:center;justify-content:space-between;margin-bottom:12px}
+.lm-date-top button,.lm-date-footer button{border:1px solid #2c668f;border-radius:9px;background:#143b5b;color:#d8f2ff;padding:7px 10px;cursor:pointer}
+.lm-date-top select{min-width:0;flex:1;background:#102c49;color:#e8f6ff;border:1px solid #36789d;border-radius:8px;padding:7px 3px;font-family:inherit}
+.lm-date-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;text-align:center}
+.lm-date-weekday{font-size:11px;color:#8ebbd7;padding:6px 0}
+.lm-date-day{border:1px solid transparent;background:transparent;color:#e2f2ff;border-radius:9px;min-height:34px;cursor:pointer;font:600 12px Cairo,sans-serif}
+.lm-date-day:hover{background:#174b73;border-color:#3282b0}
+.lm-date-day.is-today{border-color:#36b8ec}
+.lm-date-day.is-selected{background:#0284c7;color:#fff}
+.lm-date-footer{display:flex;justify-content:space-between;gap:8px;margin-top:12px}
+.lm-date-shell input[type=date]::-webkit-calendar-picker-indicator{opacity:0;pointer-events:none}
+</style>
 </head>
 <body class="min-h-screen flex flex-col">
 
@@ -886,7 +921,7 @@ body.portal-signed-in:has(#portal-main-sidebar:hover)>header{padding-inline-star
             <!-- صفحة الملف الوظيفي (للعرض الافتراضي، وتفتح للتعديل عند الضغط على زرار التعديل) -->
             <div id="employee-profile-view" class="hidden space-y-6">
 <section id="fahd1-native" class="fahd-native" dir="auto">
-<div class="fahd-top"><div class="fahd-photo-area"><img id="fahd-photo" class="fahd-photo" alt="Employee photo"><button type="button" class="fahd-photo-button" id="fahd-photo-change" onclick="fahdPickPhoto(false)">Change photo</button></div><button type="button" id="fahd-back" onclick="backToEmployeesList()">← العودة للقائمة / Back</button><div><small>LACTO MISR · EMPLOYEE 360°</small><h2 id="fahd-name">ملف الموظف</h2><p id="fahd-identity"></p></div><span id="fahd-code"></span></div>
+<div class="fahd-top"><div class="fahd-photo-area"><img id="fahd-photo" class="fahd-photo" alt="Employee photo"><button type="button" class="fahd-photo-button" id="fahd-photo-change" onclick="fahdPickPhoto(false)">Change photo</button></div><div class="fahd-header-actions"><button type="button" id="fahd-back" onclick="backToEmployeesList()">← العودة للقائمة / Back</button><span id="fahd-code"></span></div><div class="fahd-identity-block"><small>LACTO MISR · EMPLOYEE 360°</small><h2 id="fahd-name">ملف الموظف</h2><p id="fahd-identity"></p></div></div>
 <div class="fahd-tabs" role="tablist"><button class="selected" type="button" onclick="fahdTab('overview',this)"><svg class="fahd-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> Overview · نظرة عامة</button><button type="button" onclick="fahdTab('personal',this)"><svg class="fahd-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg> Personal & Job · البيانات</button><button type="button" onclick="fahdTab('financial',this)"><svg class="fahd-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="16" rx="2"/><path d="M2 9h20"/><circle cx="17" cy="15" r="1"/></svg> Financial · المالية</button><button type="button" onclick="fahdTab('attendance',this)"><svg class="fahd-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg> Attendance · الحضور</button><button type="button" onclick="fahdTab('leaves',this)"><svg class="fahd-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 2v6M17 2v6M3 10h18"/></svg> Leaves · الإجازات</button><button type="button" onclick="fahdTab('performance',this)"><svg class="fahd-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18l6-6 4 3 8-9"/><path d="M16 6h5v5"/></svg> Performance · الأداء</button></div>
 <div class="fahd-content"><div id="fahd-tab-overview" class="fahd-pane"><div id="fahd-summary" class="fahd-summary"></div></div><div id="fahd-tab-personal" class="fahd-pane" hidden><div id="fahd-fields" class="fahd-fields"></div><div class="fahd-actions"><button type="button" onclick="fahdStartEdit()" id="fahd-edit">تعديل البيانات</button><button type="button" onclick="fahdCancelEdit()" id="fahd-cancel" hidden>إلغاء</button><button type="button" onclick="fahdSave()" id="fahd-save" hidden>حفظ التعديلات</button><button type="button" onclick="fahdAddField()" id="fahd-add">＋ إضافة حقل جديد</button></div></div><div id="fahd-tab-financial" class="fahd-pane" hidden><div id="fahd-financial"></div></div><div id="fahd-tab-attendance" class="fahd-pane" hidden><div class="fahd-empty">يتم عرض بيانات الحضور عند ربط مصدرها الفعلي — لا توجد أرقام تجريبية.</div></div><div id="fahd-tab-leaves" class="fahd-pane" hidden><div class="fahd-empty">بانتظار ملف أرصدة الإجازات الفعلي.</div></div><div id="fahd-tab-performance" class="fahd-pane" hidden><div class="fahd-empty">بانتظار بيانات تقييم الأداء الفعلية.</div></div><p id="fahd-status" role="status"></p></div></section>
                 <div class="flex justify-between items-center glass-card p-4 rounded-2xl">
