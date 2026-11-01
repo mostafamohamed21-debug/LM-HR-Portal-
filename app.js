@@ -2101,3 +2101,51 @@ async function lmCommitMassHiring(){
  }catch(e){lmMassSafeText('lm-mass-errors','Import failed: '+e.message);}
  finally{lmMass.busy=false;lmMassSafeText('lm-mass-progress','');}
 }
+
+/* LM Leave Phase 1 — read-only employee balances as of 2026-10-01.
+   Previous settlements are confirmed completed; no historic liability is inferred.
+   This extension does not write to Firebase or change Dashboard/Employees. */
+(function(){
+ const original=renderHRFeature;
+ const baseDate='2026-10-01';
+ function valueByTrim(obj,names){
+   for(const wanted of names){const key=Object.keys(obj||{}).find(k=>k.trim().toLowerCase()===wanted.trim().toLowerCase());
+     if(key && obj[key]!==null && obj[key]!==undefined && String(obj[key]).trim()!=='')return obj[key];}
+   return null;
+ }
+ function yearOfHire(value){
+   if(typeof value==='number' && value>1000 && value<100000){const d=excelDateToJSDate(value);return /^\d{4}-/.test(d)?Number(d.slice(0,4)):null;}
+   if(value==null)return null;
+   const s=String(value).trim();
+   const m=s.match(/^(\d{4})[-/]\d{1,2}[-/]\d{1,2}$/);if(m)return Number(m[1]);
+   const d=s.match(/^\d{1,2}[-/]\d{1,2}[-/](\d{4})$/);if(d)return Number(d[1]);
+   return null;
+ }
+ function nextSettlement(y){
+   if(!Number.isInteger(y)||y<1900||y>2026)return null;
+   let year=y+3;
+   while(year<2027)year+=3;
+   return `01/01/${year}`;
+ }
+ function draw(){
+   const target=document.getElementById('hr-leave-balances-view');if(!target)return;
+   const employees=Array.isArray(allEmployees)?allEmployees:[];
+   const records=employees.map(emp=>{
+     const balance=valueByTrim(emp,['رصيد الاجازات','رصيد الإجازات','annual leave balance']);
+     const hire=valueByTrim(emp,['تاريخ التعيين','date_of_hiring','hireDate','hire date']);
+     return {code:getEmployeeCode(emp),name:getEmployeeName(emp),balance,hire,settlement:nextSettlement(yearOfHire(hire))};
+   });
+   const known=records.filter(x=>x.balance!==null).length;
+   const missingHire=records.filter(x=>!x.settlement).length;
+   const labels=currentLang==='ar'
+    ?['الكود','الموظف','الرصيد الفعلي في 01/10/2026','تاريخ التعيين','التسوية القادمة']
+    :['Code','Employee','Actual balance at 01 Oct 2026','Hire date','Next settlement'];
+   const notice=currentLang==='ar'
+    ?'قراءة فقط من سجلات الموظفين الحالية. جميع التسويات المالية السابقة منفذة طبقًا لإفادة الإدارة. لا تتم إضافة استحقاقات أو خصم إجازات أو تعديل Firebase في هذه المرحلة. الحركات بعد 01/10/2026 لم تُطبّق بعد.'
+    :'Read-only from current employee records. Management confirms all previous settlements completed. No accrual, debit or Firebase write is performed. Post-01 Oct 2026 transactions are not yet applied.';
+   const html=`<section class="hr-panel mt-5" id="lm-opening-leave-balances"><h2 class="text-xl font-bold text-sky-300 mb-2">${hrText('الأرصدة الافتتاحية الفعلية والتسويات القادمة','Actual opening balances and upcoming settlements')}</h2><p class="text-sm text-amber-200 mb-3">${notice}</p><p class="text-sm text-slate-300 mb-3">${hrText('سجلات بها رصيد','Records with balances')}: ${known} / ${records.length} · ${hrText('تواريخ تعيين تحتاج مراجعة','Hire dates requiring review')}: ${missingHire}</p><input id="lm-leave-search" class="hr-feature-input mb-3 w-full" type="search" placeholder="${hrText('بحث بالاسم أو الكود','Search by name or code')}" oninput="lmFilterLeaveOpening()"/><div style="overflow:auto;max-height:570px"><table class="hr-feature-table w-full"><thead><tr>${labels.map(s=>`<th>${escapeHtml(s)}</th>`).join('')}</tr></thead><tbody id="lm-leave-opening-rows">${records.map(r=>`<tr data-search="${escapeHtml((r.code+' '+r.name).toLowerCase())}"><td>${escapeHtml(r.code)}</td><td>${escapeHtml(r.name)}</td><td>${r.balance===null?'—':escapeHtml(String(r.balance))}</td><td>${r.hire===null?'—':escapeHtml(String(typeof r.hire==='number'?excelDateToJSDate(r.hire):r.hire))}</td><td>${r.settlement||hrText('مراجعة تاريخ التعيين','Review hire date')}</td></tr>`).join('')}</tbody></table></div></section>`;
+   target.insertAdjacentHTML('afterbegin',html);
+ }
+ window.lmFilterLeaveOpening=function(){const q=String(document.getElementById('lm-leave-search')?.value||'').trim().toLowerCase();document.querySelectorAll('#lm-leave-opening-rows tr').forEach(r=>r.hidden=!r.dataset.search.includes(q));};
+ renderHRFeature=function(page){original(page);if(page==='leave-balances')draw();};
+})();
