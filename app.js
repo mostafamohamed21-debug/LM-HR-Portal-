@@ -69,7 +69,7 @@ const translations = {
     ar: {
         admin: "مسؤول النظام", control_panel: "غرفة التحكم", nav_home: "الرئيسية والموظفين", nav_depts: "الإدارات والأقسام",
         nav_attendance: "الحضور والإنصراف", nav_reports: "التقارير والإحصائيات", total_emp: "إجمالي العاملين", active_depts: "الإدارات النشطة",
-        system_status: "حالة النظام", connected: "مستقر (متصل بـ Firebase)", emp_list: "قائمة العاملين بالقاعدة", search_placeholder: "بحث بالاسم أو الكود...",
+        system_status: "حالة النظام", connected: "مستقر", emp_list: "قائمة العاملين بالقاعدة", search_placeholder: "بحث بالاسم أو الكود...",
         th_code: "الكود", th_name: "اسم الموظف", th_dept: "الإدارة", th_job: "الوظيفة", th_hire: "تاريخ التعيين", th_actions: "الإجراءات",
         loading: "جاري جلب البيانات من القاعدة...", no_results: "لا توجد نتائج مطابقة للبحث", action_btn: "عرض الملف", back_btn: "← العودة للقائمة",
         profile_title: "الملف الوظيفي الشامل", edit_btn: "تعديل البيانات", save_btn: "حفظ", yes_btn: "نعم", cancel_btn: "إلغاء",
@@ -97,7 +97,7 @@ const translations = {
     en: {
         admin: "System Admin", control_panel: "Control Room", nav_home: "Home & Employees", nav_depts: "Departments",
         nav_attendance: "Attendance & Departure", nav_reports: "Reports & Analytics", total_emp: "Total Employees", active_depts: "Active Departments",
-        system_status: "System Status", connected: "Stable (Connected to Firebase)", emp_list: "Database Employees List", search_placeholder: "Search by name or code...",
+        system_status: "System Status", connected: "Stable", emp_list: "Database Employees List", search_placeholder: "Search by name or code...",
         th_code: "CODE", th_name: "EMPLOYEE NAME", th_dept: "DEPARTMENT", th_job: "JOB TITLE", th_hire: "HIRE DATE", th_actions: "ACTIONS",
         loading: "Fetching data from database...", no_results: "No matching results found", action_btn: "View Profile", back_btn: "← Back to List",
         profile_title: "Comprehensive Employee Profile", edit_btn: "Edit Data", save_btn: "Save", yes_btn: "Yes", cancel_btn: "Cancel",
@@ -478,10 +478,18 @@ function renderTable(dataList) {
         const job=getEmployeeJob(emp);
         const hire=getHireDate(emp);
         const row=document.createElement('tr'); row.className='hover:bg-slate-800/40 transition text-slate-300';
-        row.innerHTML=`<td class="p-3.5 font-mono text-sky-400">${escapeHtml(code)}</td><td class="p-3.5 font-semibold text-white">${escapeHtml(String(name).trim())}</td><td class="p-3.5">${escapeHtml(String(dept).trim())}</td><td class="p-3.5">${escapeHtml(String(job).trim())}</td><td class="p-3.5 font-mono text-xs">${escapeHtml(String(hire))}</td><td class="p-3.5 text-center"><button onclick="viewEmployee('${escapeAttr(code)}')" class="px-3.5 py-1.5 bg-sky-600/30 hover:bg-sky-600 text-sky-200 rounded-lg text-xs border border-sky-400/30 transition shadow-lg">${tr('action_btn')}</button></td>`;
+        row.innerHTML=`<td class="p-3.5 font-mono text-sky-400">${escapeHtml(code)}</td><td class="p-3.5 font-semibold text-white">${escapeHtml(String(name).trim())}</td><td class="p-3.5">${escapeHtml(String(dept).trim())}</td><td class="p-3.5">${escapeHtml(String(job).trim())}</td><td class="p-3.5 font-mono text-xs">${escapeHtml(String(hire))}</td><td class="p-3.5 text-center"><button data-employee-open="${escapeHtml(code)}" type="button" class="px-3.5 py-1.5 bg-sky-600/30 hover:bg-sky-600 text-sky-200 rounded-lg text-xs border border-sky-400/30 transition shadow-lg">${tr('action_btn')}</button></td>`;
         tableBody.appendChild(row);
     });
 }
+
+// A profile opens only from a real, bounded View button click (never from a row or whitespace).
+document.addEventListener('click',function lmEmployeeOpenClick(event){
+ const button=event.target.closest?.('#employees-table-body button[data-employee-open]');
+ if(!button || !event.isTrusted || button.disabled)return;
+ if(event.detail!==0){const r=button.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)return;}
+ event.preventDefault();event.stopPropagation();viewEmployee(button.dataset.employeeOpen);
+},true);
 
 function getHireDate(emp) { const v=getField(emp,'تاريخ التعيين ','تاريخ التعيين','hireDate','date_of_hiring '); return typeof v==='number'?excelDateToJSDate(v):v||'--'; }
 
@@ -583,7 +591,29 @@ function getFirebaseSchema(){
     const priority = new Map(businessOrder.map((k,i)=>[k,i]));
     return [codeKey,...Array.from(keys).sort((a,b)=>(priority.get(a)??999)-(priority.get(b)??999)||a.localeCompare(b,'ar'))];
 }
-function openAddEmployeeModal(){document.getElementById('add-employee-modal')?.classList.remove('hidden');buildAddEmployeeForm();fahdCreateTab('personal',document.querySelector('.fahd-create-tabs button'));}
+let lmAutoCodeReady=false;
+function lmNextEmployeeCode(records){
+ const codes=records.map(e=>String(getEmployeeCode(e)||'').trim()).filter(v=>/^\d{1,12}$/.test(v)).map(Number);
+ const max=Math.max(0,...codes);if(max>=999999999999)throw Error('Employee code range exhausted');
+ return String(max+1);
+}
+async function openAddEmployeeModal(){
+ const modal=document.getElementById('add-employee-modal');modal?.classList.remove('hidden');
+ lmAutoCodeReady=false;buildAddEmployeeForm();fahdCreateTab('personal',document.querySelector('.fahd-create-tabs button'));
+ const input=modal?.querySelector('[data-add-key="code"]');const err=document.getElementById('add-employee-error');
+ const save=modal?.querySelector('[data-save-new]');if(save)save.disabled=true;
+ if(input){input.value='…';input.readOnly=true;input.setAttribute('aria-readonly','true');input.title=fahdLang('يُولّد تلقائيًا ولا يمكن تعديله','Generated automatically; cannot be edited');}
+ try{
+  const snapshot=await db.ref(PORTAL_EMPLOYEE_COLLECTION).once('value');
+  if(modal?.classList.contains('hidden'))return;
+  const existing=snapshot.val()||{};
+  const codes=Object.keys(existing).filter(k=>/^\d{1,12}$/.test(k)).map(Number);
+  for(const e of allEmployees){const c=String(getEmployeeCode(e)||'').trim();if(/^\d{1,12}$/.test(c))codes.push(Number(c));}
+  const max=Math.max(0,...codes);if(max>=999999999999)throw Error('Employee code range exhausted');
+  if(input)input.value=String(max+1);
+  lmAutoCodeReady=true;if(save)save.disabled=false;
+ }catch(error){if(err)err.textContent=fahdLang('تعذر توليد كود الموظف. تحقق من الاتصال وأعد فتح النموذج.','Unable to generate code. Check connection and reopen the form.');console.error('Employee code allocation',error);}
+}
 function closeAddEmployeeModal(){document.getElementById('add-employee-modal')?.classList.add('hidden');}
 function fahdCreateTab(tab,button){document.querySelectorAll('.fahd-create-pane').forEach(el=>el.hidden=el.id!=='fahd-create-'+tab);document.querySelectorAll('.fahd-create-tabs button').forEach(el=>el.classList.toggle('selected',el===button));}
 function fahdParseBirthDate(raw){
@@ -619,6 +649,7 @@ function fahdStoredDate(iso){if(!iso)return '';const [y,m,d]=iso.split('-');retu
 function fahdInput(label,key,value='',type='text',extra={}){
  const wrap=document.createElement('div');wrap.className='fahd-entry';const lab=document.createElement('label');lab.textContent=label;wrap.append(lab);
  const input=document.createElement('input');input.type=type;input.value=type==='date'?fahdISO(value):String(value??'');input.dataset.addKey=key;input.maxLength=1000;
+ if(extra.readonlyCode){input.readOnly=true;input.setAttribute('aria-readonly','true');}
  if(extra.readonly){input.readOnly=true;input.dataset.computedAge='true';delete input.dataset.addKey;}
  if(extra.required)input.required=true;
  if(extra.onchange)input.addEventListener('change',extra.onchange);
@@ -628,7 +659,7 @@ function fahdAddSection(title,subtitle){const section=document.createElement('se
 function buildAddEmployeeForm(){
  const container=document.getElementById('add-employee-fields');if(!container)return;container.replaceChildren();
  const base=fahdAddSection(fahdLang('البيانات الأساسية','Core identity'),fahdLang('كود الموظف والبيانات باللغتين','Employee code and both languages'));
- base.append(fahdInput(fahdLang('الكود','Employee code'),'code','', 'text',{required:true}));
+ base.append(fahdInput(fahdLang('الكود (تلقائي)','Employee code (automatic)'),'code','', 'text',{required:true,readonlyCode:true}));
  for(const [id,ar,en,arKey,enKey] of FAHD_PAIRS){base.append(fahdInput(ar+' (AR)',arKey));base.append(fahdInput(en+' (EN)',enKey));}
  const details=fahdAddSection(fahdLang('البيانات الوظيفية والشخصية','Job & personal details'),fahdLang('التواريخ والعمر المحسوب','Dates and calculated age'));
  for(const [id,ar,en,arKey,enKey,type] of FAHD_COMMON){
@@ -644,6 +675,7 @@ function buildAddEmployeeForm(){
 }
 function fahdUpdateNewAge(){const birth=document.querySelector('#add-employee-fields [data-add-key="تاريخ الميلاد"]');const age=fahdAge(birth?.value);document.querySelectorAll('#add-employee-fields [data-computed-age]').forEach(el=>el.value=age?age+' '+fahdLang('سنة','years'):'—');}
 async function saveNewEmployee(){
+ if(!lmAutoCodeReady){const el=document.getElementById('add-employee-error');if(el)el.textContent=fahdLang('انتظر توليد الكود تلقائيًا','Wait for automatic code generation');return;}
  const data={};document.querySelectorAll('#add-employee-fields [data-add-key]').forEach(input=>{
   const key=input.dataset.addKey;let value=input.value.trim();if(input.type==='date')value=fahdStoredDate(value);
   if(value){data[key]=value;if(input.dataset.mirrorKey)data[input.dataset.mirrorKey]=value;}
@@ -657,8 +689,8 @@ async function saveNewEmployee(){
  for(const key of Object.keys(lmCustomFieldDefinitions)){if(/^cf_[a-z0-9_]{1,50}$/.test(key)){data.hr_custom_fields??={};data.hr_custom_fields[key]={valueAr:'',valueEn:''};}}
 
  const saveButton=document.querySelector('#add-employee-modal [data-save-new]');if(saveButton)saveButton.disabled=true;
- try{const ref=db.ref(PORTAL_EMPLOYEE_COLLECTION+'/'+code);const snapshot=await ref.once('value');if(snapshot.exists()){err.textContent=tr('employee_exists');return;}
-  await ref.set(data);allEmployees.push({...data,_firebasePath:PORTAL_EMPLOYEE_COLLECTION+'/'+code,_firebaseKey:code});closeAddEmployeeModal();window.fahdNewPhoto=null;renderTable(allEmployees);updateDashboardStats();showToast(tr('employee_saved'));
+ try{const ref=db.ref(PORTAL_EMPLOYEE_COLLECTION+'/'+code);const result=await ref.transaction(current=>current===null?data:undefined,undefined,false);if(!result.committed){err.textContent=fahdLang('الكود اتستخدم بالفعل بواسطة موظف آخر. أغلق النموذج وافتحه لتوليد كود جديد.','Code already assigned. Reopen the form to generate a new code.');return;}
+  allEmployees.push({...data,_firebasePath:PORTAL_EMPLOYEE_COLLECTION+'/'+code,_firebaseKey:code});closeAddEmployeeModal();window.fahdNewPhoto=null;filterEmployees();updateDashboardStats();showToast(tr('employee_saved'));viewEmployee(code);
  }catch(error){err.textContent=(error?.message||tr('login_error'));}finally{if(saveButton)saveButton.disabled=false;}
 }
 
@@ -1534,6 +1566,19 @@ function fahdProfileKeyLabel(key){
  const labels={'n_id':'National ID','الرقم القومى ':'الرقم القومي','الرقم التأمينى':'الرقم التأميني','insurance number':'Insurance number','comprehensiveSalary':'Comprehensive salary','insuranceContributionWage':'Insurance contribution wage','annual leave balance':'Annual leave balance','emp_name _en':'Employee name','date_of_hiring ':'Hire date','age to date':'Age','dob':'Date of birth','years of service':'Years of service','direct manager ':'Direct manager','job title ':'Job title','insurance status ':'Insurance status','qualification date ':'Qualification date','qulification issuing authority':'Qualification authority','n_id':'National ID','address':'Address','governorate':'Governorate'};
  return labels[key]||key.trim().replace(/_/g,' ');
 }
+// Financial presentation only: original database amounts remain unchanged.
+function lmSalaryDisplay(value){
+ const raw=String(value??'').trim();
+ if(!raw)return raw;
+ const normalized=raw.replace(/[\s,،]/g,'').replace(/[٠-٩]/g,c=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).replace(/[۰-۹]/g,c=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c)));
+ if(!/^[+-]?\d+(?:\.\d+)?$/.test(normalized))return raw;
+ const n=Number(normalized);
+ return Number.isFinite(n)?new Intl.NumberFormat('en-US',{maximumFractionDigits:0,minimumFractionDigits:0}).format(n):raw;
+}
+function lmIsSalaryKey(key){
+ const k=String(key).trim().toLowerCase().replace(/[_-]+/g,' ');
+ return /(?:الأجر|الاجر|المرتب|الراتب|الراتب|salary|wage|payroll|basic pay|gross pay|net pay|allowance|deduction|comprehensivesalary|insurancecontributionwage)/i.test(k);
+}
 function fahdProfileLanguage(key){return /[\u0600-\u06FF]/.test(key)?'ar':'en';}
 function fahdActualKey(emp,key){return Object.prototype.hasOwnProperty.call(emp,key)?key:Object.keys(emp).find(k=>k.trim()===key.trim())||key;}
 function fahdIsMojibake(value){
@@ -1597,8 +1642,9 @@ function fahdRenderCompleteFields(emp,fields){
   const card=document.createElement('div');card.className='fahd-field';card.dataset.fieldLanguage=lang;
   const label=document.createElement('label');label.textContent=fahdProfileKeyLabel(key)+' ('+lang.toUpperCase()+')';
   const input=document.createElement('input');input.type='text';input.dataset.fahdKey=key;
-  input.value=fahdIsMojibake(emp[key])?'':String(emp[key]??'');input.disabled=true;input.maxLength=2000;
+  input.value=fahdIsMojibake(emp[key])?'':(lmIsSalaryKey(key)?lmSalaryDisplay(emp[key]):String(emp[key]??''));input.disabled=true;input.maxLength=2000;
   if(/(?:^n_id$|الرقم القومى|الرقم التأمينى|insurance number)/.test(key))input.autocomplete='off';
+  if(lmIsSalaryKey(key))input.dataset.salaryOriginal=String(emp[key]??'');
   card.append(label,input);fields.append(card);fahdEditing.original[key]=input.value;
  }
 }
@@ -1618,7 +1664,7 @@ function fahdRender(emp){
  lmRenderGlobalCustomFields(emp,fields);
  fahdRefreshFieldVisibility();fahdEnableDropdowns();
  const fin=document.getElementById('fahd-financial');fin.replaceChildren();const financial=emp.financial;
- if(financial&&typeof financial==='object'){for(const [k,v] of Object.entries(financial)){if(v===null||typeof v==='object')continue;const tile=document.createElement('div');tile.className='fahd-tile';const l=document.createElement('span'),strong=document.createElement('strong');l.textContent=k;strong.textContent=String(v);tile.append(l,strong);fin.append(tile);}fin.className='fahd-summary';}
+ if(financial&&typeof financial==='object'){for(const [k,v] of Object.entries(financial)){if(v===null||typeof v==='object')continue;const tile=document.createElement('div');tile.className='fahd-tile';const l=document.createElement('span'),strong=document.createElement('strong');l.textContent=k;strong.textContent=lmIsSalaryKey(k)?lmSalaryDisplay(v):String(v);tile.append(l,strong);fin.append(tile);}fin.className='fahd-summary';}
  else {fin.className='fahd-empty';fin.textContent=fahdLang('لا توجد بيانات مالية متصلة بعد.','No connected financial data yet.');}
  fahdSetEditing(false);document.getElementById('fahd-status').textContent='';
  fahdTab('overview',document.querySelector('.fahd-tabs button'));
@@ -1645,7 +1691,7 @@ async function fahdSave(skipConfirm=false){
  catch(err){status.textContent=fahdLang('فشل الحفظ: ','Save failed: ')+(err?.message||'Permission denied');return false;}
  finally{fahdBusy=false;document.getElementById('fahd-save').disabled=false;}
 }
-function fahdSetEditing(on){fahdIsEditing=on;document.querySelectorAll('#fahd-fields [data-fahd-key],#fahd-fields [data-lm-custom-key]').forEach(el=>el.disabled=!on);fahdRefreshFieldVisibility();for(const [id,visible] of [['fahd-edit',!on],['fahd-save',on],['fahd-cancel',on]]){const el=document.getElementById(id);if(el)el.hidden=!visible;}}
+function fahdSetEditing(on){fahdIsEditing=on;document.querySelectorAll('#fahd-fields [data-salary-original]').forEach(el=>{el.value=on?el.dataset.salaryOriginal:lmSalaryDisplay(el.dataset.salaryOriginal);fahdEditing.original[el.dataset.fahdKey]=el.value;});document.querySelectorAll('#fahd-fields [data-fahd-key],#fahd-fields [data-lm-custom-key]').forEach(el=>el.disabled=!on);fahdRefreshFieldVisibility();for(const [id,visible] of [['fahd-edit',!on],['fahd-save',on],['fahd-cancel',on]]){const el=document.getElementById(id);if(el)el.hidden=!visible;}}
 function fahdStartEdit(){fahdSetEditing(true)}
 async function fahdCancelEdit(){
  if(fahdHasUnsavedChanges()){
