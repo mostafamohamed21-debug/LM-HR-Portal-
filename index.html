@@ -767,6 +767,16 @@ html[dir="ltr"] [data-five-block]{direction:ltr;text-align:left}
 html[dir="rtl"] [data-five-block]{direction:rtl;text-align:right}
 @media(max-width:600px){[data-five-block] .lm-five-status{flex-basis:100%}}
 </style>
+
+<style id="lm5-year-styles">
+.lm5-year-control{display:flex;align-items:stretch;gap:5px;direction:ltr}
+.lm5-year-control input{min-width:0!important;flex:1 1 75px;text-align:center!important;direction:ltr!important;font-variant-numeric:tabular-nums}
+.lm5-year-control .lm5-step{flex:0 0 35px;border:1px solid #286487;background:#102e4b;color:#b9eaff;border-radius:9px;font-size:19px;font-weight:700;cursor:pointer}
+.lm5-year-control .lm5-step:hover{background:#16547c}
+.lm5-year-control input:disabled{opacity:.5}
+.lm5-all{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#c3e8ff;cursor:pointer}
+.lm5-all input{width:15px!important;height:15px!important;flex:0 0 15px;accent-color:#0ea5e9}
+</style>
 </head>
 <body class="min-h-screen flex flex-col">
 
