@@ -755,6 +755,18 @@ html[dir=ltr] .lm3-dialog,html[dir=ltr] .lm3-filter{text-align:left}
 html[dir=rtl] .lm3-dialog,html[dir=rtl] .lm3-filter{text-align:right}
 @media(max-width:620px){.lm-five-status{flex-basis:100%}.lm3-filters{grid-template-columns:1fr 1fr}.lm3-dialog{padding:14px}}
 </style>
+<style id="lm4-fix">
+/* One compact checkbox, no inherited full-width input styling */
+[data-five-block].lm-five-compact{display:flex!important;grid-column:1/-1;align-items:center!important;justify-content:flex-start!important;gap:16px!important;flex-wrap:wrap!important;padding:10px 14px!important;min-height:54px!important}
+[data-five-block] .lm-five-line{display:inline-flex!important;flex-direction:row!important;align-items:center!important;gap:8px!important;width:auto!important;max-width:max-content!important;flex:0 0 auto!important;white-space:normal!important;margin:0!important}
+[data-five-block] input[type="checkbox"]{display:inline-block!important;box-sizing:border-box!important;appearance:checkbox!important;width:16px!important;min-width:16px!important;max-width:16px!important;height:16px!important;min-height:16px!important;max-height:16px!important;flex:none!important;margin:0!important;padding:0!important;border:0!important;vertical-align:middle!important}
+[data-five-block] .lm-five-status{display:flex;flex:0 1 auto;align-items:center;gap:8px;min-width:0;margin:0!important}
+[data-five-block] .lm-five-status[style*="display:none"]{display:none!important}
+[data-five-block] .lm-five-status select{width:210px!important;max-width:100%!important}
+html[dir="ltr"] [data-five-block]{direction:ltr;text-align:left}
+html[dir="rtl"] [data-five-block]{direction:rtl;text-align:right}
+@media(max-width:600px){[data-five-block] .lm-five-status{flex-basis:100%}}
+</style>
 </head>
 <body class="min-h-screen flex flex-col">
 
@@ -1192,7 +1204,7 @@ html[dir=rtl] .lm3-dialog,html[dir=rtl] .lm3-filter{text-align:right}
 
     <!-- ربط ملف الـ JS -->
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
-    <script src="app.js?v=20261101-leave-phase3"></script>
+    <script src="app.js?v=20261101-leave-phase4"></script>
     
 <div id="fahd-dialog" class="fahd-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="fahd-dialog-title"><div class="fahd-dialog-card"><h3 id="fahd-dialog-title"></h3><p id="fahd-dialog-message"></p><div id="fahd-dialog-inputs"></div><div class="fahd-dialog-actions"><button type="button" id="fahd-dialog-no">إلغاء</button><button type="button" id="fahd-dialog-yes">تأكيد</button></div></div></div></body>
 </html>
