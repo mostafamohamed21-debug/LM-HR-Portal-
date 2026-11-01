@@ -729,6 +729,32 @@ body.portal-signed-in:has(#portal-main-sidebar:hover)>header{padding-inline-star
 .lm-date-footer{display:flex;justify-content:space-between;gap:8px;margin-top:12px}
 .lm-date-shell input[type=date]::-webkit-calendar-picker-indicator{opacity:0;pointer-events:none}
 </style>
+
+<style id="lm3-compact-bilingual">
+.lm-five-compact{grid-column:1/-1;display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:12px 14px!important;border:1px solid #2b6588;border-radius:12px;background:#10243e;min-width:0}
+.lm-five-compact .lm-five-line{display:inline-flex!important;align-items:center!important;gap:9px!important;margin:0!important;cursor:pointer;flex:none;color:#d7efff}
+.lm-five-compact input[type=checkbox]{appearance:auto!important;width:17px!important;height:17px!important;min-width:17px!important;max-width:17px!important;flex:0 0 17px!important;padding:0!important;margin:0!important;accent-color:#0ea5e9}
+.lm-five-status{display:flex;align-items:center;gap:10px;flex:1 1 220px;min-width:190px}
+.lm-five-status label{margin:0!important;white-space:nowrap}
+.lm-five-status select{width:min(100%,300px)!important;padding:8px 12px}
+.lm3-head,.lm3-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.lm3-actions button,.lm3-reset{padding:9px 15px;border-radius:10px}
+.lm3-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;align-items:end;margin:16px 0}
+.lm3-filter{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#bfe5ff;min-width:0;text-align:start}
+.lm3-filter input,.lm3-filter select{width:100%;background:#081529;border:1px solid #286487;border-radius:10px;padding:10px;color:#eff8ff;min-width:0;direction:inherit;text-align:start}
+.lm3-table-scroll{max-height:520px;overflow:auto}.lm3-table-scroll table{min-width:780px}.lm3-table-scroll th,.lm3-table-scroll td{text-align:start;padding:11px}
+.lm3-overlay{position:fixed;inset:0;background:#020917d9;z-index:99990;display:grid;place-items:center;padding:16px;backdrop-filter:blur(6px)}
+.lm3-dialog{width:min(96vw,650px);max-height:90vh;overflow:auto;border:1px solid #2b8fbd;border-radius:20px;padding:24px;background:#0b1d35;box-shadow:0 20px 70px #0009;direction:inherit}
+.lm3-dialog h2{font-size:20px;font-weight:800;color:#7dd3fc}
+.lm3-result{margin:16px 0;display:grid;gap:8px}
+.lm3-result-line{display:flex;justify-content:space-between;gap:20px;padding:10px;border-bottom:1px solid #25415e}
+.lm3-result-line strong{overflow-wrap:anywhere;text-align:end}
+.lm3-result-total{display:flex;flex-direction:column;gap:5px;background:#113454;border:1px solid #2c89b9;border-radius:14px;padding:18px;text-align:center}
+.lm3-result-total strong{font-size:25px;color:#6ee7b7}
+html[dir=ltr] .lm3-dialog,html[dir=ltr] .lm3-filter{text-align:left}
+html[dir=rtl] .lm3-dialog,html[dir=rtl] .lm3-filter{text-align:right}
+@media(max-width:620px){.lm-five-status{flex-basis:100%}.lm3-filters{grid-template-columns:1fr 1fr}.lm3-dialog{padding:14px}}
+</style>
 </head>
 <body class="min-h-screen flex flex-col">
 
@@ -1166,7 +1192,7 @@ body.portal-signed-in:has(#portal-main-sidebar:hover)>header{padding-inline-star
 
     <!-- ربط ملف الـ JS -->
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
-    <script src="app.js?v=20261028-avatars-1"></script>
+    <script src="app.js?v=20261101-leave-phase3"></script>
     
 <div id="fahd-dialog" class="fahd-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="fahd-dialog-title"><div class="fahd-dialog-card"><h3 id="fahd-dialog-title"></h3><p id="fahd-dialog-message"></p><div id="fahd-dialog-inputs"></div><div class="fahd-dialog-actions"><button type="button" id="fahd-dialog-no">إلغاء</button><button type="button" id="fahd-dialog-yes">تأكيد</button></div></div></div></body>
 </html>
