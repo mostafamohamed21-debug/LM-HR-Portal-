@@ -2158,7 +2158,7 @@ async function lmCommitMassHiring(){
 // LEAVE PHASE 2: separate, admin-only balance reset tool; never modifies identity fields.
 function lmFiveUI(profile=false,value={}){
  const enabled=!!value?.enabled, status=value?.workStatus==='outside'?'outside':'working';
- return `<div class="fahd-field" data-five-block class="lm-five-compact"><label class="lm-five-line"><input type="checkbox" data-five-input="enabled" ${enabled?'checked':''} ${profile?'disabled':''} onchange="lmFiveToggle(this)"> ${hrText('ضمن نسبة 5% – ذوو الإعاقة','5% disability category')}</label><div data-five-status class="lm-five-status" style="${enabled?'':'display:none'}"><label>${hrText('ممارسة العمل','Work status')}</label><select data-five-input="status" ${profile?'disabled':''} class="hr-feature-input"><option value="working" ${status==='working'?'selected':''}>${hrText('بيعمل فعليًا','Working')}</option><option value="outside" ${status==='outside'?'selected':''}>${hrText('خارج النطاق','Outside active work')}</option></select></div></div>`;
+ return `<div class="fahd-field lm-five-compact" data-five-block><label class="lm-five-line"><input type="checkbox" data-five-input="enabled" ${enabled?'checked':''} ${profile?'disabled':''} onchange="lmFiveToggle(this)"> ${hrText('ضمن نسبة 5% – ذوو الإعاقة','5% disability category')}</label><div data-five-status class="lm-five-status" style="${enabled?'':'display:none'}"><label>${hrText('ممارسة العمل','Work status')}</label><select data-five-input="status" ${profile?'disabled':''} class="hr-feature-input"><option value="working" ${status==='working'?'selected':''}>${hrText('بيعمل فعليًا','Working')}</option><option value="outside" ${status==='outside'?'selected':''}>${hrText('خارج النطاق','Outside active work')}</option></select></div></div>`;
 }
 function lmFiveToggle(el){const block=el.closest('[data-five-block]');block.querySelector('[data-five-status]').style.display=el.checked?'':'none';}
 function lmReadFiveUI(selector){const block=document.querySelector(selector+' [data-five-block]');if(!block)return {enabled:false,workStatus:null};const enabled=block.querySelector('[data-five-input="enabled"]').checked;return {enabled,workStatus:enabled?block.querySelector('[data-five-input="status"]').value:null};}
@@ -2219,13 +2219,14 @@ function lm3Select(id,label,options){return `<label class="lm3-filter"><span>${l
 function lm3UI(){
  const categories=[['regular',lm3T('عادي','Regular')],['working',lm3T('5% يعمل فعليًا','5% Working')],['outside',lm3T('5% خارج النطاق','5% Outside')]];
  const departments=[...new Set(lm3Rows().map(r=>r.dept).filter(x=>x&&x!=='--'))].sort((a,b)=>a.localeCompare(b));
+ const settlementYears=[...new Set(lm3Rows().map(r=>r.settlement?.slice(0,4)).filter(Boolean))].sort();
  return `<section class="hr-panel mt-5" id="lm3-report">
  <div class="lm3-head"><div><h2 class="text-xl font-bold text-sky-300">${lm3T('تقارير أرصدة الإجازات','Leave Balance Reports')}</h2><p class="text-sm text-amber-200">${lm3T('الأرصدة الأساسية بتاريخ 01/10/2026، ولا تشمل حركات لاحقة لم تُسجل بعد.','Opening balances as of 01 Oct 2026; later unrecorded transactions are not included.')}</p></div><div class="lm3-actions"><button type="button" class="portal-ghost-btn" onclick="lm3Export()">${lm3T('تصدير Excel','Export Excel')}</button><button type="button" class="portal-action-btn" onclick="lm3Open()">${lm3T('حاسبة التسوية المالية','Settlement Calculator')}</button></div></div>
  <div class="lm3-filters"><label class="lm3-filter"><span>${lm3T('بحث بالكود أو الاسم','Code or name')}</span><input id="lm3-search" type="search" oninput="lm3Apply()" placeholder="${lm3T('بحث...','Search...')}"></label>
  ${lm3Select('lm3-dept',lm3T('الإدارة','Department'),departments.map(d=>[d,d]))}
  ${lm3Select('lm3-category',lm3T('التصنيف','Category'),categories)}
  ${lm3Select('lm3-balance',lm3T('الرصيد','Balance'),[['positive',lm3T('أكبر من صفر','Above zero')],['zero',lm3T('صفر','Zero')],['missing',lm3T('غير مسجل','Missing')]])}
- ${lm3Select('lm3-settlement',lm3T('التسوية','Settlement'),[['year',lm3T('خلال السنة القادمة','Next calendar year')],['missing',lm3T('تاريخ غير معروف','Unknown date')]])}
+ ${lm3Select('lm3-settlement',lm3T('سنة التسوية (يناير)','Settlement year (January)'),settlementYears.map(y=>[y,y]))}
  <button type="button" class="portal-ghost-btn lm3-reset" onclick="lm3Reset()">${lm3T('مسح الفلاتر','Clear filters')}</button></div>
  <p id="lm3-count" class="text-sm text-sky-200 my-3"></p>
  <div class="lm3-table-scroll"><table class="hr-feature-table w-full"><thead><tr>${[lm3T('الكود','Code'),lm3T('الموظف','Employee'),lm3T('الإدارة','Department'),lm3T('الرصيد','Balance'),lm3T('التصنيف','Category'),lm3T('التسوية القادمة','Next settlement')].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody id="lm3-table-body"></tbody></table></div>
@@ -2234,8 +2235,8 @@ function lm3UI(){
 }
 function lm3Apply(){
  const q=String(document.getElementById('lm3-search')?.value||'').trim().toLowerCase(),dept=document.getElementById('lm3-dept')?.value||'',cat=document.getElementById('lm3-category')?.value||'',balance=document.getElementById('lm3-balance')?.value||'',settle=document.getElementById('lm3-settlement')?.value||'';
- const year=new Date().getFullYear()+1;
- const rows=lm3Rows().filter(r=>(!q||(r.code+' '+r.name+' '+getField(r.e,'اسم الموظف','emp_name _en')).toLowerCase().includes(q))&&(!dept||r.dept===dept)&&(!cat||r.category===cat)&&(!balance||(balance==='positive'?r.balance!==null&&r.balance>0:balance==='zero'?r.balance===0:r.balance===null))&&(!settle||(settle==='year'?r.settlement?.startsWith(String(year)):!r.settlement)));
+ 
+ const rows=lm3Rows().filter(r=>(!q||(r.code+' '+r.name+' '+getField(r.e,'اسم الموظف','emp_name _en')).toLowerCase().includes(q))&&(!dept||r.dept===dept)&&(!cat||r.category===cat)&&(!balance||(balance==='positive'?r.balance!==null&&r.balance>0:balance==='zero'?r.balance===0:r.balance===null))&&(!settle||r.settlement?.startsWith(settle)));
  lm3State.filtered=rows;
  const names={regular:lm3T('عادي','Regular'),working:lm3T('5% يعمل فعليًا','5% Working'),outside:lm3T('5% خارج النطاق','5% Outside')};
  document.getElementById('lm3-count').textContent=lm3T('عدد النتائج: ','Results: ')+rows.length;
