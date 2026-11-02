@@ -791,9 +791,9 @@ const hrText=(ar,en)=>currentLang==='ar'?ar:en;
 function showHRPage(page){
     if(page!=='employees' && fahdHasUnsavedChanges()&&!window.fahdNavigationApproved){fahdGuardNavigation(()=>showHRPage(page));return;}
 
-    if(!['dashboard','employees','payroll','notifications','attendance','leave-balances','permissions','bradford'].includes(page))return;
+    if(!['dashboard','employees','payroll','notifications','attendance','leave-balances','appraisal','permissions','bradford'].includes(page))return;
     hrActivePage=page;
-    ['dashboard','payroll','notifications','attendance','leave-balances','permissions','bradford'].forEach(p=>document.getElementById('hr-'+p+'-view')?.classList.toggle('hidden',p!==page));
+    ['dashboard','payroll','notifications','attendance','leave-balances','appraisal','permissions','bradford'].forEach(p=>document.getElementById('hr-'+p+'-view')?.classList.toggle('hidden',p!==page));
     const list=document.getElementById('employees-list-view'),profile=document.getElementById('employee-profile-view');
     if(page==='employees'){if(activeEmployeeCode!==null){if(profile){profile.classList.remove('hidden');profile.style.display='block';}if(list){list.classList.add('hidden');list.style.display='none';}}else{if(list){list.classList.remove('hidden');list.style.display='block';}if(profile){profile.classList.add('hidden');profile.style.display='none';}}}
     else {if(list){list.classList.add('hidden');list.style.display='none';}if(profile){profile.classList.add('hidden');profile.style.display='none';}}
@@ -804,7 +804,7 @@ function hrCard(label,value,foot=''){return `<div class="hr-kpi"><p class="text-
 function renderHRWorkspace(){
     document.querySelectorAll('.hr-nav [data-ar]').forEach(el=>{el.textContent=el.dataset[currentLang]});
     if(hrActivePage==='dashboard'){renderRichDashboard();}
-    if(['attendance','leave-balances','permissions','bradford'].includes(hrActivePage)) renderHRFeature(hrActivePage);
+    if(['attendance','leave-balances','appraisal','permissions','bradford'].includes(hrActivePage)) renderHRFeature(hrActivePage);
     if(hrActivePage==='payroll'){
         const d=document.getElementById('hr-payroll-view');if(!d)return;
         const demo=allEmployees.slice(0,30).map((e,i)=>{const base=5500+(i%9)*850,allowance=500+(i%4)*250,deduction=(i%3)*175;return {e,base,allowance,deduction,net:base+allowance-deduction}});
@@ -2268,7 +2268,7 @@ function lm3Calculate(){const code=String(document.getElementById('lm3-code')?.v
    This engine is intentionally NOT a permission enforcement mechanism. */
 const LM_LEAVE_ENGINE_V2 = Object.freeze({
   parseDate(value) {
-    if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return null;
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
     const d = new Date(value + 'T12:00:00Z');
     return Number.isNaN(d.getTime()) || d.toISOString().slice(0,10) !== value ? null : d;
   },
@@ -2320,3 +2320,92 @@ const LM_LEAVE_ENGINE_V2 = Object.freeze({
       note:'Pure calculation only. No leave approval, entitlement posting or Firebase write.'};
   }
 });
+
+
+/* Phase 8: read-only appraisal concept, no evaluation data invented or written.
+   Leave projections are display-only and never overwrite approved opening balances. */
+function lm8Date(value){
+ if(typeof value==='number' && value>1000 && value<100000){
+  const d=new Date(Date.UTC(1899,11,30)+Math.floor(value)*86400000);
+  return Number.isNaN(d.getTime())?null:d.toISOString().slice(0,10);
+ }
+ if(value instanceof Date && !Number.isNaN(value.getTime()))return value.toISOString().slice(0,10);
+ const s=String(value??'').trim();
+ if(/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)){const [y,m,d]=s.split('-');return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;}
+ const m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+ return m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:null;
+}
+function lm8Value(e,keys){return lmBField(e,keys);}
+function lm8LeaveProjection(e){
+ const hireDate=lm8Date(lm8Value(e,['تاريخ التعيين','date_of_hiring','hireDate','hire date']));
+ const birthDate=lm8Date(lm8Value(e,['تاريخ الميلاد','dob','date of birth']));
+ const asOfDate=new Date().toLocaleDateString('en-CA',{timeZone:'Africa/Cairo'});
+ const five=lm8Value(e,['fivePercent','five_percent','disability5','fivePercentStatus']);
+ const disabilityEnabled=!!(five && typeof five==='object' && five.enabled);
+ const workStatus=disabilityEnabled?five.workStatus:'working';
+ const insuredYears=lm8Value(e,['insuredYears','insuranceYears','سنوات التأمين','مدة الاشتراك التأميني']);
+ if(!hireDate||!birthDate)return {ok:false,reason:'MISSING_DATES'};
+ return LM_LEAVE_ENGINE_V2.calculate({hireDate,birthDate,asOfDate,insuredYears,disabilityEnabled,workStatus});
+}
+function lm8Format(n){return n==null?'—':String(n);}
+function lm8LeaveRows(){
+ const body=document.getElementById('lm3-table-body');if(!body)return;
+ const table=body.closest('table'),head=table?.querySelector('thead tr');if(!head)return;
+ const titles=[hrText('الرصيد عن السنة','Annual entitlement'),hrText('المستحق حتى اليوم','Accrued to date')];
+ // Add to the live report without altering its original opening-balance column.
+ const ths=[...head.querySelectorAll('th')];
+ if(!head.dataset.lm8){
+  const after=ths[3];for(const title of titles){const th=document.createElement('th');th.textContent=title;after.after(th);}
+  head.dataset.lm8='1';
+ }
+ const map=new Map((allEmployees||[]).map(e=>[String(getEmployeeCode(e)),e]));
+ for(const row of body.querySelectorAll('tr')){
+  const code=row.cells[0]?.textContent?.trim(),e=map.get(code);
+  if(!e){if(row.cells.length===1)row.cells[0].colSpan=8;continue;}
+  const calc=lm8LeaveProjection(e),base=row.cells[3];
+  if(!base)continue;
+  const annual=document.createElement('td'),accrued=document.createElement('td');
+  annual.textContent=calc.ok?lm8Format(calc.annual):'—';
+  accrued.textContent=calc.ok?lm8Format(calc.accrued):'—';
+  if(!calc.ok){annual.title=accrued.title=hrText('بيانات التعيين أو الميلاد غير مكتملة/غير صالحة','Hire/birth date missing or invalid');}
+  else if(!calc.eligible)accrued.title=hrText('لم يكمل ستة أشهر','Under six months');
+  base.after(annual,accrued);
+ }
+}
+const lm8PreviousApply=lm3Apply;
+lm3Apply=function(){lm8PreviousApply();lm8LeaveRows();};
+function lm8Appraisal(){
+ const target=document.getElementById('hr-appraisal-view');if(!target)return;
+ const t=hrText;
+ target.innerHTML=`<section class="hr-panel"><h1 class="text-2xl font-bold text-sky-300 mb-2">${t('إدارة تقييم الأداء','Appraisal Management')}</h1><p class="text-sm text-amber-200 mb-5">${t('تصور تشغيلي للمراجعة — لا توجد درجات أو تقييمات افتراضية، ولا يتم الحفظ في Firebase قبل اعتماد نموذج التقييم والصلاحيات.','Design preview only — no invented scores and no Firebase writes before criteria and permissions are approved.')}</p>
+ <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+ ${hrCard(t('الموظفون المسجلون','Employees'),String((allEmployees||[]).length),t('من بيانات الموظفين الفعلية','From actual employee records'))}
+ ${hrCard(t('دورات التقييم المعتمدة','Approved cycles'),'—',t('لم يتم ربط سجلات التقييم','No appraisal records connected'))}
+ ${hrCard(t('التقييمات المكتملة','Completed reviews'),'—',t('لم يتم ربط سجلات التقييم','No appraisal records connected'))}</div>
+ <h2 class="font-bold text-sky-300 mb-3">${t('التصور المقترح لدورة التقييم','Proposed appraisal workflow')}</h2>
+ <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">${[
+ [t('1. إعداد الدورة','1. Cycle setup'),t('المدة، الإدارة، معايير القياس والأوزان','Period, department, criteria and weights')],
+ [t('2. تقييم المدير','2. Manager review'),t('أهداف قابلة للقياس مع أدلة الأداء','Measurable goals and supporting evidence')],
+ [t('3. مراجعة الموارد البشرية','3. HR calibration'),t('مراجعة الاتساق والملاحظات والتظلمات','Consistency, notes and appeals')],
+ [t('4. الاعتماد والخطة','4. Approval & plan'),t('اعتماد النتيجة وخطة التطوير','Final approval and development plan')]
+ ].map(x=>`<div class="rounded-xl border border-slate-600/50 p-4"><strong class="text-sky-200">${x[0]}</strong><p class="text-sm text-slate-300 mt-2">${x[1]}</p></div>`).join('')}</div>
+ <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+ <label class="text-sm">${t('بحث بكود الموظف أو اسمه','Search employee code or name')}<input id="lm8-appraisal-search" class="hr-feature-input mt-2 w-full" type="search" oninput="lm8AppraisalFilter()" placeholder="${t('بحث...','Search...')}"></label>
+ <label class="text-sm">${t('فلتر الإدارة','Department filter')}<select id="lm8-appraisal-dept" class="hr-feature-input mt-2 w-full" onchange="lm8AppraisalFilter()"><option value="">${t('كل الإدارات','All departments')}</option>${[...new Set((allEmployees||[]).map(e=>String(lm8Value(e,['الإدارة','department'])||'').trim()).filter(Boolean))].sort().map(d=>`<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('')}</select></label></div>
+ <div style="overflow:auto;max-height:460px"><table class="hr-feature-table w-full"><thead><tr>${[t('الكود','Code'),t('الموظف','Employee'),t('الإدارة','Department'),t('حالة التقييم','Appraisal status')].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody id="lm8-appraisal-rows">${(allEmployees||[]).map(e=>{const c=String(getEmployeeCode(e)),n=String(getEmployeeName(e)),d=String(lm8Value(e,['الإدارة','department'])||'');return `<tr data-code="${escapeHtml(c)}" data-name="${escapeHtml(n.toLowerCase())}" data-dept="${escapeHtml(d)}"><td>${escapeHtml(c)}</td><td>${escapeHtml(n)}</td><td>${escapeHtml(d)}</td><td class="text-slate-400">${t('لم تبدأ دورة تقييم','No appraisal cycle started')}</td></tr>`;}).join('')}</tbody></table></div>
+ <p id="lm8-appraisal-count" class="mt-3 text-sm text-slate-300"></p>
+ <div class="mt-5 rounded-xl border border-slate-600/50 p-4"><strong>${t('معايير مقترحة للنقاش','Suggested criteria for discussion')}</strong><p class="mt-2 text-sm text-slate-300">${t('تحقيق الأهداف، جودة العمل، الالتزام، العمل الجماعي، المبادرة، والتطوير. الأوزان والتقييم النهائي لم تُعتمد بعد، ولا تُربط الرواتب أو الجزاءات آليًا بنتيجة التقييم.','Goals, quality, reliability, teamwork, initiative, and development. Weights are not approved; no automatic salary or disciplinary decisions.')}</p></div></section>`;
+ lm8AppraisalFilter();
+}
+function lm8AppraisalFilter(){
+ const q=String(document.getElementById('lm8-appraisal-search')?.value||'').trim().toLowerCase();
+ const d=document.getElementById('lm8-appraisal-dept')?.value||'';
+ let shown=0;
+ document.querySelectorAll('#lm8-appraisal-rows tr').forEach(r=>{
+  const ok=(!q||( /^\d+$/.test(q)?r.dataset.code===q:r.dataset.name.includes(q)))&&(!d||r.dataset.dept===d);
+  r.hidden=!ok;if(ok)shown++;
+ });
+ const count=document.getElementById('lm8-appraisal-count');if(count)count.textContent=hrText('عدد النتائج: ','Results: ')+shown;
+}
+const lm8PreviousRender=renderHRFeature;
+renderHRFeature=function(page){if(page==='appraisal'){lm8Appraisal();return;}lm8PreviousRender(page);};
