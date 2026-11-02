@@ -2261,62 +2261,62 @@ function lm3Calculate(){const code=String(document.getElementById('lm3-code')?.v
 (function(){const prior=renderHRFeature;renderHRFeature=function(page){if(page!=='leave-balances')return prior(page);const root=document.getElementById('hr-leave-balances-view');if(!root)return;root.innerHTML=hrFeatureShell(hrText('أرصدة الإجازات','Leave balances'),hrText('الحساب التلقائي مستقل عن أداة التحديث الجماعي','Automatic accrual is separate from mass balance update'),lmBHtml())+lm3UI();document.getElementById('lm5-all-years').checked=true;document.getElementById('lm3-settlement').disabled=true;lm3Apply();};})();
 
 
-/* LM Leave Logic Phase 6: isolated, read-only entitlement simulator.
-   Does not alter Firebase, opening balances, or historical settlements.
-   Partial-year accrual is deliberately NOT inferred pending HR approval. */
-const LM_LEAVE_ENGINE_V1 = Object.freeze({
-  date(value) {
-    if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-    const d=new Date(value+'T12:00:00Z');
-    return Number.isNaN(d.getTime())||d.toISOString().slice(0,10)!==value?null:d;
+/* LM Leave Phase 7: business rules engine (no automatic Firebase writes).
+   HR-approved: 6-month eligibility gate, monthly pro-rata in first calendar
+   year, and emergency leave as an advance against future entitlement.
+   Exceptional advances above 3 days require a server-verified admin approval.
+   This engine is intentionally NOT a permission enforcement mechanism. */
+const LM_LEAVE_ENGINE_V2 = Object.freeze({
+  parseDate(value) {
+    if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return null;
+    const d = new Date(value + 'T12:00:00Z');
+    return Number.isNaN(d.getTime()) || d.toISOString().slice(0,10) !== value ? null : d;
   },
-  completedYears(start,asOf){
-    let years=asOf.getUTCFullYear()-start.getUTCFullYear();
-    if(asOf.getUTCMonth()<start.getUTCMonth()||(asOf.getUTCMonth()===start.getUTCMonth()&&asOf.getUTCDate()<start.getUTCDate()))years--;
-    return years;
+  years(start, end) {
+    let n = end.getUTCFullYear() - start.getUTCFullYear();
+    if (end.getUTCMonth() < start.getUTCMonth() ||
+        (end.getUTCMonth() === start.getUTCMonth() && end.getUTCDate() < start.getUTCDate())) n--;
+    return n;
   },
-  calculate({hireDate,birthDate,asOfDate,insuredYears,disabilityEnabled=false,workStatus='working'}) {
-    const hire=this.date(hireDate),birth=this.date(birthDate),asOf=this.date(asOfDate);
-    if(!hire||!birth||!asOf) return {ok:false,reason:'INVALID_DATE'};
-    if(hire>asOf||birth>hire) return {ok:false,reason:'DATE_ORDER'};
-    const serviceYears=this.completedYears(hire,asOf),age=this.completedYears(birth,asOf);
-    const insured=insuredYears===null||insuredYears===undefined||insuredYears===''?null:Number(insuredYears);
-    if(insured!==null&&(!Number.isFinite(insured)||insured<0))return {ok:false,reason:'INVALID_INSURANCE'};
-    if(disabilityEnabled&&workStatus==='outside')return {ok:true,days:0,category:'OUTSIDE',serviceYears,age,provisional:false};
-    if(disabilityEnabled&&workStatus==='working')return {ok:true,days:45,category:'DISABILITY_WORKING',serviceYears,age,provisional:false};
-    if(age>=50)return {ok:true,days:30,category:'AGE_50',serviceYears,age,provisional:false};
-    if(insured!==null&&insured>=10)return {ok:true,days:30,category:'INSURANCE_10',serviceYears,age,provisional:false};
-    const days=serviceYears<1?15:21;
-    return {ok:true,days,category:serviceYears<1?'FIRST_YEAR':'REGULAR',serviceYears,age,
-      provisional:insured===null,warning:insured===null?'INSURANCE_UNVERIFIED':null};
+  completedMonths(start, end) {
+    let n = (end.getUTCFullYear()-start.getUTCFullYear())*12+
+            end.getUTCMonth()-start.getUTCMonth();
+    if(end.getUTCDate()<start.getUTCDate()) n--;
+    return Math.max(0,n);
+  },
+  /* HR example treats April through October as seven months. Month-counting
+     convention for partial months must be signed off before production accrual. */
+  calendarMonthsInclusive(start,end) {
+    return (end.getUTCFullYear()-start.getUTCFullYear())*12+
+           end.getUTCMonth()-start.getUTCMonth()+1;
+  },
+  calculate({hireDate,birthDate,asOfDate,insuredYears,
+             disabilityEnabled=false,workStatus='working',
+             advanceUsed=0,advanceApproved=0}) {
+    const hire=this.parseDate(hireDate),birth=this.parseDate(birthDate),
+          asOf=this.parseDate(asOfDate);
+    if(!hire||!birth||!asOf||hire>asOf||birth>hire)
+      return {ok:false,reason:'INVALID_DATES'};
+    const insured=insuredYears==null||insuredYears===''?null:Number(insuredYears);
+    const used=Number(advanceUsed),approved=Number(advanceApproved);
+    if((insured!==null&&(!Number.isFinite(insured)||insured<0))||
+       !Number.isFinite(used)||used<0||!Number.isFinite(approved)||approved<0)
+      return {ok:false,reason:'INVALID_VALUES'};
+    const serviceYears=this.years(hire,asOf),age=this.years(birth,asOf);
+    const eligible=this.completedMonths(hire,asOf)>=6;
+    const outside=disabilityEnabled&&workStatus==='outside';
+    const annual=outside?0:disabilityEnabled&&workStatus==='working'?45:
+      age>=50||(insured!==null&&insured>=10)?30:serviceYears<1?15:21;
+    const monthsInYear=hire.getUTCFullYear()===asOf.getUTCFullYear()
+      ?Math.min(12,this.calendarMonthsInclusive(hire,asOf)):12;
+    const accrued=eligible?Math.round((annual*monthsInYear/12)*100)/100:0;
+    const remaining=Math.round((accrued-used)*100)/100;
+    const normalAdvanceLimit=3;
+    return {ok:true,eligible,annual,monthsInYear,accrued,advanceUsed:used,
+      advanceApproved:approved,remaining,normalAdvanceLimit,
+      extraAdvanceRequiresAdminApproval:true,
+      availableStandardAdvance:eligible?0:Math.max(0,normalAdvanceLimit-used),
+      provisional:insured===null,serviceYears,age,
+      note:'Pure calculation only. No leave approval, entitlement posting or Firebase write.'};
   }
 });
-function lm6Preview(){
- const root=document.getElementById('lm6-output');if(!root)return;
- const get=id=>document.getElementById(id);
- const result=LM_LEAVE_ENGINE_V1.calculate({hireDate:get('lm6-hire').value,birthDate:get('lm6-birth').value,
- asOfDate:get('lm6-asof').value,insuredYears:get('lm6-insured').value,
- disabilityEnabled:get('lm6-five').checked,workStatus:get('lm6-work').value});
- const ar=currentLang==='ar';
- if(!result.ok){root.textContent=ar?'راجع التواريخ والمدة التأمينية المدخلة.':'Check dates and insurance years.';return;}
- const names={OUTSIDE:[ 'خارج نطاق العمل: صفر تشغيليًا','Outside active work: operational zero'],DISABILITY_WORKING:['ذوو الإعاقة يعمل فعليًا','Working disability category'],AGE_50:['بلوغ 50 سنة','Age 50 or above'],INSURANCE_10:['مدة تأمينية 10 سنوات','10 insured years'],FIRST_YEAR:['السنة الأولى','First service year'],REGULAR:['السنوات التالية','Subsequent service years']};
- const category=names[result.category][ar?0:1];
- root.textContent=(ar?'الاستحقاق السنوي النظري: ':'Theoretical annual entitlement: ')+result.days+(ar?' يوم — ':' days — ')+category+
- (result.provisional?(ar?' | تقديري لحين التحقق من المدة التأمينية':' | provisional until insurance history is verified'):'')+
- (ar?' | لا يتم تعديل الرصيد الفعلي':' | actual balance unchanged');
-}
-function lm6UI(){
- const t=(ar,en)=>currentLang==='ar'?ar:en;
- const today=new Date().toISOString().slice(0,10);
- return `<section class="hr-panel mt-5" id="lm6-simulator"><h2 class="text-xl font-bold text-sky-300 mb-2">${t('اختبار منطق استحقاق الإجازات — بدون حفظ','Leave Entitlement Logic Test — No Saving')}</h2>
- <p class="text-sm text-amber-200 mb-3">${t('اختبار الاستحقاق السنوي الكامل فقط. لا يحسب كسور السنة ولا يرحّل أو يخصم أرصدة، ولا يكتب على Firebase.','Full-year entitlement test only. No prorating, carryover, deductions or Firebase writes.')}</p>
- <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
- <label>${t('تاريخ التعيين','Hire date')}<input class="hr-feature-input w-full" type="date" id="lm6-hire" onchange="lm6Preview()"></label>
- <label>${t('تاريخ الميلاد','Birth date')}<input class="hr-feature-input w-full" type="date" id="lm6-birth" onchange="lm6Preview()"></label>
- <label>${t('تاريخ الحساب','As of date')}<input class="hr-feature-input w-full" type="date" id="lm6-asof" value="${today}" onchange="lm6Preview()"></label>
- <label>${t('سنوات التأمين المثبتة (اتركها فارغة إن لم تتأكد)','Verified insured years (blank if unknown)')}<input class="hr-feature-input w-full" type="number" min="0" step="0.01" id="lm6-insured" oninput="lm6Preview()"></label>
- <label class="flex items-center gap-2"><input type="checkbox" id="lm6-five" onchange="lm6Preview()">${t('ضمن فئة 5%','5% disability category')}</label>
- <label>${t('حالة العمل','Work status')}<select class="hr-feature-input w-full" id="lm6-work" onchange="lm6Preview()"><option value="working">${t('يعمل فعليًا','Working')}</option><option value="outside">${t('خارج نطاق العمل','Outside active work')}</option></select></label>
- </div><div id="lm6-output" class="text-sky-200 font-bold mt-4" aria-live="polite">${t('أدخل بيانات الحالة التجريبية لعرض النتيجة.','Enter test-case details to see the result.')}</div></section>`;
-}
-(function(){const prior=renderHRFeature;renderHRFeature=function(page){prior(page);if(page==='leave-balances'){const root=document.getElementById('hr-leave-balances-view');if(root&&!document.getElementById('lm6-simulator'))root.insertAdjacentHTML('beforeend',lm6UI());}};})();
