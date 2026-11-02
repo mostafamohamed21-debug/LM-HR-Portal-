@@ -1261,3 +1261,9 @@ html[dir="rtl"] [data-five-block]{direction:rtl;text-align:right}
 #hr-dashboard-view .lm-notify-pending{flex:0 0 auto;color:#ffbd58;font-size:13px}
 
 </style>
+
+<style id="lm11-popover-fix">
+/* Render emergency hint above all scrolling table containers */
+.lm11-floating-pop{position:fixed!important;display:flex!important;z-index:2147483000!important;inset:auto!important;top:0;left:0;right:auto;bottom:auto;pointer-events:none;box-sizing:border-box;direction:rtl;max-width:min(280px,calc(100vw - 24px));}
+.lm11-floating-pop[dir="ltr"]{direction:ltr}
+</style>
