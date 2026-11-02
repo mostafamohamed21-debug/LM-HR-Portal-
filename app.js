@@ -2408,3 +2408,38 @@ function lm8AppraisalFilter(){
  const count=document.getElementById('lm8-appraisal-count');if(count)count.textContent=hrText('عدد النتائج: ','Results: ')+shown;
 }
 
+
+
+/* Phase 11: render the hover help as a body-level overlay, outside the clipped table. */
+(function(){
+ let floating=null,anchor=null;
+ function close(){if(floating){floating.remove();floating=null;}anchor=null;}
+ function position(){
+  if(!floating||!anchor||!anchor.isConnected){close();return;}
+  const a=anchor.getBoundingClientRect(),width=Math.min(280,window.innerWidth-24);
+  floating.style.width=width+'px';
+  const height=floating.getBoundingClientRect().height;
+  const roomAbove=a.top-12,roomBelow=window.innerHeight-a.bottom-12;
+  const top=(roomBelow>=height||roomBelow>=roomAbove)?a.bottom+8:a.top-height-8;
+  floating.style.top=Math.max(8,Math.min(top,window.innerHeight-height-8))+'px';
+  const rtl=getComputedStyle(anchor).direction==='rtl';
+  const left=rtl?a.right-width:a.left;
+  floating.style.left=Math.max(12,Math.min(left,window.innerWidth-width-12))+'px';
+ }
+ function show(el){
+  if(anchor===el&&floating){position();return;}
+  close();const inner=el.querySelector('.lm10-pop');if(!inner)return;
+  anchor=el;floating=inner.cloneNode(true);
+  floating.classList.add('lm11-floating-pop');floating.setAttribute('dir',getComputedStyle(el).direction);
+  document.body.appendChild(floating);position();
+ }
+ document.addEventListener('mouseover',e=>{const el=e.target.closest?.('.lm10-hover');if(el)show(el);else if(anchor&&!anchor.matches(':focus-within'))close();},true);
+ document.addEventListener('mouseout',e=>{if(anchor&&anchor.contains(e.target)&&(!e.relatedTarget||!anchor.contains(e.relatedTarget))&&!anchor.matches(':focus-within'))close();},true);
+ document.addEventListener('focusin',e=>{const el=e.target.closest?.('.lm10-hover');if(el)show(el);},true);
+ document.addEventListener('focusout',e=>{if(anchor&&anchor.contains(e.target))requestAnimationFrame(()=>{if(anchor&&!anchor.matches(':focus-within')&&!anchor.matches(':hover'))close();});},true);
+ document.addEventListener('keydown',e=>{if(e.key==='Escape')close();},true);
+ window.addEventListener('scroll',()=>{if(floating)position();},true);
+ window.addEventListener('resize',()=>{if(floating)position();});
+ const observer=new MutationObserver(()=>{if(anchor&&!anchor.isConnected)close();});
+ observer.observe(document.body,{childList:true,subtree:true});
+})();
