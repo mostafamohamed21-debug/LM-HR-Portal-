@@ -2149,7 +2149,7 @@ async function lmCommitMassHiring(){
    const html=`<section class="hr-panel mt-5" id="lm-opening-leave-balances"><h2 class="text-xl font-bold text-sky-300 mb-2">${hrText('الأرصدة الافتتاحية الفعلية والتسويات القادمة','Actual opening balances and upcoming settlements')}</h2><p class="text-sm text-amber-200 mb-3">${notice}</p><p class="text-sm text-slate-300 mb-3">${hrText('سجلات بها رصيد','Records with balances')}: ${known} / ${records.length} · ${hrText('تواريخ تعيين تحتاج مراجعة','Hire dates requiring review')}: ${missingHire}</p><input id="lm-leave-search" class="hr-feature-input mb-3 w-full" type="search" placeholder="${hrText('بحث بالاسم أو الكود','Search by name or code')}" oninput="lmFilterLeaveOpening()"/><div style="overflow:auto;max-height:570px"><table class="hr-feature-table w-full"><thead><tr>${labels.map(s=>`<th>${escapeHtml(s)}</th>`).join('')}</tr></thead><tbody id="lm-leave-opening-rows">${records.map(r=>`<tr data-search="${escapeHtml((r.code+' '+r.name).toLowerCase())}"><td>${escapeHtml(r.code)}</td><td>${escapeHtml(r.name)}</td><td>${r.balance===null?'—':escapeHtml(String(r.balance))}</td><td>${r.hire===null?'—':escapeHtml(String(typeof r.hire==='number'?excelDateToJSDate(r.hire):r.hire))}</td><td>${r.settlement||hrText('مراجعة تاريخ التعيين','Review hire date')}</td></tr>`).join('')}</tbody></table></div></section>`;
    target.insertAdjacentHTML('afterbegin',html);
  }
- window.lmFilterLeaveOpening=function(){const q=String(document.getElementById('lm-leave-search')?.value||'').trim().toLowerCase();document.querySelectorAll('#lm-leave-opening-rows tr').forEach(r=>r.hidden=!r.dataset.search.includes(q));};
+ window.lmFilterLeaveOpening=function(){const q=String(document.getElementById('lm-leave-search')?.value||'').trim().toLowerCase();document.querySelectorAll('#lm-leave-opening-rows tr').forEach(r=>{const code=String(r.cells[0]?.textContent||'').trim();const name=String(r.cells[1]?.textContent||'').toLocaleLowerCase();r.hidden=!!q&&(/^[0-9]+$/.test(q)?code!==q:!name.includes(q));});};
  renderHRFeature=function(page){original(page);if(page==='leave-balances')draw();};
 })();
 
@@ -2237,7 +2237,7 @@ function lm3Apply(){
  const q=String(document.getElementById('lm3-search')?.value||'').trim().toLowerCase(),dept=document.getElementById('lm3-dept')?.value||'',cat=document.getElementById('lm3-category')?.value||'',balance=document.getElementById('lm3-balance')?.value||'',settle=document.getElementById('lm3-settlement')?.value||'';
  
  const allYears=!!document.getElementById('lm5-all-years')?.checked;const selectedYear=!allYears&&/^\d{4}$/.test(settle)?Number(settle):null;
- const rows=lm3Rows().filter(r=>(!q||(r.code+' '+r.name+' '+getField(r.e,'اسم الموظف','emp_name _en')).toLowerCase().includes(q))&&(!dept||r.dept===dept)&&(!cat||r.category===cat)&&(!balance||(balance==='positive'?r.balance!==null&&r.balance>0:balance==='zero'?r.balance===0:r.balance===null))&&(allYears||(selectedYear!==null&&r.settlement&&selectedYear>=Number(r.settlement.slice(0,4))&&(selectedYear-Number(r.settlement.slice(0,4)))%3===0)));
+ const rows=lm3Rows().filter(r=>(!q||(/^[0-9]+$/.test(q)?String(r.code).trim()===q:[r.name,getField(r.e,'اسم الموظف','emp_name _en')].join(' ').toLocaleLowerCase().includes(q)))&&(!dept||r.dept===dept)&&(!cat||r.category===cat)&&(!balance||(balance==='positive'?r.balance!==null&&r.balance>0:balance==='zero'?r.balance===0:r.balance===null))&&(allYears||(selectedYear!==null&&r.settlement&&selectedYear>=Number(r.settlement.slice(0,4))&&(selectedYear-Number(r.settlement.slice(0,4)))%3===0)));
  lm3State.filtered=rows.map(r=>({...r,displaySettlement:allYears?r.settlement:`${selectedYear}-01-01`}));
  const names={regular:lm3T('عادي','Regular'),working:lm3T('5% يعمل فعليًا','5% Working'),outside:lm3T('5% خارج النطاق','5% Outside')};
  document.getElementById('lm3-count').textContent=lm3T('عدد النتائج: ','Results: ')+rows.length;
@@ -2259,3 +2259,64 @@ function lm3Calculate(){const code=String(document.getElementById('lm3-code')?.v
  target.innerHTML=line(lm3T('الموظف','Employee'),getEmployeeName(emp))+line(lm3T('الرصيد المتبقي','Remaining balance'),balance===null?'—':balance+' '+lm3T('يوم','days'))+line(lm3T('الراتب الشامل','Gross salary'),lm3Money(salary))+line(lm3T('الأجر اليومي (÷ 30)','Daily rate (÷ 30)'),lm3Money(day))+line(lm3T('التسوية القادمة','Next settlement'),date||lm3T('تاريخ التعيين يحتاج مراجعة','Hire date needs review'))+`<div class="lm3-result-total">${lm3T('المقابل النقدي التقديري','Estimated cash settlement')}<strong>${lm3Escape(lm3Money(total))}</strong></div>`+(salary===null?`<p class="text-amber-200">${lm3T('حقل الراتب الشامل غير موجود أو غير رقمي؛ لا يمكن حساب مبلغ موثوق.','Gross salary missing or invalid; amount cannot be calculated reliably.')}</p>`:'');
 }
 (function(){const prior=renderHRFeature;renderHRFeature=function(page){if(page!=='leave-balances')return prior(page);const root=document.getElementById('hr-leave-balances-view');if(!root)return;root.innerHTML=hrFeatureShell(hrText('أرصدة الإجازات','Leave balances'),hrText('الحساب التلقائي مستقل عن أداة التحديث الجماعي','Automatic accrual is separate from mass balance update'),lmBHtml())+lm3UI();document.getElementById('lm5-all-years').checked=true;document.getElementById('lm3-settlement').disabled=true;lm3Apply();};})();
+
+
+/* LM Leave Logic Phase 6: isolated, read-only entitlement simulator.
+   Does not alter Firebase, opening balances, or historical settlements.
+   Partial-year accrual is deliberately NOT inferred pending HR approval. */
+const LM_LEAVE_ENGINE_V1 = Object.freeze({
+  date(value) {
+    if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    const d=new Date(value+'T12:00:00Z');
+    return Number.isNaN(d.getTime())||d.toISOString().slice(0,10)!==value?null:d;
+  },
+  completedYears(start,asOf){
+    let years=asOf.getUTCFullYear()-start.getUTCFullYear();
+    if(asOf.getUTCMonth()<start.getUTCMonth()||(asOf.getUTCMonth()===start.getUTCMonth()&&asOf.getUTCDate()<start.getUTCDate()))years--;
+    return years;
+  },
+  calculate({hireDate,birthDate,asOfDate,insuredYears,disabilityEnabled=false,workStatus='working'}) {
+    const hire=this.date(hireDate),birth=this.date(birthDate),asOf=this.date(asOfDate);
+    if(!hire||!birth||!asOf) return {ok:false,reason:'INVALID_DATE'};
+    if(hire>asOf||birth>hire) return {ok:false,reason:'DATE_ORDER'};
+    const serviceYears=this.completedYears(hire,asOf),age=this.completedYears(birth,asOf);
+    const insured=insuredYears===null||insuredYears===undefined||insuredYears===''?null:Number(insuredYears);
+    if(insured!==null&&(!Number.isFinite(insured)||insured<0))return {ok:false,reason:'INVALID_INSURANCE'};
+    if(disabilityEnabled&&workStatus==='outside')return {ok:true,days:0,category:'OUTSIDE',serviceYears,age,provisional:false};
+    if(disabilityEnabled&&workStatus==='working')return {ok:true,days:45,category:'DISABILITY_WORKING',serviceYears,age,provisional:false};
+    if(age>=50)return {ok:true,days:30,category:'AGE_50',serviceYears,age,provisional:false};
+    if(insured!==null&&insured>=10)return {ok:true,days:30,category:'INSURANCE_10',serviceYears,age,provisional:false};
+    const days=serviceYears<1?15:21;
+    return {ok:true,days,category:serviceYears<1?'FIRST_YEAR':'REGULAR',serviceYears,age,
+      provisional:insured===null,warning:insured===null?'INSURANCE_UNVERIFIED':null};
+  }
+});
+function lm6Preview(){
+ const root=document.getElementById('lm6-output');if(!root)return;
+ const get=id=>document.getElementById(id);
+ const result=LM_LEAVE_ENGINE_V1.calculate({hireDate:get('lm6-hire').value,birthDate:get('lm6-birth').value,
+ asOfDate:get('lm6-asof').value,insuredYears:get('lm6-insured').value,
+ disabilityEnabled:get('lm6-five').checked,workStatus:get('lm6-work').value});
+ const ar=currentLang==='ar';
+ if(!result.ok){root.textContent=ar?'راجع التواريخ والمدة التأمينية المدخلة.':'Check dates and insurance years.';return;}
+ const names={OUTSIDE:[ 'خارج نطاق العمل: صفر تشغيليًا','Outside active work: operational zero'],DISABILITY_WORKING:['ذوو الإعاقة يعمل فعليًا','Working disability category'],AGE_50:['بلوغ 50 سنة','Age 50 or above'],INSURANCE_10:['مدة تأمينية 10 سنوات','10 insured years'],FIRST_YEAR:['السنة الأولى','First service year'],REGULAR:['السنوات التالية','Subsequent service years']};
+ const category=names[result.category][ar?0:1];
+ root.textContent=(ar?'الاستحقاق السنوي النظري: ':'Theoretical annual entitlement: ')+result.days+(ar?' يوم — ':' days — ')+category+
+ (result.provisional?(ar?' | تقديري لحين التحقق من المدة التأمينية':' | provisional until insurance history is verified'):'')+
+ (ar?' | لا يتم تعديل الرصيد الفعلي':' | actual balance unchanged');
+}
+function lm6UI(){
+ const t=(ar,en)=>currentLang==='ar'?ar:en;
+ const today=new Date().toISOString().slice(0,10);
+ return `<section class="hr-panel mt-5" id="lm6-simulator"><h2 class="text-xl font-bold text-sky-300 mb-2">${t('اختبار منطق استحقاق الإجازات — بدون حفظ','Leave Entitlement Logic Test — No Saving')}</h2>
+ <p class="text-sm text-amber-200 mb-3">${t('اختبار الاستحقاق السنوي الكامل فقط. لا يحسب كسور السنة ولا يرحّل أو يخصم أرصدة، ولا يكتب على Firebase.','Full-year entitlement test only. No prorating, carryover, deductions or Firebase writes.')}</p>
+ <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+ <label>${t('تاريخ التعيين','Hire date')}<input class="hr-feature-input w-full" type="date" id="lm6-hire" onchange="lm6Preview()"></label>
+ <label>${t('تاريخ الميلاد','Birth date')}<input class="hr-feature-input w-full" type="date" id="lm6-birth" onchange="lm6Preview()"></label>
+ <label>${t('تاريخ الحساب','As of date')}<input class="hr-feature-input w-full" type="date" id="lm6-asof" value="${today}" onchange="lm6Preview()"></label>
+ <label>${t('سنوات التأمين المثبتة (اتركها فارغة إن لم تتأكد)','Verified insured years (blank if unknown)')}<input class="hr-feature-input w-full" type="number" min="0" step="0.01" id="lm6-insured" oninput="lm6Preview()"></label>
+ <label class="flex items-center gap-2"><input type="checkbox" id="lm6-five" onchange="lm6Preview()">${t('ضمن فئة 5%','5% disability category')}</label>
+ <label>${t('حالة العمل','Work status')}<select class="hr-feature-input w-full" id="lm6-work" onchange="lm6Preview()"><option value="working">${t('يعمل فعليًا','Working')}</option><option value="outside">${t('خارج نطاق العمل','Outside active work')}</option></select></label>
+ </div><div id="lm6-output" class="text-sky-200 font-bold mt-4" aria-live="polite">${t('أدخل بيانات الحالة التجريبية لعرض النتيجة.','Enter test-case details to see the result.')}</div></section>`;
+}
+(function(){const prior=renderHRFeature;renderHRFeature=function(page){prior(page);if(page==='leave-balances'){const root=document.getElementById('hr-leave-balances-view');if(root&&!document.getElementById('lm6-simulator'))root.insertAdjacentHTML('beforeend',lm6UI());}};})();
