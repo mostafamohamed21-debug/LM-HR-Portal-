@@ -2461,6 +2461,14 @@ const LM13=Object.freeze({
   const birth=this.date(lmBField(e,['تاريخ الميلاد','dob','date of birth']));
   if(!birth)return {days:null,verified:false,reason:'birth missing'};
   if(this.dateAge(birth,year)>=50)return {days:30,verified:true,reason:'age'};
+  // Historical in-company service: use hire date, not a current 'years of service' field.
+  // Once 10 full years are completed, the 30-day entitlement applies prospectively.
+  const anniversaryYear=Number(hire.slice(0,4))+10;
+  const anniversaryMonth=Number(hire.slice(5,7));
+  if(year>anniversaryYear || (year===anniversaryYear && anniversaryMonth===1))
+   return {days:30,verified:true,reason:'company-tenure'};
+  if(year===anniversaryYear)
+   return {days:21,verified:true,reason:'company-tenure-transition',splitMonth:anniversaryMonth};
   const insurance=this.number(lmBField(e,['insuredYears','insuranceYears','سنوات التأمين','مدة الاشتراك التأميني']));
   const approval=this.date(lmBField(e,['insuranceApprovalDate','insuredTenureApprovalDate','تاريخ اعتماد المدة التأمينية']));
   // Approval date is mandatory for a historical entitlement increase.
@@ -2478,7 +2486,7 @@ const LM13=Object.freeze({
   for(let yr=y-3;yr<y;yr++){
    const months=this.yearMonths(hire,yr),a=this.annual(e,hire,yr);
    if(!a.verified)return {ok:false,reason:a.reason};
-   const earned=Math.round(a.days*months/12*10000)/10000;
+   const earned=Math.round((a.splitMonth ? (21*(a.splitMonth-1)+30*(13-a.splitMonth))/12 : a.days*months/12)*10000)/10000;
    const minimum=Math.min(earned,Math.round(15*months/12*10000)/10000);
    rows.push({year:yr,months,annual:a.days,earned,minimum});entitlement+=earned;benchmark+=minimum;
   }
