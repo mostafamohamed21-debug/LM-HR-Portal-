@@ -2276,7 +2276,7 @@ function lm3Export(){if(!window.XLSX){alert(lm3T('مكتبة Excel غير متا
  const headings=currentLang==='ar'?['الكود','اسم الموظف','الإدارة','الرصيد المتاح','الرصيد عن السنة','المستحق حتى اليوم','التصنيف','تاريخ التسوية القادمة']:['Code','Employee','Department','Available balance','Annual entitlement','Accrued to date','Category','Next settlement'];
  const grid=[headings,...lm3State.filtered.map(r=>[r.code,r.name,r.dept,lm10Balance(r,lm8LeaveProjection(r.e)).display,lm8LeaveProjection(r.e).ok?lm8LeaveProjection(r.e).annual:'',lm8LeaveProjection(r.e).ok?lm8LeaveProjection(r.e).accrued:'',names[r.category],r.displaySettlement||''])];
  const sheet=XLSX.utils.aoa_to_sheet(grid);sheet['!cols']=[{wch:14},{wch:36},{wch:28},{wch:25},{wch:20},{wch:22},{wch:23},{wch:24}];const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,sheet,currentLang==='ar'?'أرصدة الإجازات':'Leave balances');XLSX.writeFile(book,'LactoMisr_Leave_Report_'+new Date().toISOString().slice(0,10)+'.xlsx');}
-function lm3Open(){document.getElementById('lm3-modal')?.classList.remove('hidden');document.getElementById('lm3-code')?.focus();lm3Calculate();}
+function lm3Open(){lm12OpenReport();}
 function lm3Close(){document.getElementById('lm3-modal')?.classList.add('hidden');}
 function lm3Calculate(){const code=String(document.getElementById('lm3-code')?.value||'').trim(),target=document.getElementById('lm3-result');if(!target)return;if(!code){target.textContent=lm3T('أدخل كود الموظف لعرض بياناته.','Enter an employee code.');return;}const emp=(allEmployees||[]).find(e=>getEmployeeCode(e)===code);if(!emp){target.textContent=lm3T('كود الموظف غير موجود.','Employee code not found.');return;}
  const balance=lm3Balance(emp),salary=lm3Salary(emp),date=lm3Next(lm3Hire(emp)),day=salary===null?null:salary/30,total=salary===null||balance===null?null:day*balance;
@@ -2443,3 +2443,36 @@ function lm8AppraisalFilter(){
  const observer=new MutationObserver(()=>{if(anchor&&!anchor.isConnected)close();});
  observer.observe(document.body,{childList:true,subtree:true});
 })();
+
+/* Phase 12: actual read-only bulk financial settlement report, using current filtered employees. */
+let lm12ReportRows=[];
+function lm12OpenReport(){
+ const source=(lm3State.filtered||[]);
+ lm12ReportRows=source.map(r=>{
+  const salary=lm3Salary(r.e),balance=lm3Balance(r.e);
+  const valid=salary!==null&&Number.isFinite(salary)&&salary>=0&&balance!==null&&Number.isFinite(balance)&&balance>=0;
+  return {...r,salary,balance,daily:valid?salary/30:null,total:valid?(salary/30)*balance:null,valid};
+ });
+ const t=lm3T,esc=lm3Escape;
+ const valid=lm12ReportRows.filter(r=>r.valid),sumDays=valid.reduce((n,r)=>n+r.balance,0),sumMoney=valid.reduce((n,r)=>n+r.total,0);
+ const old=document.getElementById('lm12-settlement-report');if(old)old.remove();
+ const overlay=document.createElement('div');overlay.id='lm12-settlement-report';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');
+ overlay.innerHTML=`<div class="lm12-sheet"><header class="lm12-head"><div><h2>${t('تقرير التسوية المالية للإجازات','Leave Financial Settlement Report')}</h2><p>${t('حساب فعلي من الرواتب والأرصدة المسجلة للموظفين المطابقين للفلاتر الحالية. لا يتم تنفيذ صرف أو خصم.','Calculated from recorded salary and leave balances for currently filtered employees. No payout or deduction is performed.')}</p></div><div class="lm12-actions"><button type="button" onclick="lm12Export()">${t('تصدير Excel','Export Excel')}</button><button type="button" onclick="lm12Print()">${t('طباعة','Print')}</button><button type="button" onclick="lm12Close()">${t('العودة للأرصدة','Back to balances')} ×</button></div></header>
+ <div class="lm12-summary"><div>${t('عدد الموظفين','Employees')}<strong>${lm12ReportRows.length}</strong></div><div>${t('أيام السجلات المكتملة','Days in valid records')}<strong>${sumDays.toLocaleString()}</strong></div><div>${t('إجمالي القيمة المحسوبة','Calculated total')}<strong>${lm3Money(sumMoney)}</strong></div><div>${t('تحتاج مراجعة','Needs review')}<strong>${lm12ReportRows.length-valid.length}</strong></div></div>
+ <p class="lm12-note">${t('أساس الحساب: الراتب الشامل ÷ 30 × رصيد الإجازات المسجل. هذه قيمة تقديرية وفق بيانات النظام، وليست أمر صرف معتمدًا. السجلات الناقصة لا تُحسب بصفر.','Formula: recorded gross salary / 30 × recorded leave balance. This is a data-based estimate, not an approved payout. Incomplete records are not counted as zero.')}</p>
+ <div class="lm12-scroll"><table><thead><tr>${[t('الكود','Code'),t('الموظف','Employee'),t('الإدارة','Department'),t('تاريخ التسوية','Settlement date'),t('الرصيد المسجل (يوم)','Recorded balance (days)'),t('الراتب الشامل','Gross salary'),t('الأجر اليومي','Daily wage'),t('القيمة المالية','Financial amount'),t('الحالة','Status')].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${lm12ReportRows.map(r=>`<tr><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.dept)}</td><td>${esc(r.displaySettlement||'—')}</td><td>${r.balance===null?'—':esc(r.balance)}</td><td>${lm3Money(r.salary)}</td><td>${lm3Money(r.daily)}</td><td>${lm3Money(r.total)}</td><td>${r.valid?t('محسوب','Calculated'):t('يحتاج مراجعة','Needs review')}</td></tr>`).join('')||`<tr><td colspan="9">${t('لا توجد نتائج مطابقة للفلاتر','No employees match the filters')}</td></tr>`}</tbody><tfoot><tr><td colspan="4">${t('إجمالي السجلات المكتملة','Total of valid records')}</td><td>${sumDays}</td><td colspan="2"></td><td>${lm3Money(sumMoney)}</td><td>${valid.length} / ${lm12ReportRows.length}</td></tr></tfoot></table></div></div>`;
+ document.body.appendChild(overlay);document.body.classList.add('lm12-open');
+}
+function lm12Close(){document.getElementById('lm12-settlement-report')?.remove();document.body.classList.remove('lm12-open');}
+function lm12Export(){
+ if(!window.XLSX){alert(lm3T('مكتبة Excel غير متاحة','Excel library unavailable'));return;}
+ const t=lm3T;
+ const headings=[t('الكود','Code'),t('الموظف','Employee'),t('الإدارة','Department'),t('تاريخ التسوية','Settlement date'),t('رصيد الإجازات المسجل','Recorded leave balance'),t('الراتب الشامل','Gross salary'),t('الأجر اليومي','Daily wage'),t('قيمة التسوية','Settlement amount'),t('الحالة','Status')];
+ const data=[headings,...lm12ReportRows.map(r=>[r.code,r.name,r.dept,r.displaySettlement||'',r.balance??'',r.salary??'',r.daily??'',r.total??'',r.valid?t('محسوب','Calculated'):t('يحتاج مراجعة','Needs review')])];
+ const valid=lm12ReportRows.filter(r=>r.valid);
+ data.push([t('الإجمالي','Total'),'','','',valid.reduce((n,r)=>n+r.balance,0),'','',valid.reduce((n,r)=>n+r.total,0),'']);
+ const ws=XLSX.utils.aoa_to_sheet(data);ws['!cols']=[{wch:14},{wch:35},{wch:30},{wch:18},{wch:20},{wch:20},{wch:20},{wch:22},{wch:20}];
+ for(let i=2;i<=data.length;i++){for(const c of ['F','G','H']){const cell=ws[c+i];if(cell&&typeof cell.v==='number')cell.z='#,##0.00';}}
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Leave Settlement');XLSX.writeFile(wb,'LactoMisr_Leave_Settlement_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+function lm12Print(){window.print();}
