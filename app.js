@@ -516,7 +516,7 @@ function viewEmployee(code) {
     setFieldVal('prof-qual', currentLang === 'ar' ? (getField(emp, 'المؤهل', 'qualification') || '--') : (getField(emp, 'qualification') || '--'));
     setFieldVal('prof-qual-auth', currentLang === 'ar' ? (getField(emp, 'جهة المؤهل ', 'جهة المؤهل', 'qualAuth') || '--') : (getField(emp, 'qulification issuing authority', 'qualAuth', 'issuer') || '--'));
     setFieldVal('prof-dob',excelDateToJSDate(getField(emp,'تاريخ الميلاد','dob')));
-    setFieldVal('prof-age',getField(emp,'السن حتى تاريخه ','السن حتى تاريخه','age','age to date'));
+    setFieldVal('prof-age',fahdAge(getField(emp,'تاريخ الميلاد','dob'))||getField(emp,'السن حتى تاريخه ','السن حتى تاريخه','age','age to date'));
     setFieldVal('prof-insurance', currentLang === 'ar' ? (getField(emp, 'الحالة التأمينية ', 'الحالة التأمينية', 'insuranceStatus') || '--') : (getField(emp, 'insurance status ', 'insuranceStatus') || '--'));
     setFieldVal('prof-pob', currentLang === 'ar' ? (getField(emp, 'مكان الميلاد', 'pob') || '--') : (getField(emp, 'pob') || '--'));
     document.getElementById('profile-img').src=getField(emp,'photoUrl','photo','رابط الصورة') || 'default-avatar.png';
@@ -562,7 +562,7 @@ async function executeSave(){
     putMapped(updatedData, emp, ['المؤهل','qualification'], document.getElementById('prof-qual').value, 'qualification');
     putMapped(updatedData, emp, ['جهة المؤهل ','جهة المؤهل','qualAuth','qulification issuing authority','issuer'], document.getElementById('prof-qual-auth').value, 'qualAuth');
     putMapped(updatedData, emp, ['تاريخ الميلاد','dob'], document.getElementById('prof-dob').value, 'dob');
-    putMapped(updatedData, emp, ['السن حتى تاريخه ','السن حتى تاريخه','age','age to date'], document.getElementById('prof-age').value, 'age');
+    putMapped(updatedData, emp, ['السن حتى تاريخه ','السن حتى تاريخه','age','age to date'], fahdAge(document.getElementById('prof-dob').value)||document.getElementById('prof-age').value, 'age');
     putMapped(updatedData, emp, ['الحالة التأمينية ','الحالة التأمينية','insuranceStatus','insurance status'], document.getElementById('prof-insurance').value, 'insuranceStatus');
     putMapped(updatedData, emp, ['مكان الميلاد','pob'], document.getElementById('prof-pob').value, 'pob');
     putMapped(updatedData, emp, ['photoUrl','photo','رابط الصورة'], document.getElementById('profile-img').src, 'photoUrl');
@@ -948,7 +948,7 @@ function hrImportRows(type,rows){const aliases=hrImportColumns[type], keys=Objec
  const missing=(type==='attendance'?['code']:['code','entitled','used','remaining']).filter(k=>!mapped[k]);if(type==='attendance'&&!mapped.timestamp&&!(mapped.date&&mapped.time))missing.push('timestamp OR date+time');if(missing.length)throw Error('Missing columns: '+missing.join(', '));
  let result=[],errors=[];rows.forEach((r,i)=>{let rec={};for(let k in mapped)rec[k]=r[mapped[k]];rec.code=String(rec.code??'').trim();if(type==='attendance' && mapped.code && /بصم/.test(mapped.code)){rec.biometricId=rec.code;}let err='';if(!rec.code)err='Missing employee code';if(type==='attendance'&&!err&&Array.isArray(allEmployees)&&allEmployees.length&&!allEmployees.some(e=>getEmployeeCode(e)===rec.code))err='Employee code '+rec.code+' not found in Firebase employees';if(type==='attendance'){rec.timestamp=String(rec.timestamp??`${hrDate(rec.date)} ${rec.time??''}`).trim();if(!rec.timestamp||rec.timestamp==='undefined')err='Missing date/time';rec.source=String(rec.source||'Excel import');rec.type=String(rec.type||'Unspecified')}else{for(let k of ['entitled','used','remaining'])rec[k]=hrNum(rec[k]);if(['entitled','used','remaining'].some(k=>!Number.isFinite(rec[k])||rec[k]<0))err='Invalid balance';if(!err&&Math.abs(rec.entitled-rec.used-rec.remaining)>0.02)err='Balance mismatch';rec.year=String(rec.year||new Date().getFullYear())}if(err)errors.push(`Row ${i+2}: ${err}`);else result.push(rec)});return {result,errors,mapped};}
 async function hrReadImport(type,input){let box=document.getElementById('hr-import-preview-'+type);if(!input.files?.[0])return;let file=input.files[0];if(file.size>5*1024*1024){box.textContent='File exceeds 5 MB';return}if(!window.XLSX){box.textContent='Excel parser unavailable. Check internet connection.';return}try{const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false});const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});if(!rows.length)throw Error('Sheet is empty');if(rows.length>3000)throw Error('Maximum 3000 rows per batch');const parsed=hrImportRows(type,rows);hrImportState[type]={records:parsed.result,errors:parsed.errors,filename:file.name};let sample=parsed.result.slice(0,8);box.innerHTML=`<p class="mb-2">${hrText('سجلات صحيحة','Valid rows')}: <b>${parsed.result.length}</b> · ${hrText('أخطاء','Errors')}: <b>${parsed.errors.length}</b></p>${parsed.errors.length?`<div class="text-rose-300 mb-3">${parsed.errors.slice(0,12).map(hrEscape).join('<br>')}</div>`:''}<div style="overflow-x:auto"><table class="hr-feature-table"><thead><tr>${Object.keys(sample[0]||{}).map(k=>`<th>${hrEscape(k)}</th>`).join('')}</tr></thead><tbody>${sample.map(r=>`<tr>${Object.values(r).map(v=>`<td>${hrEscape(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>${parsed.result.length&&!parsed.errors.length?`<button class="portal-ghost-btn px-5 py-3 rounded-xl mt-4" onclick="hrCommitImport('${type}')">${hrText('حفظ الدفعة في Firebase بعد التأكيد','Save batch to Firebase after confirmation')}</button>`:'<p class="text-amber-200 mt-3">Fix errors before saving.</p>'}`;}catch(e){hrImportState[type]=null;box.textContent='Import error: '+e.message}}
-async function hrCommitImport(type){const state=hrImportState[type];if(!state?.records.length||state.errors.length)return;const ok=confirm(hrText('تأكيد حفظ البيانات المستوردة في قاعدة البورتال؟ لن يتم تحديث ESS تلقائيًا.','Save imported data in Portal Firebase? ESS will not be updated automatically.'));if(!ok)return;const batch=db.ref('hr_imports/'+type).push();try{await batch.set({filename:state.filename,createdAt:firebase.database.ServerValue.TIMESTAMP,recordCount:state.records.length,records:state.records});alert(hrText('تم حفظ الدفعة بنجاح','Batch saved successfully'));hrLoadImport(type)}catch(e){alert('Firebase write failed: '+e.message)}}
+async function hrCommitImport(type){const state=hrImportState[type];if(!state?.records.length||state.errors.length)return;const ok=await lmDialog(hrText('تأكيد حفظ البيانات المستوردة في قاعدة البورتال؟ لن يتم تحديث ESS تلقائيًا.','Save imported data in Portal Firebase? ESS will not be updated automatically.'),true);if(!ok)return;const batch=db.ref('hr_imports/'+type).push();try{await batch.set({filename:state.filename,createdAt:firebase.database.ServerValue.TIMESTAMP,recordCount:state.records.length,records:state.records});await lmDialog(hrText('تم حفظ الدفعة بنجاح','Batch saved successfully'));hrLoadImport(type)}catch(e){await lmDialog('Firebase write failed: '+e.message)}}
 async function hrLoadImport(type){const box=document.getElementById('hr-import-saved-'+type);if(!box)return;try{let snap=await db.ref('hr_imports/'+type).limitToLast(1).once('value'),items=snap.val();if(!items){box.textContent=hrText('لا توجد دفعات محفوظة بعد','No saved batches yet');return}let batch=Object.values(items)[0];box.innerHTML=`<b>${hrText('آخر دفعة محفوظة','Latest saved batch')}</b><p>${hrEscape(batch.filename)} — ${Number(batch.recordCount)||0} ${hrText('سجل','records')}</p><p class="text-xs text-slate-400">${new Date(batch.createdAt||Date.now()).toLocaleString()}</p>`}catch(e){box.textContent=hrText('تعذر قراءة البيانات: راجع صلاحيات Firebase','Cannot read saved data: check Firebase rules')}}
 
 // Real-data phase: read-only batch inspection and deterministic settlement schedule.
@@ -2079,7 +2079,7 @@ async function lmReadMassHiring(input){
 }
 async function lmCommitMassHiring(){
  if(!lmMass.valid||lmMass.busy||!portalIsAdmin())return;
- const rows=lmMass.rows;if(!confirm(lmMassMessage(`تأكيد إنشاء ${rows.length} موظف جديد؟ لن يتم تعديل أي سجل موجود.`,`Create ${rows.length} new employees? Existing records will not be changed.`)))return;
+ const rows=lmMass.rows;if(!await lmDialog(lmMassMessage(`تأكيد إنشاء ${rows.length} موظف جديد؟ لن يتم تعديل أي سجل موجود.`,`Create ${rows.length} new employees? Existing records will not be changed.`)))return;
  lmMass.busy=true;document.getElementById('lm-mass-commit').disabled=true;
  const batchId=db.ref('hr_imports').push().key;let created=0,skipped=0;const failures=[],createdCodes=[];
  try{
@@ -2172,7 +2172,7 @@ function lmBDate(v){if(typeof v==='number'&&window.XLSX){const d=XLSX.SSF.parse_
 function lmBNumber(v){if(v===null||v===undefined||String(v).trim()==='')return NaN;const n=Number(String(v).replace(/,/g,'').trim());return Number.isFinite(n)?n:NaN;}
 function lmBHtml(){return `<section class="hr-panel mb-5"><h2 class="font-bold text-sky-300 mb-2">${lmBText('تحديث أرصدة الإجازات الجماعي','Mass Leave Balance Update')}</h2><p class="text-sm text-slate-300 mb-3">${lmBText('نفس خطوات Mass Hiring: تنزيل النموذج ← رفع الملف ← فحص كامل ← معاينة ← اعتماد. لا تغيير لبيانات الموظف أو نظام الحساب التلقائي.','Same Mass Hiring workflow: template → upload → validation → preview → confirm. No identity changes or automatic accrual changes.')}</p><div class="lm-mass-toolbar"><button type="button" class="portal-action-btn" onclick="lmBDownload()">↓ ${lmBText('تنزيل نموذج Excel','Download Excel template')}</button><label class="lm-mass-file-label">↑ ${lmBText('رفع نموذج الأرصدة','Upload balances')}<input type="file" accept=".xlsx,.xls" onchange="lmBRead(this)"></label></div><p id="lm-b-summary" class="mt-3 text-sm text-slate-300"></p><pre id="lm-b-errors" class="text-rose-300 whitespace-pre-wrap text-sm"></pre><div id="lm-b-preview" class="lm-mass-preview" style="max-height:440px;overflow:auto"></div><button id="lm-b-commit" type="button" disabled class="portal-action-btn mt-4" onclick="lmBCommit()">${lmBText('اعتماد تحديث الأرصدة','Confirm balance update')}</button><p id="lm-b-progress" class="text-sm text-amber-200 mt-3"></p></section>`;}
 function lmBInvalidate(){lmBalanceState.ready=false;const b=document.getElementById('lm-b-commit');if(b)b.disabled=true;document.getElementById('lm-b-summary').textContent=lmBText('تاريخ السريان تغير. أعد رفع الملف للمراجعة.','Effective date changed. Upload file again for validation.');}
-function lmBDownload(){if(!window.XLSX){alert('Excel library unavailable');return;}const sh=XLSX.utils.aoa_to_sheet([lmBalanceColumns.map((x,i)=>i===0?'الكود ':i===1?'الاسم ':i===2?'تاريخ التعيين ':i===3?'الإدارة ':i===4?'عدد سنوات الخدمة ':i===5?'مدد خارجية ':i===6?'الرصيد عن السنة ':i===7?'الرصيد الافتتاحى ':i===8?'رصيد مستنفذ':'الرصيد الحالى ')]);sh['!cols']=lmBalanceColumns.map(()=>({wch:23}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,sh,'Sheet1');XLSX.writeFile(wb,'LactoMisr_Annual_Balance_Update.xlsx');}
+function lmBDownload(){if(!window.XLSX){showToast(lm3T('مكتبة Excel غير متاحة','Excel library unavailable'),true);return;}const sh=XLSX.utils.aoa_to_sheet([lmBalanceColumns.map((x,i)=>i===0?'الكود ':i===1?'الاسم ':i===2?'تاريخ التعيين ':i===3?'الإدارة ':i===4?'عدد سنوات الخدمة ':i===5?'مدد خارجية ':i===6?'الرصيد عن السنة ':i===7?'الرصيد الافتتاحى ':i===8?'رصيد مستنفذ':'الرصيد الحالى ')]);sh['!cols']=lmBalanceColumns.map(()=>({wch:23}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,sh,'Sheet1');XLSX.writeFile(wb,'LactoMisr_Annual_Balance_Update.xlsx');}
 async function lmBRead(input){const file=input.files?.[0],st=lmBalanceState;st.ready=false;st.rows=[];st.errors=[];document.getElementById('lm-b-commit').disabled=true;if(!file)return;
  const err=document.getElementById('lm-b-errors'),summary=document.getElementById('lm-b-summary'),preview=document.getElementById('lm-b-preview');err.textContent='';preview.replaceChildren();
  try{if(!portalIsAdmin())throw Error('Admin account required');if(!window.XLSX)throw Error('Excel parser unavailable');if(file.size>12*1024*1024)throw Error('File too large (12 MB max)');const date=new Date().toISOString().slice(0,10);
@@ -2190,7 +2190,7 @@ async function lmBRead(input){const file=input.files?.[0],st=lmBalanceState;st.r
  st.rows=parsed;st.errors=errors;st.file=file.name;st.date=date;st.ready=errors.length===0;summary.textContent=`${lmBText('صفوف','Rows')}: ${parsed.length} · ${lmBText('أخطاء','Errors')}: ${errors.length}`;err.textContent=errors.slice(0,60).join('\n');
  const table=document.createElement('table');table.className='hr-feature-table';const header=document.createElement('tr');for(const h of ['Row','Code','Employee','Old balance','New balance','Status']){const th=document.createElement('th');th.textContent=h;header.append(th);}table.append(header);for(const r of parsed.slice(0,100)){const tr=document.createElement('tr');for(const v of [r.line,r.code,r.name,r.old??'—',r.final,r.issues.join('; ')||'✓']){const td=document.createElement('td');td.textContent=v;tr.append(td);}table.append(tr);}preview.replaceChildren(table);document.getElementById('lm-b-commit').disabled=!st.ready;
  }catch(e){err.textContent=e.message;summary.textContent='';}}
-async function lmBCommit(){const st=lmBalanceState;if(!st.ready||st.busy||!portalIsAdmin())return;const status=document.getElementById('lm-b-progress');if(!confirm(lmBText(`تأكيد تحديث ${st.rows.length} موظف؟`,`Confirm update for ${st.rows.length} employees?`)))return;st.busy=true;document.getElementById('lm-b-commit').disabled=true;
+async function lmBCommit(){const st=lmBalanceState;if(!st.ready||st.busy||!portalIsAdmin())return;const status=document.getElementById('lm-b-progress');if(!await lmDialog(lmBText(`تأكيد تحديث ${st.rows.length} موظف؟`,`Confirm update for ${st.rows.length} employees?`),true))return;st.busy=true;document.getElementById('lm-b-commit').disabled=true;
  try{const snap=await db.ref(PORTAL_EMPLOYEE_COLLECTION).once('value');const live=snap.val()||{};const updates={},audit=[];
  for(const row of st.rows){const emp=live[row.code];if(!emp)throw Error('Employee removed: '+row.code);if(lmBDate(lmBField(emp,['تاريخ التعيين','date_of_hiring','hireDate']))!==row.hire)throw Error('Hire date changed: '+row.code);if(!['الإدارة','department'].some(k=>lmBKey(row.dept)===lmBKey(lmBField(emp,[k]))))throw Error('Department changed: '+row.code);
  if(!['اسم الموظف','emp_name _en'].some(k=>lmBKey(row.name)===lmBKey(lmBField(emp,[k]))))throw Error('Name changed: '+row.code);
@@ -2216,11 +2216,45 @@ function lm15CycleStart(e){
  const n=Number(override);
  return Number.isInteger(n)&&n>=2000&&n<=2100?n:year;
 }
+/* Phase 19: retirement-age settlement scheduling. Dates use calendar birthdays,
+   not potentially stale stored age fields. No Firebase writes are made here. */
+function lm19Birth(e){return lm8Date(lmBField(e,['تاريخ الميلاد','dob','date of birth']));}
+function lm19AgeOn(birth,iso){
+ if(!birth||!iso)return null;
+ const b=lm8Date(birth),d=lm8Date(iso);
+ if(!b||!d)return null;
+ const [by,bm,bd]=b.split('-').map(Number),[y,m,day]=d.split('-').map(Number);
+ const valid=(yy,mm,dd)=>{const dt=new Date(Date.UTC(yy,mm-1,dd));return dt.getUTCFullYear()===yy&&dt.getUTCMonth()===mm-1&&dt.getUTCDate()===dd;};
+ if(!valid(by,bm,bd)||!valid(y,m,day))return null;
+ return y-by-(m<bm||(m===bm&&day<bd)?1:0);
+}
+function lm19SixtyYear(e){const birth=lm19Birth(e);return birth?Number(birth.slice(0,4))+60:null;}
+function lm19FirstAnnual(e){const y=lm19SixtyYear(e);return Number.isInteger(y)?y+1:null;}
+function lm19SettlementYear(e,year){
+ const y=Number(year),start=lm15CycleStart(e),first=lm19FirstAnnual(e);
+ if(!Number.isInteger(y)||!start)return false;
+ if(first!==null&&y>=first)return true;
+ return y>=start+3&&(y-start)%3===0;
+}
+function lm19PreviousBoundary(e,year){
+ const start=lm15CycleStart(e),first=lm19FirstAnnual(e);
+ if(!start)return null;
+ if(first!==null&&year>first)return year-1;
+ // Last completed 3-year cycle strictly preceding the new settlement.
+ let prev=start;
+ while(prev+3<year)prev+=3;
+ return Math.min(prev,year-1);
+}
 function lm15Next(e){
- const year=lm15CycleStart(e);if(!year)return null;
- const now=new Date();let settlement=year+3;
- while(settlement<=now.getFullYear())settlement+=3;
- return `${settlement}-01-01`;
+ const start=lm15CycleStart(e);if(!start)return null;
+ const now=new Date(),current=now.getFullYear();
+ const first=lm19FirstAnnual(e);
+ if(first!==null&&current>=first-1){
+  const year=Math.max(first,current+1);return `${year}-01-01`;
+ }
+ let year=start+3;while(year<=current)year+=3;
+ if(first!==null&&first<year&&first>current)year=first;
+ return `${year}-01-01`;
 }
 function lm3Next(hire){const m=String(hire||'').match(/^(\d{4})-(\d\d)-(\d\d)$/);if(!m)return null;const y=Number(m[1]);if(y<1950||y>2100)return null;const now=new Date();let year=y+3;while(year<=now.getFullYear() || (year===now.getFullYear()&&now.getMonth()>=0))year+=3;return `${year}-01-01`;}
 function lm3Balance(e){const five=e.hr_five_percent||{};return five.enabled&&five.workStatus==='outside'?0:lm3Num(lmBField(e,['رصيد الاجازات','رصيد الإجازات','annual leave balance']));}
@@ -2273,7 +2307,7 @@ function lm3Apply(){
  const q=String(document.getElementById('lm3-search')?.value||'').trim().toLowerCase(),dept=document.getElementById('lm3-dept')?.value||'',cat=document.getElementById('lm3-category')?.value||'',balance=document.getElementById('lm3-balance')?.value||'',settle=document.getElementById('lm3-settlement')?.value||'';
  
  const allYears=!!document.getElementById('lm5-all-years')?.checked;const selectedYear=!allYears&&/^\d{4}$/.test(settle)?Number(settle):null;
- const rows=lm3Rows().filter(r=>(!q||(/^[0-9]+$/.test(q)?String(r.code).trim()===q:[r.name,getField(r.e,'اسم الموظف','emp_name _en')].join(' ').toLocaleLowerCase().includes(q)))&&(!dept||r.dept===dept)&&(!cat||r.category===cat)&&(!balance||(balance==='positive'?Number(lm10Balance(r,lm8LeaveProjection(r.e)).display)>0:balance==='zero'?lm10Balance(r,lm8LeaveProjection(r.e)).display==='0':lm10Balance(r,lm8LeaveProjection(r.e)).display==='—'))&&(allYears||(selectedYear!==null&&r.settlement&&selectedYear>=Number(r.settlement.slice(0,4))&&(selectedYear-Number(r.settlement.slice(0,4)))%3===0)));
+ const rows=lm3Rows().filter(r=>(!q||(/^[0-9]+$/.test(q)?String(r.code).trim()===q:[r.name,getField(r.e,'اسم الموظف','emp_name _en')].join(' ').toLocaleLowerCase().includes(q)))&&(!dept||r.dept===dept)&&(!cat||r.category===cat)&&(!balance||(balance==='positive'?Number(lm10Balance(r,lm8LeaveProjection(r.e)).display)>0:balance==='zero'?lm10Balance(r,lm8LeaveProjection(r.e)).display==='0':lm10Balance(r,lm8LeaveProjection(r.e)).display==='—'))&&(allYears||(selectedYear!==null&&r.settlement&&selectedYear>=Number(r.settlement.slice(0,4))&&lm19SettlementYear(r.e,selectedYear))));
  lm3State.filtered=rows.map(r=>({...r,displaySettlement:allYears?r.settlement:`${selectedYear}-01-01`}));
  const names={regular:lm3T('عادي','Regular'),working:lm3T('5% يعمل فعليًا','5% Working'),outside:lm3T('5% خارج النطاق','5% Outside')};
  document.getElementById('lm3-count').textContent=lm3T('عدد النتائج: ','Results: ')+rows.length;
@@ -2282,7 +2316,7 @@ function lm3Apply(){
 function lm5Step(delta){const el=document.getElementById('lm3-settlement');if(!el)return;const current=Number(el.value)||new Date().getFullYear()+1;el.value=Math.min(9999,Math.max(2026,current+delta));document.getElementById('lm5-all-years').checked=false;lm3Apply();}
 function lm5ToggleAll(){document.getElementById('lm3-settlement').disabled=document.getElementById('lm5-all-years').checked;lm3Apply();}
 function lm3Reset(){for(const id of ['lm3-search','lm3-dept','lm3-category','lm3-balance'])document.getElementById(id).value='';document.getElementById('lm3-settlement').value=new Date().getFullYear()+1;document.getElementById('lm3-settlement').disabled=false;document.getElementById('lm5-all-years').checked=true;lm3Apply();}
-function lm3Export(){if(!window.XLSX){alert(lm3T('مكتبة Excel غير متاحة','Excel library unavailable'));return;}
+function lm3Export(){if(!window.XLSX){showToast(lm3T('مكتبة Excel غير متاحة','Excel library unavailable'),true);return;}
  const names={regular:lm3T('عادي','Regular'),working:lm3T('5% يعمل فعليًا','5% Working'),outside:lm3T('5% خارج النطاق','5% Outside')};
  const headings=currentLang==='ar'?['الكود','اسم الموظف','الإدارة','الرصيد المتاح','الرصيد عن السنة','المستحق حتى اليوم','التصنيف','تاريخ التسوية القادمة']:['Code','Employee','Department','Available balance','Annual entitlement','Accrued to date','Category','Next settlement'];
  const grid=[headings,...lm3State.filtered.map(r=>[r.code,r.name,r.dept,lm10Balance(r,lm8LeaveProjection(r.e)).display,lm8LeaveProjection(r.e).ok?lm8LeaveProjection(r.e).annual:'',lm8LeaveProjection(r.e).ok?lm8LeaveProjection(r.e).accrued:'',names[r.category],r.displaySettlement||''])];
@@ -2492,9 +2526,10 @@ const LM13=Object.freeze({
  },
  cap(e,settlementYear){
   const hire=this.date(lm3Hire(e)),y=Number(settlementYear);
-  if(!hire||!Number.isInteger(y)||y<lm15CycleStart(e)+3||(y-lm15CycleStart(e))%3!==0)return {ok:false,reason:'Settlement year / hire date requires review'};
+  if(!hire||!lm19SettlementYear(e,y))return {ok:false,reason:'Settlement year / hire date requires review'};
+  const from=lm19PreviousBoundary(e,y);if(from===null)return {ok:false,reason:'Settlement cycle start missing'};
   const rows=[];let entitlement=0,benchmark=0;
-  for(let yr=y-3;yr<y;yr++){
+  for(let yr=from;yr<y;yr++){
    const months=this.yearMonths(hire,yr),a=this.annual(e,hire,yr);
    if(!a.verified)return {ok:false,reason:a.reason};
    const earned=Math.round((a.splitMonth ? (21*(a.splitMonth-1)+30*(13-a.splitMonth))/12 : a.days*months/12)*10000)/10000;
@@ -2510,7 +2545,7 @@ const LM13=Object.freeze({
    for(const x of ledger){
     if(!x||x.verified!==true||x.reason!=='BUSINESS_NEED'||!x.requestId||!x.rejectedByUid||!x.rejectedAt||!Number.isFinite(Number(x.eligibleDays))||Number(x.eligibleDays)<0){verified=false;continue;}
     if(seen.has(x.requestId))continue;seen.add(x.requestId);
-    const yr=Number(String(x.rejectedAt).slice(0,4));if(yr>=y-3&&yr<y)exception+=Number(x.eligibleDays);
+    const yr=Number(String(x.rejectedAt).slice(0,4));if(yr>=from&&yr<y)exception+=Number(x.eligibleDays);
    }
   }else if(ledger!=null)verified=false;
   exception=Math.round(exception*10000)/10000;
@@ -2532,7 +2567,7 @@ function lm12OpenReport(){
  const overlay=document.createElement('div');overlay.id='lm12-settlement-report';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');
  const cols=[t('الكود','Code'),t('الموظف','Employee'),t('الإدارة','Department'),t('سنة التسوية','Settlement year'),t('الرصيد المسجل','Recorded balance'),t('استحقاق الدورة','Cycle entitlement'),t('استهلاك مرجعي','Use benchmark'),t('الحد الأساسي','Base cap'),t('استثناء حاجة العمل','Business exception'),t('الأيام القابلة للتسوية','Settlement days'),t('الراتب الشامل','Gross salary'),t('الأجر اليومي','Daily wage'),t('القيمة المالية','Amount'),t('الحالة','Status')];
  const status=r=>r.valid?t('حساب مبدئي — يحتاج اعتماد','Provisional — approval required'):t('يحتاج مراجعة: ','Review: ')+(r.rule.ok?(r.rule.exceptionVerified?t('الراتب أو الرصيد ناقص','Missing salary/balance'):t('سجل رفض غير معتمد','Unverified refusal')):r.rule.reason);
- overlay.innerHTML=`<div class="lm12-sheet"><header class="lm12-head"><div><h2>${t('تقرير التسوية المالية للإجازات','Leave Financial Settlement Report')}</h2><p>${t('تطبيق ضوابط دورة الثلاث سنوات، والاستحقاق النسبي، وحد التسوية، والاستثناء الموثق.','Three-year cycle, proportional entitlement, settlement cap and documented exception.')}</p></div><div class="lm12-actions"><button type="button" onclick="lm12Export()">${t('تصدير Excel','Export Excel')}</button><button type="button" onclick="lm12Print()">${t('طباعة','Print')}</button><button type="button" onclick="lm12Close()">${t('العودة للأرصدة','Back to balances')} ×</button></div></header>
+ overlay.innerHTML=`<div class="lm12-sheet"><header class="lm12-head"><div><h2>${t('تقرير التسوية المالية للإجازات','Leave Financial Settlement Report')}</h2><p>${t('دورة ثلاثية قبل الستين وسنوية من يناير التالي لبلوغ الستين، مع حد التسوية والاستثناء الموثق.','Three-year cycles before age 60, annual January settlements thereafter, with caps and verified exceptions.')}</p></div><div class="lm12-actions"><button type="button" onclick="lm12Export()">${t('تصدير Excel','Export Excel')}</button><button type="button" onclick="lm12Print()">${t('طباعة','Print')}</button><button type="button" onclick="lm12Close()">${t('العودة للأرصدة','Back to balances')} ×</button></div></header>
  <div class="lm12-summary"><div>${t('الموظفون','Employees')}<strong>${lm12ReportRows.length}</strong></div><div>${t('أيام التسوية المبدئية','Provisional days')}<strong>${sumDays.toLocaleString()}</strong></div><div>${t('القيمة المبدئية','Provisional amount')}<strong>${lm3Money(sumMoney)}</strong></div><div>${t('تحتاج مراجعة','Needs review')}<strong>${lm12ReportRows.length-valid.length}</strong></div></div>
  <p class="lm12-note">${t('تنبيه: الأرصدة الحالية تعكس البيانات المسجلة ولا تمثل بالضرورة رصيد يناير التاريخي. لا يتم الصرف أو تصفير الأرصدة قبل التحقق من حركة الإجازات والاعتماد. الموافقات والرفض من ESS لم يتم ربطها بعد.','Important: current recorded balances are not necessarily historical January balances. No payout or reset without a verified leave ledger and approval. ESS approvals/refusals are not yet connected.')}</p>
  <div class="lm12-scroll"><table><thead><tr>${cols.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${lm12ReportRows.map(r=>`<tr><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.dept)}</td><td>${r.year||'—'}</td><td>${r.balance??'—'}</td><td>${r.rule.ok?r.rule.entitlement:'—'}</td><td>${r.rule.ok?r.rule.benchmark:'—'}</td><td>${r.rule.ok?r.rule.base:'—'}</td><td>${r.rule.ok?r.rule.exception:'—'}</td><td>${r.days??'—'}</td><td>${lm3Money(r.salary)}</td><td>${lm3Money(r.daily)}</td><td>${lm3Money(r.total)}</td><td>${esc(status(r))}</td></tr>`).join('')||`<tr><td colspan="14">${t('لا توجد نتائج','No results')}</td></tr>`}</tbody><tfoot><tr><td colspan="9">${t('إجمالي السجلات القابلة للحساب','Total calculable records')}</td><td>${sumDays}</td><td colspan="2"></td><td>${lm3Money(sumMoney)}</td><td>${valid.length}/${lm12ReportRows.length}</td></tr></tfoot></table></div></div>`;
@@ -2540,7 +2575,7 @@ function lm12OpenReport(){
 }
 function lm12Close(){document.getElementById('lm12-settlement-report')?.remove();document.body.classList.remove('lm12-open');}
 function lm12Export(){
- if(!window.XLSX){alert(lm3T('مكتبة Excel غير متاحة','Excel library unavailable'));return;}
+ if(!window.XLSX){showToast(lm3T('مكتبة Excel غير متاحة','Excel library unavailable'),true);return;}
  const t=lm3T;
  const headings=[t('الكود','Code'),t('الموظف','Employee'),t('الإدارة','Department'),t('سنة التسوية','Settlement year'),t('الرصيد المسجل','Recorded balance'),t('استحقاق الدورة','Cycle entitlement'),t('الاستهلاك المرجعي','Use benchmark'),t('الحد الأساسي','Base cap'),t('الاستثناء','Exception'),t('أيام التسوية','Settlement days'),t('الراتب الشامل','Gross salary'),t('الأجر اليومي','Daily wage'),t('القيمة المالية','Amount'),t('الحالة','Status')];
  const data=[headings,...lm12ReportRows.map(r=>[r.code,r.name,r.dept,r.year||'',r.balance??'',r.rule.ok?r.rule.entitlement:'',r.rule.ok?r.rule.benchmark:'',r.rule.ok?r.rule.base:'',r.rule.ok?r.rule.exception:'',r.days??'',r.salary??'',r.daily??'',r.total??'',r.valid?t('مبدئي','Provisional'):t('مراجعة','Review')])];
@@ -2578,7 +2613,7 @@ async function lm15SaveLegacy(code){
  if(year!==null&&(!Number.isInteger(year)||year<2000||year>2100)){el.textContent=t('سنة غير صالحة.','Invalid cycle year.');return;}
  const prev=e.hr_leave_settlement_cycle?.startYear??null;
  if(Number(prev||0)===Number(year||0)){el.textContent=t('لا يوجد تغيير للحفظ.','No changes to save.');return;}
- if(!window.confirm(t('تأكيد تعديل بداية دورة التسوية للموظف '+code+'؟','Confirm settlement cycle change for employee '+code+'?')))return;
+ if(!await lmDialog(t('تأكيد تعديل بداية دورة التسوية للموظف '+code+'؟','Confirm settlement cycle change for employee '+code+'?'),true))return;
  el.textContent=t('جارٍ الحفظ...','Saving...');
  try{
   const actor=portalAuth.currentUser.uid,base=e._firebasePath||`${PORTAL_EMPLOYEE_COLLECTION}/${code}`;
