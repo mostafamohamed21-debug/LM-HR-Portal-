@@ -515,8 +515,8 @@ function viewEmployee(code) {
     setFieldVal('prof-service',getField(emp,'سنوات الخدمة ','سنوات الخدمة','yearsService','years service'));
     setFieldVal('prof-qual', currentLang === 'ar' ? (getField(emp, 'المؤهل', 'qualification') || '--') : (getField(emp, 'qualification') || '--'));
     setFieldVal('prof-qual-auth', currentLang === 'ar' ? (getField(emp, 'جهة المؤهل ', 'جهة المؤهل', 'qualAuth') || '--') : (getField(emp, 'qulification issuing authority', 'qualAuth', 'issuer') || '--'));
-    setFieldVal('prof-dob',excelDateToJSDate(getField(emp,'تاريخ الميلاد','dob')));
-    setFieldVal('prof-age',fahdAge(getField(emp,'تاريخ الميلاد','dob'))||getField(emp,'السن حتى تاريخه ','السن حتى تاريخه','age','age to date'));
+    setFieldVal('prof-dob',excelDateToJSDate(fahdEmployeeBirth(emp)));
+    setFieldVal('prof-age',fahdAge(fahdEmployeeBirth(emp))||'—');
     setFieldVal('prof-insurance', currentLang === 'ar' ? (getField(emp, 'الحالة التأمينية ', 'الحالة التأمينية', 'insuranceStatus') || '--') : (getField(emp, 'insurance status ', 'insuranceStatus') || '--'));
     setFieldVal('prof-pob', currentLang === 'ar' ? (getField(emp, 'مكان الميلاد', 'pob') || '--') : (getField(emp, 'pob') || '--'));
     document.getElementById('profile-img').src=getField(emp,'photoUrl','photo','رابط الصورة') || 'default-avatar.png';
@@ -616,14 +616,41 @@ async function openAddEmployeeModal(){
 }
 function closeAddEmployeeModal(){document.getElementById('add-employee-modal')?.classList.add('hidden');}
 function fahdCreateTab(tab,button){document.querySelectorAll('.fahd-create-pane').forEach(el=>el.hidden=el.id!=='fahd-create-'+tab);document.querySelectorAll('.fahd-create-tabs button').forEach(el=>el.classList.toggle('selected',el===button));}
+/* Phase 20: calendar-exact age, with supported Firebase/Excel date formats.
+   Never use a stale stored age as a substitute for a missing/invalid DOB. */
 function fahdParseBirthDate(raw){
- if(!raw)return null;const t=String(raw).trim();let d;
- if(/^\d{4}-\d{2}-\d{2}$/.test(t)){const [y,m,day]=t.split('-').map(Number);d=new Date(y,m-1,day);if(d.getFullYear()!==y||d.getMonth()!==m-1||d.getDate()!==day)return null;}
- else if(/^\d{1,2}[\/-]\d{1,2}[\/-]\d{4}$/.test(t)){const [day,m,y]=t.split(/[\/-]/).map(Number);d=new Date(y,m-1,day);if(d.getFullYear()!==y||d.getMonth()!==m-1||d.getDate()!==day)return null;}
- else return null;
- return d>new Date()?null:d;
+ if(raw===null||raw===undefined||raw==='')return null;
+ let y,m,day;
+ if(typeof raw==='number'&&Number.isFinite(raw)&&raw>1000&&raw<100000){
+  const d=new Date(Date.UTC(1899,11,30)+Math.floor(raw)*86400000);
+  y=d.getUTCFullYear();m=d.getUTCMonth()+1;day=d.getUTCDate();
+ }else{
+  const t=String(raw).trim();let match;
+  if((match=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:T.*)?$/))){[,y,m,day]=match;}
+  else if((match=t.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/))){[,day,m,y]=match;}
+  else return null;
+ }
+ y=Number(y);m=Number(m);day=Number(day);
+ const d=new Date(y,m-1,day);
+ if(d.getFullYear()!==y||d.getMonth()!==m-1||d.getDate()!==day||d>new Date())return null;
+ return d;
 }
-function fahdAge(raw){const dob=fahdParseBirthDate(raw);if(!dob)return '';const now=new Date();let age=now.getFullYear()-dob.getFullYear();if(now.getMonth()<dob.getMonth()||(now.getMonth()===dob.getMonth()&&now.getDate()<dob.getDate()))age--;return String(age);}
+function fahdAgeAt(raw,asOf){
+ const dob=fahdParseBirthDate(raw);if(!dob)return '';
+ const now=asOf instanceof Date?asOf:new Date();
+ let age=now.getFullYear()-dob.getFullYear();
+ if(now.getMonth()<dob.getMonth()||(now.getMonth()===dob.getMonth()&&now.getDate()<dob.getDate()))age--;
+ return age>=0?String(age):'';
+}
+function fahdAge(raw){return fahdAgeAt(raw,new Date());}
+function fahdEmployeeBirth(emp){
+ const entries=Object.entries(emp||{});
+ for(const key of ['تاريخ الميلاد','dob','date of birth','birthDate','Date of Birth']){
+  const found=entries.find(([k,v])=>k.trim().toLocaleLowerCase()===key.toLocaleLowerCase()&&v!==null&&v!==undefined&&String(v).trim()!=='');
+  if(found&&fahdParseBirthDate(found[1]))return found[1];
+ }
+ return null;
+}
 /* v11: bilingual employee creation uses explicit Firebase schema pairs. */
 const FAHD_PAIRS=[
  ['name','الاسم','Name','اسم الموظف ','emp_name _en'],
@@ -2218,7 +2245,7 @@ function lm15CycleStart(e){
 }
 /* Phase 19: retirement-age settlement scheduling. Dates use calendar birthdays,
    not potentially stale stored age fields. No Firebase writes are made here. */
-function lm19Birth(e){return lm8Date(lmBField(e,['تاريخ الميلاد','dob','date of birth']));}
+function lm19Birth(e){return lm8Date(fahdEmployeeBirth(e));}
 function lm19AgeOn(birth,iso){
  if(!birth||!iso)return null;
  const b=lm8Date(birth),d=lm8Date(iso);
@@ -2408,7 +2435,7 @@ function lm8Date(value){
 function lm8Value(e,keys){return lmBField(e,keys);}
 function lm8LeaveProjection(e){
  const hireDate=lm8Date(lm8Value(e,['تاريخ التعيين','date_of_hiring','hireDate','hire date']));
- const birthDate=lm8Date(lm8Value(e,['تاريخ الميلاد','dob','date of birth']));
+ const birthDate=lm8Date(fahdEmployeeBirth(e));
  const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
  const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));const asOfDate=`${p.year}-${p.month}-${p.day}`;
  const five=e.hr_five_percent;
@@ -2503,7 +2530,7 @@ const LM13=Object.freeze({
   const f=e.hr_five_percent||{};
   if(f.enabled&&f.workStatus==='outside')return {days:0,verified:true,reason:'outside'};
   if(f.enabled&&f.workStatus==='working')return {days:45,verified:true,reason:'disability'};
-  const birth=this.date(lmBField(e,['تاريخ الميلاد','dob','date of birth']));
+  const birth=this.date(fahdEmployeeBirth(e));
   if(!birth)return {days:null,verified:false,reason:'birth missing'};
   if(this.dateAge(birth,year)>=50)return {days:30,verified:true,reason:'age'};
   // Historical in-company service: use hire date, not a current 'years of service' field.
