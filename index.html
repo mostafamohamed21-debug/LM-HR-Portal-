@@ -1156,7 +1156,7 @@ html[dir="rtl"] [data-five-block]{direction:rtl;text-align:right}
  <div class="fahd-create-top"><div><small>LACTO MISR · EMPLOYEE 360°</small><h2 id="lm-mass-title">Mass Hiring · التعيين الجماعي</h2><p id="lm-mass-subtitle">مراجعة كاملة قبل إنشاء أي موظف · Preview before writing</p></div><button type="button" onclick="lmCloseMassHiring()">✕ &nbsp; إغلاق / Close</button></div>
  <div class="lm-mass-body">
   <div class="lm-mass-toolbar"><button type="button" class="portal-action-btn" onclick="lmDownloadHiringTemplate()">↓ Excel Template · تنزيل القالب</button><label class="lm-mass-file-label">↑ Excel / CSV · رفع الملف<input type="file" id="lm-mass-file" accept=".xlsx,.xls,.csv" onchange="lmReadMassHiring(this)"></label><span id="lm-mass-filename"></span></div>
-  <p class="lm-mass-hint" id="lm-mass-hint">القالب يستخدم أسماء الحقول الفعلية من Firebase. يتم إنشاء موظفين جدد فقط؛ لا استبدال ولا تعديل للسجلات الموجودة. راجع المعاينة أولًا.</p>
+  <p class="lm-mass-hint" id="lm-mass-hint">القالب يستخدم أسماء الحقول الفعلية في البورتال. يتم إنشاء موظفين جدد فقط؛ لا استبدال ولا تعديل للسجلات الموجودة. راجع المعاينة أولًا.</p>
   <div id="lm-mass-summary" class="lm-mass-summary">حمّل القالب واملأ بيانات الموظفين، ثم ارفع الملف للمعاينة.</div>
   <div id="lm-mass-errors" class="lm-mass-errors" role="alert"></div>
   <div id="lm-mass-preview" class="lm-mass-preview"></div>
@@ -1206,7 +1206,7 @@ html[dir="rtl"] [data-five-block]{direction:rtl;text-align:right}
                 </div>
                 <button id="forgot-send-btn" onclick="sendPasswordVerificationCode()" class="portal-action-btn w-full py-3 rounded-xl text-xs font-bold" data-translate="send_code_btn">إرسال رابط إعادة تعيين كلمة المرور</button>
                 <div id="forgot-message" class="min-h-5 text-center text-xs font-bold"></div>
-                <p class="text-[10px] text-slate-500 text-center" data-translate="forgot_email_note">يجب تفعيل خدمة البريد في Firebase (Trigger Email/Cloud Function) لكي يصل الرمز فعلياً إلى البريد.</p>
+                <p class="text-[10px] text-slate-500 text-center" data-translate="forgot_email_note">يجب تفعيل خدمة إرسال البريد الإلكتروني حتى يصل رمز التحقق فعليًا.</p>
             </div>
         </div>
     </div>
