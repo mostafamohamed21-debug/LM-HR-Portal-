@@ -388,8 +388,8 @@ async function loadEmployeesFromFirebase() {
         if (typeof renderHRWorkspace === 'function') renderHRWorkspace();
         const status = document.getElementById('connection-status');
         if (status) status.textContent = currentLang === 'ar'
-            ? `متصل بـ Firebase — ${allEmployees.length} موظف`
-            : `Connected to Firebase — ${allEmployees.length} employees`;
+            ? `متصل بالبورتال — ${lm27ActiveEmployees().length} موظف على رأس العمل`
+            : `Connected to Portal — ${lm27ActiveEmployees().length} active employees`;
     } catch (error) {
         if (tableBody) tableBody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-300">${tr('login_error')}</td></tr>`;
         showToast(tr('login_error'), true);
@@ -591,7 +591,8 @@ async function executeSave(){
 function uploadEmployeePhoto(event){const file=event.target.files?.[0];if(!file||activeEmployeeCode===null)return;const reader=new FileReader();reader.onload=async e=>{const base64=e.target.result;document.getElementById('profile-img').src=base64;try{const emp=allEmployees.find(x=>String(getEmployeeCode(x))===String(activeEmployeeCode));const savePath=emp?emp._firebasePath:`${PORTAL_EMPLOYEE_COLLECTION}/${activeEmployeeCode}`;await db.ref(savePath).update({photoUrl:base64});if(emp)emp.photoUrl=base64;showToast();}catch(err){}};reader.readAsDataURL(file);}
 
 function showToast(message=null,isError=false){const toast=document.getElementById('toast-notification');const msg=document.getElementById('toast-message');if(!toast||!msg)return;msg.innerText=message||tr('toast_success');msg.classList.toggle('text-red-300',isError);msg.classList.toggle('text-white',!isError);toast.classList.remove('translate-y-32','opacity-0');setTimeout(()=>toast.classList.add('translate-y-32','opacity-0'),3200);}
-function updateDashboardStats(){const el=document.getElementById('total-employees-count');if(el)el.innerText=allEmployees.length;}
+function lm27ActiveEmployees(){return (allEmployees||[]).filter(e=>!lm23IsArchived(e));}
+function updateDashboardStats(){const el=document.getElementById('total-employees-count');if(el)el.innerText=lm27ActiveEmployees().length;}
 
 function getFirebaseSchema(){
     const keys=new Set();
@@ -1846,7 +1847,7 @@ function renderRichDashboard(){
  const root=document.getElementById('hr-dashboard-view');if(!root)return;
  const T=(a,b)=>currentLang==='ar'?a:b;
  const E=x=>escapeHtml(String(x??''));
- const emp=allEmployees||[],total=emp.length;
+ const emp=lm27ActiveEmployees(),total=emp.length;
  const field=(o,...names)=>{for(const n of names){const v=Object.entries(o||{}).find(([k])=>k.trim().toLowerCase()===n.trim().toLowerCase());if(v&&String(v[1]??'').trim())return v[1]}return ''};
  const group=fn=>{const map=new Map();emp.forEach(e=>{const k=String(fn(e)||'').trim();if(k&&k!=='--')map.set(k,(map.get(k)||0)+1)});return [...map].sort((a,b)=>b[1]-a[1])};
  const departments=group(getEmployeeDept),qual=group(e=>currentLang==='en'?(field(e,'qualification','qualification_en','qualification english')||field(e,'المؤهل')):(field(e,'المؤهل')||field(e,'qualification')));
@@ -2020,7 +2021,7 @@ function lmUpdateQualGauge(value){
    for(let day=1;day<=total;day++){const b=document.createElement('button');b.type='button';b.className='lm-date-day';b.textContent=day;const val=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;if(val===chosen)b.classList.add('is-selected');if(year===now.getFullYear()&&month===now.getMonth()&&day===now.getDate())b.classList.add('is-today');b.onclick=()=>{input.value=val;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));close();};grid.append(b);}pop.append(grid);
    const footer=document.createElement('div');footer.className='lm-date-footer';const today=document.createElement('button');today.type='button';today.textContent=ar?'اليوم':'Today';today.onclick=()=>{const d=new Date(),v=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;input.value=v;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));close();};const clear=document.createElement('button');clear.type='button';clear.textContent=ar?'مسح':'Clear';clear.onclick=()=>{input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));close();};footer.append(clear,today);pop.append(footer);
   }
-  draw();document.body.append(pop);active=pop;const r=input.getBoundingClientRect();let left=Math.min(Math.max(12,r.left),window.innerWidth-pop.offsetWidth-12),top=r.bottom+6;if(top+pop.offsetHeight>window.innerHeight-8)top=Math.max(8,r.top-pop.offsetHeight-6);pop.style.left=left+'px';pop.style.top=top+'px';
+  draw();document.body.append(pop);active=pop;const r=input.getBoundingClientRect();let left=Math.min(Math.max(12,r.left),Math.max(12,window.innerWidth-pop.offsetWidth-12)),top=r.bottom+6;if(top+pop.offsetHeight>window.innerHeight-8)top=Math.max(8,r.top-pop.offsetHeight-6);pop.style.left=left+'px';pop.style.top=top+'px';
  }
  function attach(input){if(input.dataset.lmDateReady)return;const key=input.dataset.fahdKey||input.name||input.id||'';if(input.type!=='date'&&!input.classList.contains('lm25-calendar-value')&&!(input.closest('#fahd-fields')&&dateCandidate(key)))return;
   // Do not change the type of legacy profile fields: they may hold Excel serials or display strings.
@@ -2149,7 +2150,7 @@ async function lmCommitMassHiring(){
    lmMassSafeText('lm-mass-progress',`${lmMassMessage('تم إنشاء','Created')}: ${created} / ${rows.length} · ${lmMassMessage('تجاوز','Skipped')}: ${skipped}`);
   }
   try{await db.ref('hr_imports/'+batchId).set({type:'MASS_HIRING',actorUid:portalAuth.currentUser?.uid||'',createdAt:firebase.database.ServerValue.TIMESTAMP,filename:lmMass.file,requestedCount:rows.length,createdCount:created,skippedCount:skipped,errorCount:failures.length,createdCodes,errors:failures.slice(0,100)});}catch(e){failures.push('Audit log: '+e.message);}
-  renderTable(allEmployees);updateDashboardStats();
+  filterEmployees();updateDashboardStats();if(typeof renderRichDashboard==='function')renderRichDashboard();
   lmMassSafeText('lm-mass-status',`${lmMassMessage('تم إنشاء','Created')} ${created} · ${lmMassMessage('تجاوز','Skipped')} ${skipped} · ${lmMassMessage('أخطاء','Errors')} ${failures.length}`);
   lmMassSafeText('lm-mass-errors',failures.join('\n'));
   lmMass.valid=false;
@@ -2749,7 +2750,7 @@ async function lm23Save(emp,next,action){
  // One atomic multi-path update; if security rules deny it, no local status is changed.
  await db.ref(base).update({hr_service_lifecycle:nextRecord,['hr_service_history/'+key]:{action,previous:old,next,actorUid:actor,createdAt:stamp}});
  emp.hr_service_lifecycle={...next,updatedBy:actor};
- lm22RenderLifecycle(emp);filterEmployees();
+ lm22RenderLifecycle(emp);filterEmployees();updateDashboardStats();if(typeof renderRichDashboard==='function')renderRichDashboard();
  if(typeof lm3Apply==='function'&&document.getElementById('lm3-table-body'))lm3Apply();
 }
 async function lm24Restore(emp){
