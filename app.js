@@ -1617,7 +1617,7 @@ function fahdIsMojibake(value){
 }
 function fahdHasUnsavedChanges(){
  if(!fahdIsEditing||!fahdEditing)return false;
- return Array.from(document.querySelectorAll('#fahd-fields [data-fahd-key]')).some(input=>input.value!==(fahdEditing.original[input.dataset.fahdKey]??'')) || Array.from(document.querySelectorAll('#fahd-fields [data-lm-custom-key]')).some(input=>input.value!==(input.dataset.initialValue||'')) || JSON.stringify(lmReadFiveUI('#fahd-fields'))!==JSON.stringify((allEmployees.find(e=>String(getEmployeeCode(e))===String(fahdEditing.code))||{}).hr_five_percent||{enabled:false,workStatus:null});
+ return Array.from(document.querySelectorAll('#fahd-fields [data-fahd-key]:not([data-calculated-age])')).some(input=>input.value!==(fahdEditing.original[input.dataset.fahdKey]??'')) || Array.from(document.querySelectorAll('#fahd-fields [data-lm-custom-key]')).some(input=>input.value!==(input.dataset.initialValue||'')) || JSON.stringify(lmReadFiveUI('#fahd-fields'))!==JSON.stringify((allEmployees.find(e=>String(getEmployeeCode(e))===String(fahdEditing.code))||{}).hr_five_percent||{enabled:false,workStatus:null});
 }
 // Styled three-choice dialog, created in JS so no HTML changes are needed.
 function fahdUnsavedDialog(){
@@ -1673,6 +1673,16 @@ function fahdRenderCompleteFields(emp,fields){
   const label=document.createElement('label');label.textContent=fahdProfileKeyLabel(key)+' ('+lang.toUpperCase()+')';
   const input=document.createElement('input');input.type='text';input.dataset.fahdKey=key;
   input.value=fahdIsMojibake(emp[key])?'':(lmIsSalaryKey(key)?lmSalaryDisplay(emp[key]):String(emp[key]??''));input.disabled=true;input.maxLength=2000;
+  // Phase 21: The complete-profile cards previously displayed a stale imported
+  // age from Firebase. Age is a calculated display, never a stored snapshot.
+  const normalizedKey=key.trim().toLocaleLowerCase();
+  if(['السن حتى تاريخه','age to date','age'].includes(normalizedKey)){
+   const liveAge=fahdAge(fahdEmployeeBirth(emp));
+   input.value=liveAge||'—';
+   input.dataset.calculatedAge='true';
+   input.readOnly=true;
+  }
+
   if(/(?:^n_id$|الرقم القومى|الرقم التأمينى|insurance number)/.test(key))input.autocomplete='off';
   if(lmIsSalaryKey(key))input.dataset.salaryOriginal=String(emp[key]??'');
   card.append(label,input);fields.append(card);fahdEditing.original[key]=input.value;
@@ -1709,7 +1719,7 @@ function fahdRefreshFieldVisibility(){
 async function fahdSave(skipConfirm=false){
  if(fahdBusy||!fahdEditing)return;const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(fahdEditing.code));const status=document.getElementById('fahd-status');
  if(!emp||!fahdEditing.path||emp._firebasePath!==fahdEditing.path||!fahdEditing.path.startsWith('employees_v2/')){status.textContent=fahdLang('تعذر تحديد السجل','Employee record unavailable');return false;}
- const updates=lmCustomValueInputs();const five=lmReadFiveUI('#fahd-fields');if(JSON.stringify(five)!==JSON.stringify(emp.hr_five_percent||{enabled:false,workStatus:null}))updates.hr_five_percent=five;document.querySelectorAll('#fahd-fields [data-fahd-key]').forEach(input=>{
+ const updates=lmCustomValueInputs();const five=lmReadFiveUI('#fahd-fields');if(JSON.stringify(five)!==JSON.stringify(emp.hr_five_percent||{enabled:false,workStatus:null}))updates.hr_five_percent=five;document.querySelectorAll('#fahd-fields [data-fahd-key]:not([data-calculated-age])').forEach(input=>{
   const key=input.dataset.fahdKey;if(input.value===fahdEditing.original[key])return;
   const value=input.type==='date'?fahdStoredDate(input.value):input.value.trim();updates[key]=value;
   // Each translated field is independent; never overwrite its counterpart.
@@ -1722,7 +1732,7 @@ async function fahdSave(skipConfirm=false){
  catch(err){status.textContent=fahdLang('فشل الحفظ: ','Save failed: ')+(err?.message||'Permission denied');return false;}
  finally{fahdBusy=false;document.getElementById('fahd-save').disabled=false;}
 }
-function fahdSetEditing(on){fahdIsEditing=on;document.querySelectorAll('#fahd-fields [data-salary-original]').forEach(el=>{el.value=on?el.dataset.salaryOriginal:lmSalaryDisplay(el.dataset.salaryOriginal);fahdEditing.original[el.dataset.fahdKey]=el.value;});document.querySelectorAll('#fahd-fields [data-fahd-key],#fahd-fields [data-lm-custom-key],#fahd-fields [data-five-input]').forEach(el=>el.disabled=!on);fahdRefreshFieldVisibility();for(const [id,visible] of [['fahd-edit',!on],['fahd-save',on],['fahd-cancel',on]]){const el=document.getElementById(id);if(el)el.hidden=!visible;}}
+function fahdSetEditing(on){fahdIsEditing=on;document.querySelectorAll('#fahd-fields [data-salary-original]').forEach(el=>{el.value=on?el.dataset.salaryOriginal:lmSalaryDisplay(el.dataset.salaryOriginal);fahdEditing.original[el.dataset.fahdKey]=el.value;});document.querySelectorAll('#fahd-fields [data-fahd-key],#fahd-fields [data-lm-custom-key],#fahd-fields [data-five-input]').forEach(el=>el.disabled=el.dataset.calculatedAge==='true'||!on);fahdRefreshFieldVisibility();for(const [id,visible] of [['fahd-edit',!on],['fahd-save',on],['fahd-cancel',on]]){const el=document.getElementById(id);if(el)el.hidden=!visible;}}
 function fahdStartEdit(){fahdSetEditing(true)}
 async function fahdCancelEdit(){
  if(fahdHasUnsavedChanges()){
