@@ -2214,7 +2214,7 @@ function lm15CycleStart(e){
  if(!Number.isInteger(year)||year<1950||year>2100)return null;
  const override=e?.hr_leave_settlement_cycle?.startYear;
  const n=Number(override);
- return year<2011&&Number.isInteger(n)&&n>=year&&n<=2011?n:year;
+ return Number.isInteger(n)&&n>=2000&&n<=2100?n:year;
 }
 function lm15Next(e){
  const year=lm15CycleStart(e);if(!year)return null;
@@ -2554,13 +2554,13 @@ function lm12Print(){window.print();}
 
 
 /* Phase 15: legacy settlement-cycle anchors, independent from original hire dates. */
-function lm15LegacyEmployees(){return (allEmployees||[]).filter(e=>{const y=Number(String(lm3Hire(e)||'').slice(0,4));return y>=1950&&y<2011;}).sort((a,b)=>String(getEmployeeCode(a)).localeCompare(String(getEmployeeCode(b)),undefined,{numeric:true}));}
+function lm15LegacyEmployees(){return (allEmployees||[]).filter(e=>{const y=Number(String(lm3Hire(e)||'').slice(0,4));return y>=1950&&y<=2100;}).sort((a,b)=>String(getEmployeeCode(a)).localeCompare(String(getEmployeeCode(b)),undefined,{numeric:true}));}
 function lm15OpenLegacy(){
  const t=lm3T,esc=lm3Escape;
  document.getElementById('lm15-legacy-overlay')?.remove();
  const legacy=lm15LegacyEmployees();
  const root=document.createElement('div');root.id='lm15-legacy-overlay';root.className='lm15-legacy-overlay';root.setAttribute('role','dialog');root.setAttribute('aria-modal','true');
- root.innerHTML=`<div class="lm15-legacy-sheet"><header class="lm15-legacy-head"><div><h2>${t('بداية دورة تسوية الموظفين القدام','Legacy employee settlement cycles')}</h2><p>${t('تاريخ التعيين ثابت لحساب الأقدمية. السنة المخصصة تغيّر جدول التسوية فقط، ولا تعيد حساب الأرصدة الافتتاحية أو التسويات السابقة.','Hire date remains unchanged for tenure. The override only changes the settlement schedule; opening balances and past settlements are untouched.')}</p></div><button type="button" class="portal-ghost-btn" onclick="lm15CloseLegacy()">${t('إغلاق','Close')} ×</button></header><label class="lm15-legacy-search">${t('بحث بالكود أو الاسم','Search by code or name')} <input id="lm15-legacy-search" type="search" oninput="lm15FilterLegacy()" placeholder="${t('بحث','Search')}"></label><div class="lm15-legacy-scroll"><table class="hr-feature-table"><thead><tr>${[t('الكود','Code'),t('الموظف','Employee'),t('تاريخ التعيين','Hire date'),t('بداية الدورة المعتمدة','Approved cycle start'),t('التسوية القادمة','Next settlement'),t('الإجراء','Action')].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${legacy.map(e=>{const code=String(getEmployeeCode(e)),hire=lm3Hire(e),saved=e.hr_leave_settlement_cycle?.startYear;return `<tr data-search="${esc((code+' '+getEmployeeName(e)).toLowerCase())}"><td>${esc(code)}</td><td>${esc(getEmployeeName(e))}</td><td dir="ltr">${esc(hire)}</td><td><label class="lm16-auto-label"><input type="checkbox" id="lm16-auto-${esc(code)}" ${saved==null?'checked':''} onchange="lm16ToggleYear('${esc(code)}')"> ${t('من تاريخ التعيين','From hire date')}</label><select id="lm15-year-${esc(code)}" ${saved==null?'disabled':''}>${Array.from({length:12},(_,i)=>2000+i).filter(y=>y>=Number(String(hire).slice(0,4))).map(y=>`<option value="${y}" ${Number(saved)===y?'selected':''}>${y}</option>`).join('')}</select></td><td dir="ltr">${esc(lm15Next(e)||'—')}</td><td><button class="portal-ghost-btn" type="button" onclick="lm15SaveLegacy('${esc(code)}')">${t('حفظ','Save')}</button></td></tr>`;}).join('')}</tbody></table></div><p class="lm15-legacy-status" id="lm15-legacy-status">${t('التغيير يتطلب صلاحية المسؤول، ويُسجَّل في سجل التدقيق.','Administrator authorization is required; every change is audited.')}</p></div>`;
+ root.innerHTML=`<div class="lm15-legacy-sheet"><header class="lm15-legacy-head"><div><h2>${t('بداية دورات التسوية المعتمدة','Approved employee settlement cycles')}</h2><p>${t('تاريخ التعيين ثابت لحساب الأقدمية. السنة المخصصة تغيّر جدول التسوية فقط، ولا تعيد حساب الأرصدة الافتتاحية أو التسويات السابقة.','Hire date remains unchanged for tenure. The override only changes the settlement schedule; opening balances and past settlements are untouched.')}</p></div><button type="button" class="portal-ghost-btn" onclick="lm15CloseLegacy()">${t('إغلاق','Close')} ×</button></header><label class="lm15-legacy-search">${t('بحث بالكود أو الاسم','Search by code or name')} <input id="lm15-legacy-search" type="search" oninput="lm15FilterLegacy()" placeholder="${t('بحث','Search')}"></label><div class="lm15-legacy-scroll"><table class="hr-feature-table"><thead><tr>${[t('الكود','Code'),t('الموظف','Employee'),t('تاريخ التعيين','Hire date'),t('بداية الدورة المعتمدة','Approved cycle start'),t('التسوية القادمة','Next settlement'),t('الإجراء','Action')].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${legacy.map(e=>{const code=String(getEmployeeCode(e)),hire=lm3Hire(e),saved=e.hr_leave_settlement_cycle?.startYear;return `<tr data-search="${esc((code+' '+getEmployeeName(e)).toLowerCase())}"><td>${esc(code)}</td><td>${esc(getEmployeeName(e))}</td><td dir="ltr">${esc(hire)}</td><td><label class="lm16-auto-label"><input type="checkbox" id="lm16-auto-${esc(code)}" ${saved==null?'checked':''} onchange="lm16ToggleYear('${esc(code)}')"> ${t('من تاريخ التعيين','From hire date')}</label><select id="lm15-year-${esc(code)}" ${saved==null?'disabled':''}>${Array.from({length:101},(_,i)=>2000+i).map(y=>`<option value="${y}" ${Number(saved)===y?'selected':''}>${y}</option>`).join('')}</select></td><td dir="ltr">${esc(lm15Next(e)||'—')}</td><td><button class="portal-ghost-btn" type="button" onclick="lm15SaveLegacy('${esc(code)}')">${t('حفظ','Save')}</button></td></tr>`;}).join('')}</tbody></table></div><p class="lm15-legacy-status" id="lm15-legacy-status">${t('التغيير يتطلب صلاحية المسؤول، ويُسجَّل في سجل التدقيق.','Administrator authorization is required; every change is audited.')}</p></div>`;
  document.body.appendChild(root);
 }
 function lm16ToggleYear(code){const cb=document.getElementById('lm16-auto-'+code),sel=document.getElementById('lm15-year-'+code);if(sel&&cb)sel.disabled=cb.checked;}
@@ -2570,12 +2570,12 @@ async function lm15SaveLegacy(code){
  const t=lm3T,el=document.getElementById('lm15-legacy-status');if(!el)return;
  if(!portalIsAdmin()||!portalAuth.currentUser){el.textContent=t('لا تملك صلاحية الاعتماد.','Administrator permission required.');return;}
  const e=(allEmployees||[]).find(x=>String(getEmployeeCode(x))===String(code));
- if(!e||Number(String(lm3Hire(e)||'').slice(0,4))>=2011){el.textContent=t('هذا الموظف غير مؤهل للتعديل التاريخي.','Employee is not eligible for legacy override.');return;}
+ if(!e){el.textContent=t('الموظف غير موجود.','Employee not found.');return;}
  const select=document.getElementById('lm15-year-'+code);if(!select)return;
  const auto=document.getElementById('lm16-auto-'+code)?.checked;
  const year=auto?null:Number(select.value);
  const hireYear=Number(String(lm3Hire(e)||'').slice(0,4));
- if(year!==null&&(!Number.isInteger(year)||year<2000||year>2011||year<hireYear)){el.textContent=t('سنة غير صالحة.','Invalid cycle year.');return;}
+ if(year!==null&&(!Number.isInteger(year)||year<2000||year>2100)){el.textContent=t('سنة غير صالحة.','Invalid cycle year.');return;}
  const prev=e.hr_leave_settlement_cycle?.startYear??null;
  if(Number(prev||0)===Number(year||0)){el.textContent=t('لا يوجد تغيير للحفظ.','No changes to save.');return;}
  if(!window.confirm(t('تأكيد تعديل بداية دورة التسوية للموظف '+code+'؟','Confirm settlement cycle change for employee '+code+'?')))return;
