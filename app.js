@@ -2004,7 +2004,7 @@ function lmUpdateQualGauge(value){
  function dateCandidate(key){return /(?:تاريخ|date|dob|birth|hire|joining|expiry|expiration)/i.test(key)&&!/(?:تاريخ.*(رقم|عدد)|update|created|modified|timestamp)/i.test(key);}
  function close(){if(active){active.remove();active=null;}}
  function show(input){
-  if(input.disabled||input.readOnly)return;
+  if(input.disabled||(input.readOnly&&!input.classList.contains('lm25-calendar-value')))return;
   close();const pop=document.createElement('div');pop.className='lm-date-pop';pop.dir=typeof currentLang!=='undefined'&&currentLang==='en'?'ltr':'rtl';pop.setAttribute('role','dialog');pop.setAttribute('aria-label',pop.dir==='rtl'?'اختيار التاريخ':'Choose date');
   const chosen=iso(input.value);const now=new Date();let year=chosen?+chosen.slice(0,4):now.getFullYear(),month=chosen?+chosen.slice(5,7)-1:now.getMonth();
   const ar=pop.dir==='rtl';const months=ar?['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']:['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -2022,11 +2022,12 @@ function lmUpdateQualGauge(value){
   }
   draw();document.body.append(pop);active=pop;const r=input.getBoundingClientRect();let left=Math.min(Math.max(12,r.left),window.innerWidth-pop.offsetWidth-12),top=r.bottom+6;if(top+pop.offsetHeight>window.innerHeight-8)top=Math.max(8,r.top-pop.offsetHeight-6);pop.style.left=left+'px';pop.style.top=top+'px';
  }
- function attach(input){if(input.dataset.lmDateReady)return;const key=input.dataset.fahdKey||input.name||input.id||'';if(input.type!=='date'&&!(input.closest('#fahd-fields')&&dateCandidate(key)))return;
+ function attach(input){if(input.dataset.lmDateReady)return;const key=input.dataset.fahdKey||input.name||input.id||'';if(input.type!=='date'&&!input.classList.contains('lm25-calendar-value')&&!(input.closest('#fahd-fields')&&dateCandidate(key)))return;
   // Do not change the type of legacy profile fields: they may hold Excel serials or display strings.
-  if(input.type!=='date'&&input.value&&!iso(input.value))return;
+  if(input.type!=='date'&&!input.classList.contains('lm25-calendar-value')&&input.value&&!iso(input.value))return;
   input.dataset.lmDateReady='1';const wrap=document.createElement('span');wrap.className='lm-date-shell';input.parentNode.insertBefore(wrap,input);wrap.append(input);const btn=document.createElement('button');btn.type='button';btn.className='lm-date-trigger';btn.textContent='▦';btn.setAttribute('aria-label','Choose date / اختيار التاريخ');btn.onclick=()=>show(input);wrap.append(btn);
-  if(input.type==='date')input.addEventListener('click',e=>{if(e.target===input){e.preventDefault();show(input);}});
+  // The calendar opens ONLY from the dedicated button, never from the input.
+  if(input.type==='date'){input.setAttribute('tabindex','-1');input.setAttribute('aria-label',input.getAttribute('aria-label')||'Date selected using calendar button');}
  }
  function scan(){document.querySelectorAll('input[type="date"],#fahd-fields input[data-fahd-key]').forEach(attach);}
  document.addEventListener('click',e=>{if(active&&!active.contains(e.target)&&!e.target.closest('.lm-date-trigger')&&!e.target.closest('.lm-date-shell>input'))close();},true);
@@ -2725,22 +2726,15 @@ function lm24Modal(title,build){
 }
 function lm24Field(card,label,options,value){const wrap=lm24El('label','lm24-field');wrap.append(lm24El('span','',label));const sel=lm24El('select');for(const [v,t] of options){const op=lm24El('option','',t);op.value=v;sel.append(op);}sel.value=value||'';wrap.append(sel);card.append(wrap);return sel;}
 function lm24Date(card,label,value){
- const wrap=lm24El('div','lm24-field');wrap.append(lm24El('span','',label));const row=lm24El('div','lm24-date-row');
- const date=lm24El('input');date.type='date';date.lang='en';date.value=/^\d{4}-\d{2}-\d{2}$/.test(value||'')?value:'';date.setAttribute('aria-label',label);
- const picker=lm24El('button','lm24-calendar','📅');picker.type='button';picker.setAttribute('aria-label',lm22Text('فتح التقويم','Open calendar'));
- const year=lm24El('input');year.type='number';year.min='1900';year.max='2100';year.placeholder=lm22Text('السنة','Year');year.setAttribute('aria-label',lm22Text('السنة','Year'));
- const month=lm24El('select');month.setAttribute('aria-label',lm22Text('الشهر','Month'));
- const day=lm24El('select');day.setAttribute('aria-label',lm22Text('اليوم','Day'));
- for(let m=1;m<=12;m++){const o=lm24El('option','',String(m).padStart(2,'0'));o.value=String(m).padStart(2,'0');month.append(o);}
- for(let d=1;d<=31;d++){const o=lm24El('option','',String(d).padStart(2,'0'));o.value=String(d).padStart(2,'0');day.append(o);}
- const syncParts=()=>{if(date.value){const [y,m,d]=date.value.split('-');year.value=y;month.value=m;day.value=d;}};
- const syncDate=()=>{const y=String(year.value).padStart(4,'0'),m=month.value,d=day.value;const candidate=`${y}-${m}-${d}`;const parsed=new Date(candidate+'T12:00:00Z');date.value=parsed.getUTCFullYear()===Number(y)&&parsed.getUTCMonth()+1===Number(m)&&parsed.getUTCDate()===Number(d)?candidate:'';};
- date.onchange=syncParts;year.onchange=syncDate;month.onchange=syncDate;day.onchange=syncDate;
- picker.onclick=()=>{try{if(typeof date.showPicker==='function')date.showPicker();else date.focus();}catch{date.focus();}};
- const native=lm24El('div','lm24-date-native');native.append(date,picker);row.append(native);
- const parts=lm24El('div','lm24-date-parts');parts.append(day,month,year);row.append(parts);wrap.append(row);card.append(wrap);
- if(date.value)syncParts();else{const [y,m,d]=lm23Now().split('-');year.value=y;month.value=m;day.value=d;syncDate();}
- return {get value(){return date.value;},focus(){date.focus();}};
+ // Single calendar control shared with the Portal-wide branded date picker.
+ // No native browser date picker, duplicate calendar buttons or manual date parts.
+ const wrap=lm24El('div','lm24-field');wrap.append(lm24El('span','',label));
+ const input=lm24El('input','lm25-calendar-value');input.type='text';input.readOnly=true;
+ input.placeholder='YYYY-MM-DD';input.dir='ltr';input.setAttribute('aria-label',label);
+ input.value=/^\d{4}-\d{2}-\d{2}$/.test(value||'')?value:'';
+ wrap.append(input);card.append(wrap);
+ // MutationObserver in the common calendar module attaches exactly one trigger.
+ return {get value(){return input.value;},focus(){const btn=input.closest('.lm-date-shell')?.querySelector('.lm-date-trigger');if(btn)btn.focus();}};
 }
 function lm24Actions(card,close,onSave,saveLabel){const actions=lm24El('div','lm24-actions');const cancel=lm24El('button','lm24-secondary',lm22Text('إلغاء','Cancel'));cancel.type='button';cancel.onclick=close;const save=lm24El('button','lm24-primary',saveLabel);save.type='button';save.onclick=()=>onSave(save);actions.append(cancel,save);card.append(actions);}
 async function lm23Save(emp,next,action){
