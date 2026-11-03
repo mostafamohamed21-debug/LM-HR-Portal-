@@ -2029,8 +2029,8 @@ function lmUpdateQualGauge(value){
   // The calendar opens ONLY from the dedicated button, never from the input.
   if(input.type==='date'){input.setAttribute('tabindex','-1');input.setAttribute('aria-label',input.getAttribute('aria-label')||'Date selected using calendar button');}
  }
- function scan(){document.querySelectorAll('input[type="date"],#fahd-fields input[data-fahd-key]').forEach(attach);}
- document.addEventListener('click',e=>{if(active&&!active.contains(e.target)&&!e.target.closest('.lm-date-trigger')&&!e.target.closest('.lm-date-shell>input'))close();},true);
+ function scan(){document.querySelectorAll('input[type="date"],input.lm25-calendar-value,#fahd-fields input[data-fahd-key]').forEach(attach);}
+ document.addEventListener('click',e=>{if(active&&!active.contains(e.target)&&!e.target.closest('.lm-date-trigger'))close();},true);
  document.addEventListener('keydown',e=>{if(e.key==='Escape')close();});window.addEventListener('resize',close);window.addEventListener('scroll',close,true);
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{scan();new MutationObserver(scan).observe(document.body,{childList:true,subtree:true});});else{scan();new MutationObserver(scan).observe(document.body,{childList:true,subtree:true});}
 })();
@@ -2733,7 +2733,7 @@ function lm24Date(card,label,value){
  input.placeholder='YYYY-MM-DD';input.dir='ltr';input.setAttribute('aria-label',label);
  input.value=/^\d{4}-\d{2}-\d{2}$/.test(value||'')?value:'';
  wrap.append(input);card.append(wrap);
- // MutationObserver in the common calendar module attaches exactly one trigger.
+ // The shared calendar's MutationObserver attaches one trigger to this input.
  return {get value(){return input.value;},focus(){const btn=input.closest('.lm-date-shell')?.querySelector('.lm-date-trigger');if(btn)btn.focus();}};
 }
 function lm24Actions(card,close,onSave,saveLabel){const actions=lm24El('div','lm24-actions');const cancel=lm24El('button','lm24-secondary',lm22Text('إلغاء','Cancel'));cancel.type='button';cancel.onclick=close;const save=lm24El('button','lm24-primary',saveLabel);save.type='button';save.onclick=()=>onSave(save);actions.append(cancel,save);card.append(actions);}
