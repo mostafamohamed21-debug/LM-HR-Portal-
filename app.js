@@ -2209,12 +2209,25 @@ const lm3State={search:'',dept:[],category:[],balance:'all',settlement:'all',fil
 function lm3T(ar,en){return currentLang==='ar'?ar:en;}
 function lm3Num(v){if(typeof v==='number')return Number.isFinite(v)?v:null;const s=String(v??'').replace(/,/g,'').trim();return s!==''&&Number.isFinite(Number(s))?Number(s):null;}
 function lm3Hire(e){return lmBDate(lmBField(e,['تاريخ التعيين','date_of_hiring','hireDate','hire date']));}
+function lm15CycleStart(e){
+ const hire=lm3Hire(e),year=Number(String(hire||'').slice(0,4));
+ if(!Number.isInteger(year)||year<1950||year>2100)return null;
+ const override=e?.hr_leave_settlement_cycle?.startYear;
+ const n=Number(override);
+ return year<2011&&Number.isInteger(n)&&n>=year&&n<=2011?n:year;
+}
+function lm15Next(e){
+ const year=lm15CycleStart(e);if(!year)return null;
+ const now=new Date();let settlement=year+3;
+ while(settlement<=now.getFullYear())settlement+=3;
+ return `${settlement}-01-01`;
+}
 function lm3Next(hire){const m=String(hire||'').match(/^(\d{4})-(\d\d)-(\d\d)$/);if(!m)return null;const y=Number(m[1]);if(y<1950||y>2100)return null;const now=new Date();let year=y+3;while(year<=now.getFullYear() || (year===now.getFullYear()&&now.getMonth()>=0))year+=3;return `${year}-01-01`;}
 function lm3Balance(e){const five=e.hr_five_percent||{};return five.enabled&&five.workStatus==='outside'?0:lm3Num(lmBField(e,['رصيد الاجازات','رصيد الإجازات','annual leave balance']));}
 function lm3Category(e){const f=e.hr_five_percent||{};return !f.enabled?'regular':f.workStatus==='outside'?'outside':'working';}
 function lm3Salary(e){return lm3Num(lmBField(e,['الراتب الشامل','المرتب الشامل','gross salary','gross_salary','total salary','الشامل','الاجر الشامل','الأجر الشامل','comprehensiveSalary']));}
 function lm3Money(v){return v===null?'—':v.toLocaleString(currentLang==='ar'?'ar-EG':'en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+lm3T('ج.م','EGP');}
-function lm3Rows(){return (allEmployees||[]).map(e=>({e,code:getEmployeeCode(e),name:getEmployeeName(e),dept:String(getEmployeeDept(e)||'').trim(),category:lm3Category(e),balance:lm3Balance(e),settlement:lm3Next(lm3Hire(e))}));}
+function lm3Rows(){return (allEmployees||[]).map(e=>({e,code:getEmployeeCode(e),name:getEmployeeName(e),dept:String(getEmployeeDept(e)||'').trim(),category:lm3Category(e),balance:lm3Balance(e),settlement:lm15Next(e)}));}
 function lm3Escape(v){return escapeHtml(String(v??''));}
 function lm3Select(id,label,options){return `<label class="lm3-filter"><span>${label}</span><select id="${id}" onchange="lm3Apply()"><option value="">${lm3T('الكل','All')}</option>${options.map(([v,t])=>`<option value="${lm3Escape(v)}">${lm3Escape(t)}</option>`).join('')}</select></label>`;}
 function lm3UI(){
@@ -2222,7 +2235,7 @@ function lm3UI(){
  const departments=[...new Set(lm3Rows().map(r=>r.dept).filter(x=>x&&x!=='--'))].sort((a,b)=>a.localeCompare(b));
  const defaultYear=new Date().getFullYear()+1;
  return `<section class="hr-panel mt-5" id="lm3-report">
- <div class="lm3-head"><div><h2 class="text-xl font-bold text-sky-300">${lm3T('تقارير أرصدة الإجازات','Leave Balance Reports')}</h2><p class="text-sm text-amber-200">${lm3T('الأرصدة الأساسية بتاريخ 01/10/2026، ولا تشمل حركات لاحقة لم تُسجل بعد.','Opening balances as of 01 Oct 2026; later unrecorded transactions are not included.')}</p></div><div class="lm3-actions"><button type="button" class="portal-ghost-btn" onclick="lm3Export()">${lm3T('تصدير Excel','Export Excel')}</button><button type="button" class="portal-action-btn" onclick="lm3Open()">${lm3T('تقرير التسوية المالية','Financial Settlement Report')}</button></div></div>
+ <div class="lm3-head"><div><h2 class="text-xl font-bold text-sky-300">${lm3T('تقارير أرصدة الإجازات','Leave Balance Reports')}</h2><p class="text-sm text-amber-200">${lm3T('الأرصدة الأساسية بتاريخ 01/10/2026، ولا تشمل حركات لاحقة لم تُسجل بعد.','Opening balances as of 01 Oct 2026; later unrecorded transactions are not included.')}</p></div><div class="lm3-actions"><button type="button" class="portal-ghost-btn" onclick="lm15OpenLegacy()">${lm3T('دورات الموظفين القدام','Legacy cycles')}</button><button type="button" class="portal-ghost-btn" onclick="lm3Export()">${lm3T('تصدير Excel','Export Excel')}</button><button type="button" class="portal-action-btn" onclick="lm3Open()">${lm3T('تقرير التسوية المالية','Financial Settlement Report')}</button></div></div>
  <div class="lm3-filters"><label class="lm3-filter"><span>${lm3T('بحث بالكود أو الاسم','Code or name')}</span><input id="lm3-search" type="search" oninput="lm3Apply()" placeholder="${lm3T('بحث...','Search...')}"></label>
  ${lm3Select('lm3-dept',lm3T('الإدارة','Department'),departments.map(d=>[d,d]))}
  ${lm3Select('lm3-category',lm3T('التصنيف','Category'),categories)}
@@ -2254,9 +2267,7 @@ function lm10Emergency(e){
 function lm10BalanceHtml(r,calc){
  const state=lm10Balance(r,calc);if(state.eligible!==false)return lm3Escape(state.display);
  const t=lm3T;
- const hint=state.advance.verified?t('أيام الطوارئ المتبقية','Remaining emergency days'):t('الحد المبدئي، يحتاج مراجعة الطلبات السابقة','Initial allowance; previous requests need verification');
- const detail=state.recorded!==null&&state.recorded!==0?`<p class="lm10-note">${t('الرصيد المسجل سابقًا: ','Previously recorded: ')}${lm3Escape(state.recorded)} — ${t('لم يتم تغييره في Firebase','Not changed in Firebase')}</p>`:'';
- return `<span class="lm10-hover" tabindex="0" role="button" aria-label="${t('تفاصيل رصيد الطوارئ','Emergency leave details')}" ><span class="lm10-zero">0 <span aria-hidden="true">ⓘ</span></span><span class="lm10-pop" role="tooltip"><strong>✦ ${t('إجازة طوارئ مقدمة','Emergency leave advance')}</strong><span>${t('لم يكمل الموظف 6 أشهر؛ الرصيد السنوي المتاح صفر.','Under six months of service; usable annual balance is zero.')}</span><span class="lm10-amount">${lm3Escape(state.advance.remaining)} ${t('أيام','days')}</span><span>${hint}</span><span class="lm10-note">${t('تتطلب موافقة وتخصم من الاستحقاق مستقبلًا.','Approval required; deducted from future entitlement.')}</span>${detail}</span></span>`;
+ return `<span class="lm10-hover" tabindex="0" role="button" aria-label="${t('تفاصيل الإجازة الطارئة','Emergency leave information')}"><span class="lm10-zero">0 <span aria-hidden="true">ⓘ</span></span><span class="lm10-pop" role="tooltip"><strong>${t('أيام إجازة طارئة: 3 أيام','Emergency leave: 3 days')}</strong><span>${t('يتم خصمها عند إتمام 6 أشهر ونزول الرصيد الفعلي.','They will be deducted once six months are completed and the actual leave balance becomes available.')}</span></span></span>`;
 }
 function lm3Apply(){
  const q=String(document.getElementById('lm3-search')?.value||'').trim().toLowerCase(),dept=document.getElementById('lm3-dept')?.value||'',cat=document.getElementById('lm3-category')?.value||'',balance=document.getElementById('lm3-balance')?.value||'',settle=document.getElementById('lm3-settlement')?.value||'';
@@ -2279,7 +2290,7 @@ function lm3Export(){if(!window.XLSX){alert(lm3T('مكتبة Excel غير متا
 function lm3Open(){lm12OpenReport();}
 function lm3Close(){document.getElementById('lm3-modal')?.classList.add('hidden');}
 function lm3Calculate(){const code=String(document.getElementById('lm3-code')?.value||'').trim(),target=document.getElementById('lm3-result');if(!target)return;if(!code){target.textContent=lm3T('أدخل كود الموظف لعرض بياناته.','Enter an employee code.');return;}const emp=(allEmployees||[]).find(e=>getEmployeeCode(e)===code);if(!emp){target.textContent=lm3T('كود الموظف غير موجود.','Employee code not found.');return;}
- const balance=lm3Balance(emp),salary=lm3Salary(emp),date=lm3Next(lm3Hire(emp)),day=salary===null?null:salary/30,total=salary===null||balance===null?null:day*balance;
+ const balance=lm3Balance(emp),salary=lm3Salary(emp),date=lm15Next(emp),day=salary===null?null:salary/30,total=salary===null||balance===null?null:day*balance;
  const line=(label,value)=>`<div class="lm3-result-line"><span>${label}</span><strong>${lm3Escape(value)}</strong></div>`;
  target.innerHTML=line(lm3T('الموظف','Employee'),getEmployeeName(emp))+line(lm3T('الرصيد المتبقي','Remaining balance'),balance===null?'—':balance+' '+lm3T('يوم','days'))+line(lm3T('الراتب الشامل','Gross salary'),lm3Money(salary))+line(lm3T('الأجر اليومي (÷ 30)','Daily rate (÷ 30)'),lm3Money(day))+line(lm3T('التسوية القادمة','Next settlement'),date||lm3T('تاريخ التعيين يحتاج مراجعة','Hire date needs review'))+`<div class="lm3-result-total">${lm3T('المقابل النقدي التقديري','Estimated cash settlement')}<strong>${lm3Escape(lm3Money(total))}</strong></div>`+(salary===null?`<p class="text-amber-200">${lm3T('حقل الراتب الشامل غير موجود أو غير رقمي؛ لا يمكن حساب مبلغ موثوق.','Gross salary missing or invalid; amount cannot be calculated reliably.')}</p>`:'');
 }
@@ -2416,15 +2427,15 @@ function lm8AppraisalFilter(){
  function close(){if(floating){floating.remove();floating=null;}anchor=null;}
  function position(){
   if(!floating||!anchor||!anchor.isConnected){close();return;}
-  const a=anchor.getBoundingClientRect(),width=Math.min(280,window.innerWidth-24);
+  const a=anchor.getBoundingClientRect(),width=Math.min(260,window.innerWidth-24);
   floating.style.width=width+'px';
   const height=floating.getBoundingClientRect().height;
-  const roomAbove=a.top-12,roomBelow=window.innerHeight-a.bottom-12;
-  const top=(roomBelow>=height||roomBelow>=roomAbove)?a.bottom+8:a.top-height-8;
-  floating.style.top=Math.max(8,Math.min(top,window.innerHeight-height-8))+'px';
-  const rtl=getComputedStyle(anchor).direction==='rtl';
-  const left=rtl?a.right-width:a.left;
-  floating.style.left=Math.max(12,Math.min(left,window.innerWidth-width-12))+'px';
+  // Prefer directly above the balance cell; below only when the row is near the top.
+  const above=a.top-height-8,below=a.bottom+8;
+  const top=above>=8?above:(below+height<=window.innerHeight-8?below:Math.max(8,above));
+  floating.style.top=Math.round(top)+'px';
+  const left=a.left+a.width/2-width/2;
+  floating.style.left=Math.round(Math.max(12,Math.min(left,window.innerWidth-width-12)))+'px';
  }
  function show(el){
   if(anchor===el&&floating){position();return;}
@@ -2481,7 +2492,7 @@ const LM13=Object.freeze({
  },
  cap(e,settlementYear){
   const hire=this.date(lm3Hire(e)),y=Number(settlementYear);
-  if(!hire||!Number.isInteger(y)||y<Number(hire.slice(0,4))+3||(y-Number(hire.slice(0,4)))%3!==0)return {ok:false,reason:'Settlement year / hire date requires review'};
+  if(!hire||!Number.isInteger(y)||y<lm15CycleStart(e)+3||(y-lm15CycleStart(e))%3!==0)return {ok:false,reason:'Settlement year / hire date requires review'};
   const rows=[];let entitlement=0,benchmark=0;
   for(let yr=y-3;yr<y;yr++){
    const months=this.yearMonths(hire,yr),a=this.annual(e,hire,yr);
@@ -2540,3 +2551,41 @@ function lm12Export(){
  XLSX.writeFile(wb,'LactoMisr_Leave_Settlement_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 function lm12Print(){window.print();}
+
+
+/* Phase 15: legacy settlement-cycle anchors, independent from original hire dates. */
+function lm15LegacyEmployees(){return (allEmployees||[]).filter(e=>{const y=Number(String(lm3Hire(e)||'').slice(0,4));return y>=1950&&y<2011;}).sort((a,b)=>String(getEmployeeCode(a)).localeCompare(String(getEmployeeCode(b)),undefined,{numeric:true}));}
+function lm15OpenLegacy(){
+ const t=lm3T,esc=lm3Escape;
+ document.getElementById('lm15-legacy-overlay')?.remove();
+ const legacy=lm15LegacyEmployees();
+ const root=document.createElement('div');root.id='lm15-legacy-overlay';root.className='lm15-legacy-overlay';root.setAttribute('role','dialog');root.setAttribute('aria-modal','true');
+ root.innerHTML=`<div class="lm15-legacy-sheet"><header class="lm15-legacy-head"><div><h2>${t('بداية دورة تسوية الموظفين القدام','Legacy employee settlement cycles')}</h2><p>${t('تاريخ التعيين ثابت لحساب الأقدمية. السنة المخصصة تغيّر جدول التسوية فقط، ولا تعيد حساب الأرصدة الافتتاحية أو التسويات السابقة.','Hire date remains unchanged for tenure. The override only changes the settlement schedule; opening balances and past settlements are untouched.')}</p></div><button type="button" class="portal-ghost-btn" onclick="lm15CloseLegacy()">${t('إغلاق','Close')} ×</button></header><label class="lm15-legacy-search">${t('بحث بالكود أو الاسم','Search by code or name')} <input id="lm15-legacy-search" type="search" oninput="lm15FilterLegacy()" placeholder="${t('بحث','Search')}"></label><div class="lm15-legacy-scroll"><table class="hr-feature-table"><thead><tr>${[t('الكود','Code'),t('الموظف','Employee'),t('تاريخ التعيين','Hire date'),t('بداية الدورة المعتمدة','Approved cycle start'),t('التسوية القادمة','Next settlement'),t('الإجراء','Action')].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${legacy.map(e=>{const code=String(getEmployeeCode(e)),hire=lm3Hire(e),saved=e.hr_leave_settlement_cycle?.startYear;return `<tr data-search="${esc((code+' '+getEmployeeName(e)).toLowerCase())}"><td>${esc(code)}</td><td>${esc(getEmployeeName(e))}</td><td dir="ltr">${esc(hire)}</td><td><select id="lm15-year-${esc(code)}"><option value="">${t('تلقائي من التعيين','Automatic from hire')}</option><option value="2011" ${Number(saved)===2011?'selected':''}>2011</option></select></td><td dir="ltr">${esc(lm15Next(e)||'—')}</td><td><button class="portal-ghost-btn" type="button" onclick="lm15SaveLegacy('${esc(code)}')">${t('حفظ','Save')}</button></td></tr>`;}).join('')}</tbody></table></div><p class="lm15-legacy-status" id="lm15-legacy-status">${t('التغيير يتطلب صلاحية المسؤول، ويُسجَّل في سجل التدقيق.','Administrator authorization is required; every change is audited.')}</p></div>`;
+ document.body.appendChild(root);
+}
+function lm15FilterLegacy(){const q=String(document.getElementById('lm15-legacy-search')?.value||'').trim().toLowerCase();document.querySelectorAll('#lm15-legacy-overlay tbody tr').forEach(tr=>tr.hidden=!tr.dataset.search.includes(q));}
+function lm15CloseLegacy(){document.getElementById('lm15-legacy-overlay')?.remove();}
+async function lm15SaveLegacy(code){
+ const t=lm3T,el=document.getElementById('lm15-legacy-status');if(!el)return;
+ if(!portalIsAdmin()||!portalAuth.currentUser){el.textContent=t('لا تملك صلاحية الاعتماد.','Administrator permission required.');return;}
+ const e=(allEmployees||[]).find(x=>String(getEmployeeCode(x))===String(code));
+ if(!e||Number(String(lm3Hire(e)||'').slice(0,4))>=2011){el.textContent=t('هذا الموظف غير مؤهل للتعديل التاريخي.','Employee is not eligible for legacy override.');return;}
+ const select=document.getElementById('lm15-year-'+code);if(!select)return;
+ const year=select.value===''?null:Number(select.value);
+ if(year!==null&&year!==2011){el.textContent=t('سنة غير صالحة.','Invalid cycle year.');return;}
+ const prev=e.hr_leave_settlement_cycle?.startYear??null;
+ if(Number(prev||0)===Number(year||0)){el.textContent=t('لا يوجد تغيير للحفظ.','No changes to save.');return;}
+ if(!window.confirm(t('تأكيد تعديل بداية دورة التسوية للموظف '+code+'؟','Confirm settlement cycle change for employee '+code+'?')))return;
+ el.textContent=t('جارٍ الحفظ...','Saving...');
+ try{
+  const actor=portalAuth.currentUser.uid,base=e._firebasePath||`${PORTAL_EMPLOYEE_COLLECTION}/${code}`;
+  if(!base.startsWith(PORTAL_EMPLOYEE_COLLECTION+'/'))throw Error('Invalid employee path');
+  const auditRef=db.ref('hr_imports/leave-cycle-audit').push();
+  const updates={};
+  updates[base+'/hr_leave_settlement_cycle']=year===null?null:{startYear:year,approvedByUid:actor,approvedAt:firebase.database.ServerValue.TIMESTAMP,source:'FINANCE_LEGACY_RECONCILIATION'};
+  updates['hr_imports/leave-cycle-audit/'+auditRef.key]={employeeCode:code,hireDate:lm3Hire(e),oldStartYear:prev,newStartYear:year,actorUid:actor,createdAt:firebase.database.ServerValue.TIMESTAMP,reason:'FINANCE_LEGACY_RECONCILIATION'};
+  await db.ref().update(updates);
+  e.hr_leave_settlement_cycle=year===null?null:{startYear:year,approvedByUid:actor,source:'FINANCE_LEGACY_RECONCILIATION'};
+  el.textContent=t('تم الحفظ وتوثيق العملية.','Saved and audited.');lm15OpenLegacy();lm3Apply();
+ }catch(err){el.textContent=t('تعذر الحفظ: ','Save failed: ')+err.message;}
+}
