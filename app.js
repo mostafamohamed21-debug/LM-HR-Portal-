@@ -76,13 +76,13 @@ const translations = {
         confirm_title: "هل ترغب في حفظ التعديلات؟", change_photo: "تعديل الصورة", sec_job: "البيانات الوظيفية", manager_label: "المدير المباشر",
         service_years: "سنوات الخدمة", sec_qual: "المؤهل العلمي", qual_label: "المؤهل", qual_auth: "جهة المؤهل", sec_personal: "البيانات الشخصية",
         dob_label: "تاريخ الميلاد", age_label: "السن حتى تاريخه", insurance_label: "الحالة التأمينية", pob_label: "مكان الميلاد",
-        toast_success: "تم حفظ التعديلات بنجاح وتحديث Firebase", login_title: "تسجيل الدخول", login_subtitle: "أدخل كود الموظف وكلمة المرور",
+        toast_success: "تم حفظ التعديلات بنجاح وتحديث بيانات البورتال", login_title: "تسجيل الدخول", login_subtitle: "أدخل كود الموظف وكلمة المرور",
         code_placeholder: "كود الموظف", pass_placeholder: "كلمة المرور", remember_me: "تذكرني", forgot_pass: "نسيت كلمة المرور؟", login_btn: "دخول للنظام",
         logout_btn: "تسجيل الخروج", login_required: "يرجى إدخال كود الموظف وكلمة المرور", login_not_found: "كود الموظف غير مسجل!",
         login_wrong_pass: "كلمة المرور غير صحيحة!", setup_password_title: "الموظف مسجل لكن لا توجد كلمة مرور. أنشئ كلمة مرور للمتابعة.", confirm_password_placeholder: "تأكيد كلمة المرور", create_password_btn: "إنشاء كلمة المرور والدخول", password_mismatch: "كلمتا المرور غير متطابقتين.", password_too_short: "كلمة المرور يجب أن تكون 6 أحرف على الأقل.", password_saved: "تم إنشاء كلمة المرور وحفظها. جاري تسجيل الدخول...", login_error: "حدث خطأ أثناء الاتصال، حاول مرة أخرى.", logged_out: "تم تسجيل الخروج بنجاح",
-        add_employee_btn: "+ إضافة موظف", add_employee_title: "إضافة موظف جديد", add_employee_hint: "سيتم إنشاء السجل مباشرة داخل Firebase.", save_employee_btn: "حفظ الموظف",
+        add_employee_btn: "+ إضافة موظف", add_employee_title: "إضافة موظف جديد", add_employee_hint: "سيتم إنشاء السجل مباشرة في قاعدة بيانات البورتال.", save_employee_btn: "حفظ الموظف",
         employee_exists: "هذا الكود موجود بالفعل.", employee_saved: "تمت إضافة الموظف بنجاح إلى Firebase.", required_code: "كود الموظف مطلوب.",
-        firebase_fields_title: "حقول Firebase", firebase_fields_hint: "كل الحقول الموجودة فعلياً على سجل الموظف تظهر هنا ويمكن تعديلها.",
+        firebase_fields_title: "حقول سجل الموظف", firebase_fields_hint: "كل الحقول المسجلة للموظف تظهر هنا ويمكن تعديلها.",
         add_custom_field_btn: "+ إضافة خانة إضافية", custom_field_title: "إضافة خانة إضافية", field_name_label: "اسم الخانة", field_value_label: "القيمة",
         custom_field_saved: "تمت إضافة الخانة وتحديث Firebase فوراً.", custom_field_invalid: "اسم الخانة غير صالح. تجنب . # $ [ ] /",
         forgot_title: "استعادة كلمة المرور", forgot_hint: "سيتم إرسال رابط إعادة تعيين كلمة المرور إلى بريد الإدارة.", forgot_code_placeholder: "كود الموظف",
@@ -91,7 +91,7 @@ const translations = {
         email_required: "أدخل البريد الإلكتروني.", code_sent: "تم إنشاء رمز التحقق وتجهيزه للإرسال إلى البريد.", code_sent_no_email: "تم تجهيز الرمز، لكن خدمة البريد غير مفعلة في Firebase بعد.",
         invalid_code: "رمز التحقق غير صحيح أو منتهي.", password_changed: "تم تغيير كلمة المرور بنجاح.", new_password_required: "أدخل كلمة المرور الجديدة.",
         code_expired: "انتهت صلاحية رمز التحقق، اطلب رمزاً جديداً.", employee_email_found: "تم العثور على البريد المسجل.", employee_email_missing: "لا يوجد بريد مسجل، أدخل بريد الموظف.",
-        schema_loading: "جاري تجهيز حقول Firebase...",
+        schema_loading: "جاري تجهيز حقول سجل الموظف...",
         header_brand: "لاكتو مصر - شؤون العاملين", powered_by: "برمجة وتطوير إدارة الموارد البشرية", portal_version: "بورتال الموظفين v5.2 - النسخة الاحترافية"
     },
     en: {
@@ -104,13 +104,13 @@ const translations = {
         confirm_title: "Do you want to save changes?", change_photo: "Change Photo", sec_job: "Job Details", manager_label: "Direct Manager",
         service_years: "Years of Service", sec_qual: "Education Qualification", qual_label: "Qualification", qual_auth: "Issuing Authority", sec_personal: "Personal Data",
         dob_label: "Date of Birth", age_label: "Age to Date", insurance_label: "Insurance Status", pob_label: "Place of Birth",
-        toast_success: "Changes saved successfully & synced with Firebase", login_title: "Sign in", login_subtitle: "Enter employee code and password",
+        toast_success: "Changes saved successfully in the Portal", login_title: "Sign in", login_subtitle: "Enter employee code and password",
         code_placeholder: "Employee Code", pass_placeholder: "Password", remember_me: "Remember Me", forgot_pass: "Forgot password?", login_btn: "Sign in",
         logout_btn: "Sign out", login_required: "Please enter employee code and password", login_not_found: "Employee code not found!",
         login_wrong_pass: "Incorrect password!", setup_password_title: "Your employee record exists but has no password. Create one to continue.", confirm_password_placeholder: "Confirm password", create_password_btn: "Create Password & Sign In", password_mismatch: "The passwords do not match.", password_too_short: "Password must be at least 6 characters.", password_saved: "Password created and saved. Signing in...", login_error: "Connection error. Please try again.", logged_out: "Signed out successfully",
-        add_employee_btn: "+ Add Employee", add_employee_title: "Add New Employee", add_employee_hint: "The record will be created directly in Firebase.", save_employee_btn: "Save Employee",
+        add_employee_btn: "+ Add Employee", add_employee_title: "Add New Employee", add_employee_hint: "The record will be created in the Portal database.", save_employee_btn: "Save Employee",
         employee_exists: "This employee code already exists.", employee_saved: "Employee added successfully to Firebase.", required_code: "Employee code is required.",
-        firebase_fields_title: "Firebase Fields", firebase_fields_hint: "All fields currently stored on the employee record appear here and can be edited.",
+        firebase_fields_title: "Employee Record Fields", firebase_fields_hint: "All stored employee fields appear here and can be edited.",
         add_custom_field_btn: "+ Add Extra Field", custom_field_title: "Add Extra Field", field_name_label: "Field Name", field_value_label: "Value",
         custom_field_saved: "Field added and Firebase updated immediately.", custom_field_invalid: "Invalid field name. Avoid . # $ [ ] /",
         forgot_title: "Password Recovery", forgot_hint: "A password reset link will be sent to the admin email.", forgot_code_placeholder: "Employee Code",
@@ -973,10 +973,10 @@ function hrNum(x){let n=Number(String(x??'').replace(/,/g,''));return Number.isF
 function hrDate(x){if(typeof x==='number'&&window.XLSX){let d=XLSX.SSF.parse_date_code(x);return d?`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`:String(x)}return String(x??'').trim()}
 function hrImportRows(type,rows){const aliases=hrImportColumns[type], keys=Object.keys(rows[0]||{}), mapped={};for(let field in aliases){let match=keys.find(k=>aliases[field].some(a=>hrNorm(a)===hrNorm(k)));if(match)mapped[field]=match}
  const missing=(type==='attendance'?['code']:['code','entitled','used','remaining']).filter(k=>!mapped[k]);if(type==='attendance'&&!mapped.timestamp&&!(mapped.date&&mapped.time))missing.push('timestamp OR date+time');if(missing.length)throw Error('Missing columns: '+missing.join(', '));
- let result=[],errors=[];rows.forEach((r,i)=>{let rec={};for(let k in mapped)rec[k]=r[mapped[k]];rec.code=String(rec.code??'').trim();if(type==='attendance' && mapped.code && /بصم/.test(mapped.code)){rec.biometricId=rec.code;}let err='';if(!rec.code)err='Missing employee code';if(type==='attendance'&&!err&&Array.isArray(allEmployees)&&allEmployees.length&&!allEmployees.some(e=>getEmployeeCode(e)===rec.code))err='Employee code '+rec.code+' not found in Firebase employees';if(type==='attendance'){rec.timestamp=String(rec.timestamp??`${hrDate(rec.date)} ${rec.time??''}`).trim();if(!rec.timestamp||rec.timestamp==='undefined')err='Missing date/time';rec.source=String(rec.source||'Excel import');rec.type=String(rec.type||'Unspecified')}else{for(let k of ['entitled','used','remaining'])rec[k]=hrNum(rec[k]);if(['entitled','used','remaining'].some(k=>!Number.isFinite(rec[k])||rec[k]<0))err='Invalid balance';if(!err&&Math.abs(rec.entitled-rec.used-rec.remaining)>0.02)err='Balance mismatch';rec.year=String(rec.year||new Date().getFullYear())}if(err)errors.push(`Row ${i+2}: ${err}`);else result.push(rec)});return {result,errors,mapped};}
-async function hrReadImport(type,input){let box=document.getElementById('hr-import-preview-'+type);if(!input.files?.[0])return;let file=input.files[0];if(file.size>5*1024*1024){box.textContent='File exceeds 5 MB';return}if(!window.XLSX){box.textContent='Excel parser unavailable. Check internet connection.';return}try{const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false});const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});if(!rows.length)throw Error('Sheet is empty');if(rows.length>3000)throw Error('Maximum 3000 rows per batch');const parsed=hrImportRows(type,rows);hrImportState[type]={records:parsed.result,errors:parsed.errors,filename:file.name};let sample=parsed.result.slice(0,8);box.innerHTML=`<p class="mb-2">${hrText('سجلات صحيحة','Valid rows')}: <b>${parsed.result.length}</b> · ${hrText('أخطاء','Errors')}: <b>${parsed.errors.length}</b></p>${parsed.errors.length?`<div class="text-rose-300 mb-3">${parsed.errors.slice(0,12).map(hrEscape).join('<br>')}</div>`:''}<div style="overflow-x:auto"><table class="hr-feature-table"><thead><tr>${Object.keys(sample[0]||{}).map(k=>`<th>${hrEscape(k)}</th>`).join('')}</tr></thead><tbody>${sample.map(r=>`<tr>${Object.values(r).map(v=>`<td>${hrEscape(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>${parsed.result.length&&!parsed.errors.length?`<button class="portal-ghost-btn px-5 py-3 rounded-xl mt-4" onclick="hrCommitImport('${type}')">${hrText('حفظ الدفعة في Firebase بعد التأكيد','Save batch to Firebase after confirmation')}</button>`:'<p class="text-amber-200 mt-3">Fix errors before saving.</p>'}`;}catch(e){hrImportState[type]=null;box.textContent='Import error: '+e.message}}
-async function hrCommitImport(type){const state=hrImportState[type];if(!state?.records.length||state.errors.length)return;const ok=await lmDialog(hrText('تأكيد حفظ البيانات المستوردة في قاعدة البورتال؟ لن يتم تحديث ESS تلقائيًا.','Save imported data in Portal Firebase? ESS will not be updated automatically.'),true);if(!ok)return;const batch=db.ref('hr_imports/'+type).push();try{await batch.set({filename:state.filename,createdAt:firebase.database.ServerValue.TIMESTAMP,recordCount:state.records.length,records:state.records});await lmDialog(hrText('تم حفظ الدفعة بنجاح','Batch saved successfully'));hrLoadImport(type)}catch(e){await lmDialog('Firebase write failed: '+e.message)}}
-async function hrLoadImport(type){const box=document.getElementById('hr-import-saved-'+type);if(!box)return;try{let snap=await db.ref('hr_imports/'+type).limitToLast(1).once('value'),items=snap.val();if(!items){box.textContent=hrText('لا توجد دفعات محفوظة بعد','No saved batches yet');return}let batch=Object.values(items)[0];box.innerHTML=`<b>${hrText('آخر دفعة محفوظة','Latest saved batch')}</b><p>${hrEscape(batch.filename)} — ${Number(batch.recordCount)||0} ${hrText('سجل','records')}</p><p class="text-xs text-slate-400">${new Date(batch.createdAt||Date.now()).toLocaleString()}</p>`}catch(e){box.textContent=hrText('تعذر قراءة البيانات: راجع صلاحيات Firebase','Cannot read saved data: check Firebase rules')}}
+ let result=[],errors=[];rows.forEach((r,i)=>{let rec={};for(let k in mapped)rec[k]=r[mapped[k]];rec.code=String(rec.code??'').trim();if(type==='attendance' && mapped.code && /بصم/.test(mapped.code)){rec.biometricId=rec.code;}let err='';if(!rec.code)err='Missing employee code';if(type==='attendance'&&!err&&Array.isArray(allEmployees)&&allEmployees.length&&!allEmployees.some(e=>getEmployeeCode(e)===rec.code))err='Employee code '+rec.code+' not found in Portal employee records';if(type==='attendance'){rec.timestamp=String(rec.timestamp??`${hrDate(rec.date)} ${rec.time??''}`).trim();if(!rec.timestamp||rec.timestamp==='undefined')err='Missing date/time';rec.source=String(rec.source||'Excel import');rec.type=String(rec.type||'Unspecified')}else{for(let k of ['entitled','used','remaining'])rec[k]=hrNum(rec[k]);if(['entitled','used','remaining'].some(k=>!Number.isFinite(rec[k])||rec[k]<0))err='Invalid balance';if(!err&&Math.abs(rec.entitled-rec.used-rec.remaining)>0.02)err='Balance mismatch';rec.year=String(rec.year||new Date().getFullYear())}if(err)errors.push(`Row ${i+2}: ${err}`);else result.push(rec)});return {result,errors,mapped};}
+async function hrReadImport(type,input){let box=document.getElementById('hr-import-preview-'+type);if(!input.files?.[0])return;let file=input.files[0];if(file.size>5*1024*1024){box.textContent='File exceeds 5 MB';return}if(!window.XLSX){box.textContent='Excel parser unavailable. Check internet connection.';return}try{const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false});const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});if(!rows.length)throw Error('Sheet is empty');if(rows.length>3000)throw Error('Maximum 3000 rows per batch');const parsed=hrImportRows(type,rows);hrImportState[type]={records:parsed.result,errors:parsed.errors,filename:file.name};let sample=parsed.result.slice(0,8);box.innerHTML=`<p class="mb-2">${hrText('سجلات صحيحة','Valid rows')}: <b>${parsed.result.length}</b> · ${hrText('أخطاء','Errors')}: <b>${parsed.errors.length}</b></p>${parsed.errors.length?`<div class="text-rose-300 mb-3">${parsed.errors.slice(0,12).map(hrEscape).join('<br>')}</div>`:''}<div style="overflow-x:auto"><table class="hr-feature-table"><thead><tr>${Object.keys(sample[0]||{}).map(k=>`<th>${hrEscape(k)}</th>`).join('')}</tr></thead><tbody>${sample.map(r=>`<tr>${Object.values(r).map(v=>`<td>${hrEscape(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>${parsed.result.length&&!parsed.errors.length?`<button class="portal-ghost-btn px-5 py-3 rounded-xl mt-4" onclick="hrCommitImport('${type}')">${hrText('حفظ الدفعة في البورتال بعد التأكيد','Save batch to Portal after confirmation')}</button>`:'<p class="text-amber-200 mt-3">Fix errors before saving.</p>'}`;}catch(e){hrImportState[type]=null;box.textContent='Import error: '+e.message}}
+async function hrCommitImport(type){const state=hrImportState[type];if(!state?.records.length||state.errors.length)return;const ok=await lmDialog(hrText('تأكيد حفظ البيانات المستوردة في قاعدة البورتال؟ لن يتم تحديث ESS تلقائيًا.','Save imported data in the Portal? ESS will not be updated automatically.'),true);if(!ok)return;const batch=db.ref('hr_imports/'+type).push();try{await batch.set({filename:state.filename,createdAt:firebase.database.ServerValue.TIMESTAMP,recordCount:state.records.length,records:state.records});await lmDialog(hrText('تم حفظ الدفعة بنجاح','Batch saved successfully'));hrLoadImport(type)}catch(e){await lmDialog('Portal save failed: '+e.message)}}
+async function hrLoadImport(type){const box=document.getElementById('hr-import-saved-'+type);if(!box)return;try{let snap=await db.ref('hr_imports/'+type).limitToLast(1).once('value'),items=snap.val();if(!items){box.textContent=hrText('لا توجد دفعات محفوظة بعد','No saved batches yet');return}let batch=Object.values(items)[0];box.innerHTML=`<b>${hrText('آخر دفعة محفوظة','Latest saved batch')}</b><p>${hrEscape(batch.filename)} — ${Number(batch.recordCount)||0} ${hrText('سجل','records')}</p><p class="text-xs text-slate-400">${new Date(batch.createdAt||Date.now()).toLocaleString()}</p>`}catch(e){box.textContent=hrText('تعذر قراءة البيانات: راجع صلاحيات البورتال','Cannot read saved data: check Portal permissions')}}
 
 // Real-data phase: read-only batch inspection and deterministic settlement schedule.
 function hrSettlementSchedule(hireDate, asOfYear=new Date().getFullYear()) {
@@ -1006,7 +1006,7 @@ async function hrShowImportedData(type){
   const batch=Object.values(obj)[0],records=Object.values(batch.records||{}),valid=records.filter(x=>x&&typeof x==='object');
   const cols=type==='attendance'?['code','timestamp','type','source']:['code','year','entitled','used','remaining'];
   target.innerHTML=`<p class="mb-3">${hrText('سجلات آخر دفعة','Latest batch records')}: ${valid.length} — ${hrEscape(batch.filename||'')}</p><div style="overflow:auto;max-height:360px"><table class="hr-feature-table"><thead><tr>${cols.map(c=>`<th>${hrEscape(c)}</th>`).join('')}</tr></thead><tbody>${valid.slice(0,100).map(r=>`<tr>${cols.map(c=>`<td>${hrEscape(r[c]??'')}</td>`).join('')}</tr>`).join('')}</tbody></table></div><p class="text-xs text-slate-400 mt-2">${hrText('عرض أول 100 سجل فقط. القيم المعروضة بيانات مصدر وليست نتائج حسابية معتمدة.','Showing first 100 records. Source data, not approved calculations.')}</p>`;
- }catch(e){target.textContent=hrText('تعذر قراءة الدفعة: راجع صلاحيات Firebase','Cannot read batch: check Firebase permissions')}
+ }catch(e){target.textContent=hrText('تعذر قراءة الدفعة: راجع صلاحيات البورتال','Cannot read batch: check Portal permissions')}
 }
 const _hrFeatureOriginal=renderHRFeature;
 renderHRFeature=function(page){_hrFeatureOriginal(page);if(['attendance','leave-balances'].includes(page)){const container=document.getElementById('hr-'+page+'-view');if(container){container.insertAdjacentHTML('beforeend',hrExtraTools(page)+`<div class="hr-panel mt-5"><h2 class="font-bold text-sky-300 mb-3">${hrText('البيانات المستوردة فعليًا','Actual imported records')}</h2><button class="portal-ghost-btn px-4 py-2 rounded-xl mb-3" onclick="hrShowImportedData('${page}')">${hrText('عرض آخر دفعة','View latest batch')}</button><div id="hr-import-records-${page}"></div></div>`)}hrLoadImport(page)}};
@@ -1708,6 +1708,7 @@ function fahdRender(emp){
  if(financial&&typeof financial==='object'){for(const [k,v] of Object.entries(financial)){if(v===null||typeof v==='object')continue;const tile=document.createElement('div');tile.className='fahd-tile';const l=document.createElement('span'),strong=document.createElement('strong');l.textContent=k;strong.textContent=lmIsSalaryKey(k)?lmSalaryDisplay(v):String(v);tile.append(l,strong);fin.append(tile);}fin.className='fahd-summary';}
  else {fin.className='fahd-empty';fin.textContent=fahdLang('لا توجد بيانات مالية متصلة بعد.','No connected financial data yet.');}
  fahdSetEditing(false);document.getElementById('fahd-status').textContent='';
+ lm22RenderLifecycle(emp);
  fahdTab('overview',document.querySelector('.fahd-tabs button'));
 }
 function fahdRefreshFieldVisibility(){
@@ -2038,7 +2039,7 @@ function lmMassSchema(){
 function lmOpenMassHiring(){
  if(!portalIsAdmin()){showToast(lmMassMessage('هذه العملية تتطلب حساب الإدارة','Admin account required'),true);return;}
  document.getElementById('lm-mass-workspace')?.classList.remove('hidden');
- document.getElementById('lm-mass-hint').textContent=lmMassMessage('القالب يستخدم مفاتيح Firebase الفعلية. كل صف يمثل موظفًا جديدًا. لا استبدال ولا تعديل للسجلات الحالية.','Template uses actual Firebase field keys. Each row is a new employee. Existing records are never replaced or edited.');
+ document.getElementById('lm-mass-hint').textContent=lmMassMessage('القالب يستخدم مفاتيح حقول الموظفين الفعلية. كل صف يمثل موظفًا جديدًا. لا استبدال ولا تعديل للسجلات الحالية.','Template uses actual employee field keys. Each row is a new employee. Existing records are never replaced or edited.');
 }
 function lmCloseMassHiring(){if(lmMass.busy)return;document.getElementById('lm-mass-workspace')?.classList.add('hidden');}
 function lmMassSafeText(id,value){const el=document.getElementById(id);if(el)el.textContent=value;}
@@ -2459,7 +2460,7 @@ function lm8Format(n){return n==null?'—':String(n);}
 function lm8Appraisal(){
  const target=document.getElementById('hr-appraisal-view');if(!target)return;
  const t=hrText;
- target.innerHTML=`<section class="hr-panel"><h1 class="text-2xl font-bold text-sky-300 mb-2">${t('إدارة تقييم الأداء','Appraisal Management')}</h1><p class="text-sm text-amber-200 mb-5">${t('تصور تشغيلي للمراجعة — لا توجد درجات أو تقييمات افتراضية، ولا يتم الحفظ في Firebase قبل اعتماد نموذج التقييم والصلاحيات.','Design preview only — no invented scores and no Firebase writes before criteria and permissions are approved.')}</p>
+ target.innerHTML=`<section class="hr-panel"><h1 class="text-2xl font-bold text-sky-300 mb-2">${t('إدارة تقييم الأداء','Appraisal Management')}</h1><p class="text-sm text-amber-200 mb-5">${t('تصور تشغيلي للمراجعة — لا توجد درجات أو تقييمات افتراضية، ولا يتم الحفظ في البورتال قبل اعتماد نموذج التقييم والصلاحيات.','Design preview only — no invented scores and no database writes before criteria and permissions are approved.')}</p>
  <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
  ${hrCard(t('الموظفون المسجلون','Employees'),String((allEmployees||[]).length),t('من بيانات الموظفين الفعلية','From actual employee records'))}
  ${hrCard(t('دورات التقييم المعتمدة','Approved cycles'),'—',t('لم يتم ربط سجلات التقييم','No appraisal records connected'))}
@@ -2663,4 +2664,86 @@ async function lm15SaveLegacy(code){
   e.hr_leave_settlement_cycle=year===null?null:{startYear:year,approvedByUid:actor,source:'FINANCE_LEGACY_RECONCILIATION'};
   el.textContent=t('تم الحفظ وتوثيق العملية.','Saved and audited.');lm15OpenLegacy();lm3Apply();
  }catch(err){el.textContent=t('تعذر الحفظ: ','Save failed: ')+err.message;}
+}
+
+
+/* Phase 22: additive lifecycle foundation.
+   This is a DRAFT record, not a termination, approval, payroll posting, or leave settlement.
+   No existing leave balance or cycle is modified. */
+const LM22_REASONS=Object.freeze({
+ resignation:['استقالة','Resignation'],
+ retirement:['بلوغ سن التقاعد','Retirement age'],
+ abandonment:['انقطاع عن العمل','Work abandonment'],
+ dismissal:['فصل','Dismissal'],
+ contract_expiry:['انتهاء العقد دون تجديد','Contract expiry without renewal']
+});
+function lm22Text(ar,en){return currentLang==='en'?en:ar;}
+function lm22Lifecycle(e){const x=e?.hr_service_lifecycle;return x&&typeof x==='object'&&!Array.isArray(x)?x:{};}
+function lm22RenderLifecycle(emp){
+ const root=document.getElementById('fahd1-native');
+ if(!root)return;
+ let panel=document.getElementById('lm22-service-panel');
+ if(!panel){panel=document.createElement('section');panel.id='lm22-service-panel';panel.className='hr-panel';panel.style.cssText='margin:18px 0;padding:18px;border:1px solid #2c5a77;border-radius:18px;background:rgba(12,30,53,.8);color:#e2e8f0';root.append(panel);}
+ const x=lm22Lifecycle(emp),reason=LM22_REASONS[x.reason]?.[currentLang==='en'?1:0]||lm22Text('غير محدد','Not specified');
+ const renewal=x.renewal==='yes'?lm22Text('نعم','Yes'):x.renewal==='no'?lm22Text('لا','No'):lm22Text('لم يحدد','Not set');
+ panel.replaceChildren();
+ const title=document.createElement('h3');title.textContent=lm22Text('حالة الخدمة والتجديد — سجل تمهيدي','Service & Renewal — Draft Record');title.style.cssText='font-size:18px;font-weight:700;margin-bottom:10px;color:#7dd3fc';
+ const info=document.createElement('p');info.style.cssText='font-size:13px;line-height:2;white-space:pre-line';
+ info.textContent=lm22Text('الحالة: ','Status: ')+(x.status==='draft'?lm22Text('مسودة للمراجعة','Draft for review'):lm22Text('لم تسجل حالة بعد','No record yet'))+'\n'+lm22Text('السبب: ','Reason: ')+reason+'\n'+lm22Text('تاريخ انتهاء الخدمة المقترح: ','Proposed end date: ')+(x.endDate||'—')+'\n'+lm22Text('تجديد: ','Renewal: ')+renewal+'\n'+lm22Text('بداية التجديد: ','Renewal start: ')+(x.renewalStart||'—')+'\n'+lm22Text('نهاية التجديد: ','Renewal end: ')+(x.renewalEnd||'—');
+ const note=document.createElement('p');note.style.cssText='font-size:12px;color:#fbbf24;margin:10px 0';
+ note.textContent=lm22Text('هذه بيانات تمهيدية فقط؛ لا تنهي الخدمة ولا تعتمد تسوية أو تغير رصيد الإجازات أو دورة الثلاث سنوات. بعد الستين يظل التجديد خاضعًا للتسوية السنوية.','Draft only: no termination, payout, balance change, or three-year cycle reset. Renewal after 60 retains annual settlement.');
+ const button=document.createElement('button');button.type='button';button.className='portal-ghost-btn';button.style.cssText='padding:9px 16px;border-radius:12px;border:1px solid #3888b9';
+ button.textContent=lm22Text('إضافة / تعديل مسودة حالة الخدمة','Add / Edit Service Draft');
+ button.onclick=()=>lm22EditLifecycle(String(getEmployeeCode(emp)));
+ panel.append(title,info,note,button);
+}
+async function lm22EditLifecycle(code){
+ const emp=allEmployees.find(e=>String(getEmployeeCode(e))===code);if(!emp)return;
+ const old=lm22Lifecycle(emp),ar=currentLang!=='en';
+ const overlay=document.createElement('div');overlay.style.cssText='position:fixed;inset:0;z-index:2147483646;background:#020617dd;display:grid;place-items:center;padding:16px';
+ const card=document.createElement('div');card.dir=ar?'rtl':'ltr';card.setAttribute('role','dialog');card.setAttribute('aria-modal','true');
+ card.style.cssText='width:min(520px,96vw);max-height:90vh;overflow:auto;padding:22px;background:#10223a;color:#e2e8f0;border:1px solid #36719b;border-radius:18px;font-family:inherit';
+ const title=document.createElement('h3');title.textContent=lm22Text('مسودة حالة الخدمة والتجديد','Service & Renewal Draft');title.style.cssText='font-weight:700;font-size:20px;margin-bottom:14px';
+ card.append(title);
+ function field(label,type,value,options){
+  const wrap=document.createElement('label');wrap.style.cssText='display:block;margin:10px 0;font-size:13px';
+  const caption=document.createElement('span');caption.textContent=label;caption.style.display='block';caption.style.marginBottom='5px';
+  const input=options?document.createElement('select'):document.createElement('input');
+  if(!options)input.type=type;
+  input.style.cssText='width:100%;padding:9px;border:1px solid #3c6685;border-radius:9px;background:#07172b;color:#fff';
+  if(options)for(const [v,t] of options){const o=document.createElement('option');o.value=v;o.textContent=t;input.append(o);}
+  input.value=value||'';wrap.append(caption,input);card.append(wrap);return input;
+ }
+ const reason=field(lm22Text('سبب انتهاء الخدمة المحتمل','Possible service-end reason'),'text',old.reason,[
+  ['',lm22Text('غير محدد','Not set')],...Object.entries(LM22_REASONS).map(([k,v])=>[k,v[ar?0:1]])]);
+ const end=field(lm22Text('تاريخ انتهاء الخدمة المقترح','Proposed service-end date'),'date',old.endDate);
+ const renewal=field(lm22Text('هل سيتم التجديد؟','Will employment be renewed?'),'text',old.renewal,[
+  ['',lm22Text('لم يحدد','Not set')],['yes',lm22Text('نعم','Yes')],['no',lm22Text('لا','No')]]);
+ const renewalStart=field(lm22Text('تاريخ بدء التجديد','Renewal start'),'date',old.renewalStart);
+ const renewalEnd=field(lm22Text('تاريخ نهاية التجديد','Renewal end'),'date',old.renewalEnd);
+ const msg=document.createElement('p');msg.style.cssText='color:#fbbf24;font-size:12px;line-height:1.8';
+ msg.textContent=lm22Text('الحفظ كمسودة فقط. لا يتم تغيير حالة الموظف أو احتساب تسوية أو إرسال إشعار.','Draft save only. No status changes, settlement calculation, or notifications.');
+ const actions=document.createElement('div');actions.style.cssText='display:flex;gap:10px;justify-content:flex-end;margin-top:16px';
+ const cancel=document.createElement('button');cancel.type='button';cancel.textContent=lm22Text('إلغاء','Cancel');cancel.className='portal-ghost-btn';cancel.style.padding='10px 16px';
+ const save=document.createElement('button');save.type='button';save.textContent=lm22Text('حفظ المسودة','Save draft');save.className='portal-ghost-btn';save.style.cssText='padding:10px 16px;background:#14658e;color:white;border-radius:10px';
+ cancel.onclick=()=>overlay.remove();
+ save.onclick=async()=>{
+  const next={status:'draft',reason:reason.value,endDate:end.value,renewal:renewal.value,renewalStart:renewalStart.value,renewalEnd:renewalEnd.value};
+  if(next.renewalStart&&next.renewalEnd&&next.renewalEnd<next.renewalStart){await lmDialog(lm22Text('نهاية التجديد قبل بدايته.','Renewal end precedes its start.'));return;}
+  if(next.renewal==='no'&&(next.renewalStart||next.renewalEnd)){await lmDialog(lm22Text('امسح تواريخ التجديد عند اختيار عدم التجديد.','Clear renewal dates when renewal is No.'));return;}
+  if(!(await lmDialog(lm22Text('حفظ بيانات حالة الخدمة كمسودة دون أي أثر مالي أو تغيير حالة الموظف؟','Save service details as a draft without financial or employment-status changes?'),true)))return;
+  save.disabled=true;
+  try{
+   const path=emp._firebasePath||`${PORTAL_EMPLOYEE_COLLECTION}/${code}`;
+   const actor=portalAuth.currentUser?.uid||'';
+   const audit=db.ref('hr_imports/service_lifecycle_audit').push();
+   const changes={};
+   changes[path+'/hr_service_lifecycle']={...next,updatedAt:firebase.database.ServerValue.TIMESTAMP,updatedBy:actor};
+   changes[audit.path.toString().replace(/^\//,'')]={code,employeePath:path,action:'DRAFT_SERVICE_LIFECYCLE',previous:old,next,actorUid:actor,createdAt:firebase.database.ServerValue.TIMESTAMP};
+   await db.ref().update(changes);
+   emp.hr_service_lifecycle={...next,updatedBy:actor};
+   overlay.remove();lm22RenderLifecycle(emp);await lmDialog(lm22Text('تم حفظ المسودة مع سجل التغيير.','Draft and audit entry saved.'));
+  }catch(err){save.disabled=false;await lmDialog(lm22Text('تعذر حفظ المسودة: ','Unable to save draft: ')+(err.message||err));}
+ };
+ actions.append(cancel,save);card.append(msg,actions);overlay.append(card);document.body.append(overlay);
 }
