@@ -2686,123 +2686,110 @@ async function lm15SaveLegacy(code){
 
 
 
-/* Phase 23 — Real lifecycle state, same employee record, reversible archive.
-   Never delete employees, attendance or history. Actual state changes are
-   explicitly confirmed and audited. Retirement reminders do not mutate data. */
-const LM23_REASONS={
- resignation:['استقالة','Resignation'],retirement:['بلوغ سن التقاعد','Retirement'],
- abandonment:['انقطاع عن العمل','Work abandonment'],dismissal:['فصل','Dismissal'],
- contract_expiry:['انتهاء العقد دون تجديد','Contract expiry without renewal']
-};
+
+/* Phase 24: bilingual status switch, reversible employee archive, verified date controls. */
+const LM23_REASONS={resignation:['استقالة','Resignation'],retirement:['بلوغ سن التقاعد','Retirement'],abandonment:['انقطاع عن العمل','Work abandonment'],dismissal:['فصل','Dismissal'],contract_expiry:['انتهاء العقد دون تجديد','Contract expired without renewal']};
 function lm22Text(ar,en){return currentLang==='en'?en:ar;}
 function lm22Lifecycle(e){const v=e?.hr_service_lifecycle;return v&&typeof v==='object'&&!Array.isArray(v)?v:{};}
-function lm23SixtyDate(e){const b=lm19Birth(e);if(!b)return null;return `${Number(b.slice(0,4))+60}${b.slice(4)}`;}
 function lm23Now(){const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const x=Object.fromEntries(p.map(z=>[z.type,z.value]));return `${x.year}-${x.month}-${x.day}`;}
+function lm23SixtyDate(e){const b=lm19Birth(e);return b?`${Number(b.slice(0,4))+60}${b.slice(4)}`:null;}
 function lm23IsArchived(e){return lm22Lifecycle(e).status==='ended';}
-function lm23AlertNeeded(e){const d=lm23SixtyDate(e);return d&&d<=lm23Now()&&!lm23IsArchived(e)&&!lm22Lifecycle(e).retirementDecision;}
+function lm23AlertNeeded(e){const x=lm22Lifecycle(e),d=lm23SixtyDate(e);return Boolean(d&&d<=lm23Now()&&!lm23IsArchived(e)&&!x.retirementDecision);}
+function lm24El(tag,cls,txt){const el=document.createElement(tag);if(cls)el.className=cls;if(txt!==undefined)el.textContent=txt;return el;}
 function lm22RenderLifecycle(emp){
  const root=document.getElementById('fahd1-native');if(!root)return;
- let panel=document.getElementById('lm22-service-panel');
- if(!panel){panel=document.createElement('section');panel.id='lm22-service-panel';panel.style.cssText='margin:18px 0;padding:18px;border:1px solid var(--border-color,#2c5a77);border-radius:18px;background:var(--card-bg,#10243b);color:var(--text-color,#e2e8f0)';root.append(panel);}
- panel.replaceChildren();
- const x=lm22Lifecycle(emp),reason=LM23_REASONS[x.reason]?.[currentLang==='en'?1:0]||'—';
- const title=document.createElement('h3');title.style.cssText='font-size:18px;font-weight:700;margin:0 0 12px';title.textContent=lm22Text('حالة الخدمة والتجديد','Service & Renewal');
- const status=document.createElement('p');status.style.cssText='line-height:2;font-size:14px;white-space:pre-line';
- status.textContent=lm22Text('حالة السجل: ','Record status: ')+(lm23IsArchived(emp)?lm22Text('منتهي الخدمة — أرشيف المنتهية خدمتهم','Service ended — archived'):lm22Text('على قوة العمل','Active'))+
- '\n'+lm22Text('السبب: ','Reason: ')+reason+
- '\n'+lm22Text('تاريخ الانتهاء: ','End date: ')+(x.endDate||'—')+
- '\n'+lm22Text('التجديد: ','Renewal: ')+(x.renewal==='yes'?lm22Text('نعم','Yes'):x.renewal==='no'?lm22Text('لا','No'):'—')+
- '\n'+lm22Text('بداية التجديد: ','Renewal start: ')+(x.renewalStart||'—')+
- '\n'+lm22Text('نهاية التجديد: ','Renewal end: ')+(x.renewalEnd||'—');
- panel.append(title,status);
+ let panel=document.getElementById('lm22-service-panel');if(!panel){panel=lm24El('section','lm24-panel');panel.id='lm22-service-panel';root.append(panel);}
+ panel.replaceChildren();panel.dir=currentLang==='ar'?'rtl':'ltr';
+ const x=lm22Lifecycle(emp),ended=lm23IsArchived(emp);
+ const head=lm24El('div','lm24-head');const title=lm24El('div','lm24-title',lm22Text('الحالة الوظيفية','Employment status'));
+ const toggle=lm24El('button','lm24-toggle '+(ended?'lm24-red':'lm24-green'));toggle.type='button';toggle.setAttribute('role','switch');toggle.setAttribute('aria-checked',String(!ended));
+ toggle.append(lm24El('span','lm24-switch-dot'),lm24El('span','',ended?lm22Text('منتهي الخدمة','Service ended'):lm22Text('على رأس العمل','Active employee')));
+ toggle.onclick=()=>ended?lm24Restore(emp):lm22EditLifecycle(String(getEmployeeCode(emp)));
+ head.append(title,toggle);panel.append(head);
+ const detail=lm24El('div','lm24-details');
+ if(ended){detail.textContent=lm22Text('سبب الانتهاء: ','End reason: ')+(LM23_REASONS[x.reason]?.[currentLang==='ar'?0:1]||'—')+'  ·  '+lm22Text('تاريخ الانتهاء: ','End date: ')+(x.endDate||'—');}
+ else if(x.renewal==='yes'){detail.textContent=lm22Text('تجديد العمل: ','Renewed: ')+(x.renewalStart||'—')+' — '+(x.renewalEnd||'—');}
+ else detail.textContent=lm22Text('السجل نشط. الضغط على الزر يفتح إجراءات إنهاء الخدمة.','Record is active. Select the switch to start service-end procedure.');
+ panel.append(detail);
  if(lm23AlertNeeded(emp)){
-  const warning=document.createElement('p');warning.style.cssText='color:#fbbf24;padding:12px;border:1px solid #d9a441;border-radius:12px;line-height:1.7';
-  warning.textContent=lm22Text('تنبيه: الموظف بلغ سن الستين في ','Retirement-age alert: employee reached 60 on ')+lm23SixtyDate(emp)+lm22Text('. هل سيتم إنهاء خدمته أم تجديد العمل؟ لا يتم الأرشفة تلقائيًا قبل تأكيد القرار.','. End service or renew employment? Archiving requires confirmation.');
-  panel.append(warning);
+  const alert=lm24El('div','lm24-warning',lm22Text('تنبيه سن التقاعد: بلغ الموظف الستين في ','Retirement alert: Employee reached age 60 on ')+lm23SixtyDate(emp)+lm22Text('. يرجى اختيار إنهاء الخدمة أو تجديد العمل.','. Choose service end or renewal.'));
+  const renew=lm24El('button','lm24-secondary',lm22Text('تسجيل تجديد بعد الستين','Record post-60 renewal'));renew.type='button';renew.onclick=()=>lm24Renew(emp);alert.append(renew);panel.append(alert);
  }
- const actions=document.createElement('div');actions.style.cssText='display:flex;flex-wrap:wrap;gap:10px;margin-top:12px';
- const edit=document.createElement('button');edit.type='button';edit.className='portal-ghost-btn';edit.textContent=lm22Text('تسجيل قرار فعلي / تجديد','Record actual decision / renewal');edit.onclick=()=>lm22EditLifecycle(String(getEmployeeCode(emp)));
- actions.append(edit);
- if(lm23IsArchived(emp)){
-  const restore=document.createElement('button');restore.type='button';restore.className='portal-ghost-btn';restore.textContent=lm22Text('استعادة الموظف من الأرشيف','Restore employee from archive');restore.onclick=()=>lm23Restore(emp);actions.append(restore);
- }
- panel.append(actions);
- const note=document.createElement('p');note.style.cssText='font-size:12px;opacity:.8;margin-top:10px';
- note.textContent=lm22Text('لا يتم حذف السجل أو صرف تسوية أو تصفير رصيد. الأرشفة قابلة للاستعادة، وكل تغيير مسجل.','No deletion, payout or balance reset. Archiving is reversible and audited.');
- panel.append(note);
+ if(!ended){const renew=lm24El('button','lm24-secondary',lm22Text('تجديد العقد / استمرار الخدمة','Renew contract / continue service'));renew.type='button';renew.onclick=()=>lm24Renew(emp);panel.append(renew);}
 }
+function lm24Modal(title,build){
+ const overlay=lm24El('div','lm24-overlay');const card=lm24El('section','lm24-dialog');card.dir=currentLang==='ar'?'rtl':'ltr';card.setAttribute('role','dialog');card.setAttribute('aria-modal','true');card.setAttribute('aria-label',title);
+ card.append(lm24El('h3','lm24-dialog-title',title));overlay.append(card);document.body.append(overlay);
+ const close=()=>overlay.remove();const esc=e=>{if(e.key==='Escape'){document.removeEventListener('keydown',esc,true);close();}};document.addEventListener('keydown',esc,true);
+ const done=()=>{document.removeEventListener('keydown',esc,true);close();};build(card,done);return overlay;
+}
+function lm24Field(card,label,options,value){const wrap=lm24El('label','lm24-field');wrap.append(lm24El('span','',label));const sel=lm24El('select');for(const [v,t] of options){const op=lm24El('option','',t);op.value=v;sel.append(op);}sel.value=value||'';wrap.append(sel);card.append(wrap);return sel;}
+function lm24Date(card,label,value){
+ const wrap=lm24El('div','lm24-field');wrap.append(lm24El('span','',label));const row=lm24El('div','lm24-date-row');
+ const date=lm24El('input');date.type='date';date.lang='en';date.value=/^\d{4}-\d{2}-\d{2}$/.test(value||'')?value:'';date.setAttribute('aria-label',label);
+ const picker=lm24El('button','lm24-calendar','📅');picker.type='button';picker.setAttribute('aria-label',lm22Text('فتح التقويم','Open calendar'));
+ const year=lm24El('input');year.type='number';year.min='1900';year.max='2100';year.placeholder=lm22Text('السنة','Year');year.setAttribute('aria-label',lm22Text('السنة','Year'));
+ const month=lm24El('select');month.setAttribute('aria-label',lm22Text('الشهر','Month'));
+ const day=lm24El('select');day.setAttribute('aria-label',lm22Text('اليوم','Day'));
+ for(let m=1;m<=12;m++){const o=lm24El('option','',String(m).padStart(2,'0'));o.value=String(m).padStart(2,'0');month.append(o);}
+ for(let d=1;d<=31;d++){const o=lm24El('option','',String(d).padStart(2,'0'));o.value=String(d).padStart(2,'0');day.append(o);}
+ const syncParts=()=>{if(date.value){const [y,m,d]=date.value.split('-');year.value=y;month.value=m;day.value=d;}};
+ const syncDate=()=>{const y=String(year.value).padStart(4,'0'),m=month.value,d=day.value;const candidate=`${y}-${m}-${d}`;const parsed=new Date(candidate+'T12:00:00Z');date.value=parsed.getUTCFullYear()===Number(y)&&parsed.getUTCMonth()+1===Number(m)&&parsed.getUTCDate()===Number(d)?candidate:'';};
+ date.onchange=syncParts;year.onchange=syncDate;month.onchange=syncDate;day.onchange=syncDate;
+ picker.onclick=()=>{try{if(typeof date.showPicker==='function')date.showPicker();else date.focus();}catch{date.focus();}};
+ const native=lm24El('div','lm24-date-native');native.append(date,picker);row.append(native);
+ const parts=lm24El('div','lm24-date-parts');parts.append(day,month,year);row.append(parts);wrap.append(row);card.append(wrap);
+ if(date.value)syncParts();else{const [y,m,d]=lm23Now().split('-');year.value=y;month.value=m;day.value=d;syncDate();}
+ return {get value(){return date.value;},focus(){date.focus();}};
+}
+function lm24Actions(card,close,onSave,saveLabel){const actions=lm24El('div','lm24-actions');const cancel=lm24El('button','lm24-secondary',lm22Text('إلغاء','Cancel'));cancel.type='button';cancel.onclick=close;const save=lm24El('button','lm24-primary',saveLabel);save.type='button';save.onclick=()=>onSave(save);actions.append(cancel,save);card.append(actions);}
 async function lm23Save(emp,next,action){
- if(!portalIsAdmin()||!portalAuth.currentUser)throw Error('ADMIN_REQUIRED');
+ if(!portalIsAdmin()||!portalAuth.currentUser)throw Error(lm22Text('ليس لديك صلاحية تعديل الحالة الوظيفية.','No permission to change employment status.'));
  const code=String(getEmployeeCode(emp)),base=emp._firebasePath;
- if(!base||!base.startsWith(PORTAL_EMPLOYEE_COLLECTION+'/'))throw Error('EMPLOYEE_PATH_MISSING');
- const actor=portalAuth.currentUser.uid;
- const old=lm22Lifecycle(emp);
- const auditKey=db.ref('hr_imports/service_lifecycle_audit').push().key;
- if(!auditKey)throw Error('AUDIT_KEY_MISSING');
- const record={...next,updatedAt:firebase.database.ServerValue.TIMESTAMP,updatedBy:actor};
- const updates={
-  [base+'/hr_service_lifecycle']:record,
-  ['hr_imports/service_lifecycle_audit/'+auditKey]:{
-   code,employeePath:base,action,previous:old,next,actorUid:actor,
-   createdAt:firebase.database.ServerValue.TIMESTAMP
-  }
- };
- await db.ref().update(updates);
+ if(!base||base!==`${PORTAL_EMPLOYEE_COLLECTION}/${code}`)throw Error('EMPLOYEE_PATH_MISSING');
+ const actor=portalAuth.currentUser.uid,old=lm22Lifecycle(emp),key=db.ref(base+'/hr_service_history').push().key;
+ if(!key)throw Error('HISTORY_KEY_MISSING');
+ const stamp=firebase.database.ServerValue.TIMESTAMP;
+ const nextRecord={...next,updatedAt:stamp,updatedBy:actor};
+ // Both lifecycle state and its audit event live under the same employee record.
+ // One atomic multi-path update; if security rules deny it, no local status is changed.
+ await db.ref(base).update({hr_service_lifecycle:nextRecord,['hr_service_history/'+key]:{action,previous:old,next,actorUid:actor,createdAt:stamp}});
  emp.hr_service_lifecycle={...next,updatedBy:actor};
- lm22RenderLifecycle(emp);
- filterEmployees();
- if(document.getElementById('lm3-table-body'))lm3Apply();
+ lm22RenderLifecycle(emp);filterEmployees();
+ if(typeof lm3Apply==='function'&&document.getElementById('lm3-table-body'))lm3Apply();
 }
-async function lm23Restore(emp){
- if(!(await lmDialog(lm22Text('تأكيد استعادة الموظف إلى قائمة العاملين؟ ستظل كل تواريخ الخدمة السابقة محفوظة.','Restore employee to active list? Service history will remain recorded.'),true)))return;
- try{
-  const x=lm22Lifecycle(emp);
-  await lm23Save(emp,{...x,status:'active',restoredAt:lm23Now(),previousEnd:{reason:x.reason,endDate:x.endDate}},'RESTORE_EMPLOYEE');
-  await lmDialog(lm22Text('تمت استعادة الموظف مع الاحتفاظ بتاريخ خدمته.','Employee restored; service history retained.'));
- }catch(e){await lmDialog(lm22Text('تعذر الاستعادة: ','Restore failed: ')+(e.message||e));}
+async function lm24Restore(emp){
+ if(!(await lmDialog(lm22Text('تأكيد استعادة الموظف إلى العاملين؟ سيتم الاحتفاظ بتاريخ انتهاء الخدمة السابق.','Restore employee to active staff? Previous service-end history will remain.'),true)))return;
+ try{const x=lm22Lifecycle(emp);await lm23Save(emp,{...x,status:'active',previousEnd:{reason:x.reason,endDate:x.endDate},restoredAt:lm23Now()},'RESTORE_EMPLOYEE');await lmDialog(lm22Text('تمت الاستعادة بنجاح.','Employee restored.'));}
+ catch(e){await lmDialog(lm22Text('تعذر الاستعادة: ','Restore failed: ')+(e.message||e));}
 }
-async function lm22EditLifecycle(code){
+function lm22EditLifecycle(code){
  const emp=allEmployees.find(e=>String(getEmployeeCode(e))===code);if(!emp)return;
- const old=lm22Lifecycle(emp),ar=currentLang!=='en';
- const overlay=document.createElement('div');overlay.style.cssText='position:fixed;inset:0;z-index:2147483646;background:rgba(2,6,23,.84);display:grid;place-items:center;padding:16px';
- const card=document.createElement('div');card.dir=ar?'rtl':'ltr';card.setAttribute('role','dialog');card.setAttribute('aria-modal','true');
- card.style.cssText='width:min(520px,96vw);max-height:90vh;overflow:auto;padding:22px;background:var(--card-bg,#10223a);color:var(--text-color,#e2e8f0);border:1px solid #36719b;border-radius:18px;font-family:inherit';
- const title=document.createElement('h3');title.textContent=lm22Text('تسجيل حالة الخدمة والتجديد','Service & Renewal Decision');title.style.cssText='font-weight:700;font-size:20px;margin-bottom:14px';card.append(title);
- function field(label,type,value,options){
-  const wrap=document.createElement('label');wrap.style.cssText='display:block;margin:10px 0;font-size:13px';
-  const caption=document.createElement('span');caption.textContent=label;caption.style.cssText='display:block;margin-bottom:5px';
-  const input=options?document.createElement('select'):document.createElement('input');if(!options)input.type=type;
-  input.style.cssText='width:100%;padding:9px;border:1px solid #3c6685;border-radius:9px;background:#07172b;color:#fff';
-  if(options)for(const [v,t] of options){const o=document.createElement('option');o.value=v;o.textContent=t;input.append(o);}
-  input.value=value||'';wrap.append(caption,input);card.append(wrap);return input;
- }
- const reason=field(lm22Text('سبب انتهاء الخدمة','Service-end reason'),'text',old.reason,[['',lm22Text('اختر السبب','Select reason')],...Object.entries(LM23_REASONS).map(([k,v])=>[k,v[ar?0:1]])]);
- const end=field(lm22Text('تاريخ انتهاء الخدمة الفعلي','Actual service-end date'),'date',old.endDate|| (lm23AlertNeeded(emp)?lm23SixtyDate(emp):''));
- const renewal=field(lm22Text('هل سيتم التجديد؟','Renewal decision'),'text',old.renewal,[['',lm22Text('لم يحدد','Not set')],['yes',lm22Text('نعم','Yes')],['no',lm22Text('لا','No')]]);
- const start=field(lm22Text('بداية التجديد','Renewal start'),'date',old.renewalStart);
- const finish=field(lm22Text('نهاية التجديد','Renewal end'),'date',old.renewalEnd);
- const mode=field(lm22Text('الإجراء الفعلي','Actual action'),'text','',[
-  ['',lm22Text('اختر الإجراء','Select action')],
-  ['end',lm22Text('إنهاء الخدمة ونقل إلى الأرشيف','End service and archive')],
-  ['renew',lm22Text('تسجيل تجديد / استمرار العمل','Record renewal / continuation')]
- ]);
- const actions=document.createElement('div');actions.style.cssText='display:flex;gap:10px;justify-content:flex-end;margin-top:16px';
- const cancel=document.createElement('button');cancel.type='button';cancel.textContent=lm22Text('إلغاء','Cancel');cancel.className='portal-ghost-btn';
- const save=document.createElement('button');save.type='button';save.textContent=lm22Text('تنفيذ القرار','Apply decision');save.className='portal-ghost-btn';
- cancel.onclick=()=>overlay.remove();
- save.onclick=async()=>{
-  if(!mode.value){await lmDialog(lm22Text('اختر الإجراء المطلوب.','Choose an action.'));return;}
-  if(mode.value==='end'&&(!reason.value||!end.value)){await lmDialog(lm22Text('سبب وتاريخ إنهاء الخدمة مطلوبان.','End reason and date are required.'));return;}
-  if(mode.value==='renew'&&(!start.value||!finish.value||finish.value<start.value)){await lmDialog(lm22Text('حدد بداية ونهاية تجديد صحيحتين.','Provide valid renewal start and end dates.'));return;}
-  if(mode.value==='end'&&end.value>lm23Now()){await lmDialog(lm22Text('لا يمكن أرشفة موظف بتاريخ انتهاء خدمة مستقبلي.','Cannot archive before the service-end date.'));return;}
-  if(!(await lmDialog(mode.value==='end'?lm22Text('تأكيد إنهاء الخدمة ونقل الموظف إلى الأرشيف؟ لا يتم حذف بياناته أو تعديل رصيده.','Confirm end of service and archive? No employee data or leave balances will be deleted.'):lm22Text('تأكيد تجديد العمل مع الاحتفاظ بالدورات والتاريخ السابق؟','Confirm renewal while preserving service history and existing cycles?'),true)))return;
-  save.disabled=true;
-  try{
-   const next={...old,status:mode.value==='end'?'ended':'active',reason:reason.value||old.reason||'',endDate:end.value||old.endDate||'',renewal:mode.value==='renew'?'yes':'no',renewalStart:mode.value==='renew'?start.value:'',renewalEnd:mode.value==='renew'?finish.value:'',
-    retirementDecision:reason.value==='retirement'||lm23AlertNeeded(emp)?mode.value:'',decisionDate:lm23Now()};
-   await lm23Save(emp,next,mode.value==='end'?'END_SERVICE_ARCHIVE':'RENEW_SERVICE');
-   overlay.remove();await lmDialog(lm22Text('تم تنفيذ القرار وحفظه في سجل التغييرات.','Decision applied and audited.'));
-  }catch(e){save.disabled=false;await lmDialog(lm22Text('تعذر تنفيذ القرار: ','Decision failed: ')+(e.message||e));}
- };
- actions.append(cancel,save);card.append(actions);overlay.append(card);document.body.append(overlay);
+ const x=lm22Lifecycle(emp);
+ lm24Modal(lm22Text('إنهاء خدمة الموظف','End employee service'),(card,close)=>{
+ const reason=lm24Field(card,lm22Text('سبب انتهاء الخدمة','Reason for ending service'),[['',lm22Text('اختر السبب','Select reason')],...Object.entries(LM23_REASONS).map(([k,v])=>[k,v[currentLang==='ar'?0:1]])],x.reason);
+ const end=lm24Date(card,lm22Text('تاريخ انتهاء الخدمة الفعلي','Actual service-end date'),x.endDate|| (lm23AlertNeeded(emp)?lm23SixtyDate(emp):lm23Now()));
+ const note=lm24El('p','lm24-note',lm22Text('لن يتم حذف بيانات الموظف أو تصفير رصيده. سيتم نقله إلى أرشيف المنتهية خدمتهم بعد التأكيد.','The employee record and leave balance will be preserved. Confirmation moves the employee to the ended-service archive.'));card.append(note);
+ lm24Actions(card,close,async save=>{
+ if(!reason.value){await lmDialog(lm22Text('اختر سبب انتهاء الخدمة.','Select an end-of-service reason.'));return;}
+ if(!end.value||end.value>lm23Now()){await lmDialog(lm22Text('اختر تاريخ انتهاء خدمة صحيحًا، لا يتجاوز اليوم.','Choose a valid end date no later than today.'));return;}
+ if(!(await lmDialog(lm22Text('تأكيد إنهاء الخدمة ونقل الموظف للأرشيف؟','Confirm end of service and archive this employee?'),true)))return;
+ save.disabled=true;try{await lm23Save(emp,{...x,status:'ended',reason:reason.value,endDate:end.value,renewal:'no',retirementDecision:reason.value==='retirement'?'end':x.retirementDecision||'',decisionDate:lm23Now()},'END_SERVICE_ARCHIVE');close();await lmDialog(lm22Text('تم إنهاء الخدمة ونقل الموظف إلى الأرشيف.','Service ended and employee archived.'));}
+ catch(e){save.disabled=false;await lmDialog(lm22Text('تعذر الحفظ: ','Save failed: ')+(e.message||e));}
+ },lm22Text('تأكيد إنهاء الخدمة','Confirm service end'));
+ });
+}
+function lm24Renew(emp){
+ const x=lm22Lifecycle(emp);
+ lm24Modal(lm22Text('تجديد العقد / استمرار العمل','Contract renewal / continued service'),(card,close)=>{
+ const start=lm24Date(card,lm22Text('بداية التجديد','Renewal start date'),x.renewalStart||lm23Now());
+ const end=lm24Date(card,lm22Text('نهاية التجديد','Renewal end date'),x.renewalEnd||'');
+ card.append(lm24El('p','lm24-note',lm22Text('التجديد قبل الستين لا يعيد بدء دورة الثلاث سنوات. بعد الستين تستمر التسوية السنوية.','Renewal before age 60 preserves the three-year cycle; after 60, annual settlement continues.')));
+ lm24Actions(card,close,async save=>{
+ if(!start.value||!end.value||end.value<start.value){await lmDialog(lm22Text('أدخل تاريخي بداية ونهاية تجديد صحيحين.','Enter valid renewal start and end dates.'));return;}
+ if(!(await lmDialog(lm22Text('تأكيد تسجيل التجديد مع الاحتفاظ بسجل الخدمة؟','Confirm renewal while preserving service history?'),true)))return;
+ save.disabled=true;try{await lm23Save(emp,{...x,status:'active',renewal:'yes',renewalStart:start.value,renewalEnd:end.value,retirementDecision:lm23SixtyDate(emp)&&lm23SixtyDate(emp)<=lm23Now()?'renew':x.retirementDecision||'',decisionDate:lm23Now()},'RENEW_SERVICE');close();await lmDialog(lm22Text('تم حفظ التجديد بنجاح.','Renewal saved successfully.'));}
+ catch(e){save.disabled=false;await lmDialog(lm22Text('تعذر الحفظ: ','Save failed: ')+(e.message||e));}
+ },lm22Text('حفظ التجديد','Save renewal'));
+ });
 }
