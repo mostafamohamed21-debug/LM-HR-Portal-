@@ -2342,7 +2342,7 @@ const LM_LEAVE_ENGINE_V2 = Object.freeze({
     const eligible=this.completedMonths(hire,asOf)>=6;
     const outside=disabilityEnabled&&workStatus==='outside';
     const annual=outside?0:disabilityEnabled&&workStatus==='working'?45:
-      age>=50||(insured!==null&&insured>=10)?30:serviceYears<1?15:21;
+      age>=50||serviceYears>=10||(insured!==null&&insured>=10)?30:serviceYears<1?15:21;
     const monthsInYear=hire.getUTCFullYear()===asOf.getUTCFullYear()
       ?Math.min(12,this.calendarMonthsInclusive(hire,asOf)):12;
     const accrued=Math.round((annual*monthsInYear/12)*100)/100;
