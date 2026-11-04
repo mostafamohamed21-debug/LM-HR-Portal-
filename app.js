@@ -2793,23 +2793,26 @@ function lm24Renew(emp){
 
 
 // Phase 29: UI-only additions. No Firebase writes, ESS modifications, or changes to approval rules.
-const lm29Services=[
- ['leave','الإجازات','Leave requests','leave-balances'],
- ['permission','الأذونات','Personal permissions','permissions'],
- ['attendance','الحضور والتصحيحات','Attendance & corrections','attendance'],
- ['notifications','الإشعارات والطلبات الحالية','Existing requests & notifications','notifications'],
- ['mission','المأموريات','Missions',null],
- ['advance','السلف المالية','Financial advances',null],
- ['documents','مستندات الموظفين','Employee documents',null],
- ['support','الدعم الفني','IT support',null],
- ['complaints','الشكاوى والمقترحات','Complaints & suggestions',null],
- ['chat','محادثات HR','HR conversations',null],
- ['clinic','العيادة الطبية','Medical clinic',null]
+const lm29ServiceGroups=[
+ {ar:'الخدمات الإدارية والمالية',en:'Administrative & financial services',items:[
+  ['mission','المأموريات','Missions','استقبال ومراجعة طلبات المأموريات، ثم تنفيذ استثناء الموقع بعد الاعتماد.','Mission requests, approvals and location exceptions.'],
+  ['advance','السلف المالية','Financial advances','مراجعة طلبات السلف وإجراءات المستندات والصرف.','Advance requests, paperwork and disbursement workflow.'],
+  ['documents','مستندات الملف الوظيفي','Personnel file documents','طلبات استلام الأصول ومواعيد إعادتها.','Original-document requests and return tracking.'],
+  ['salary-letter','مفردات المرتب','Salary statements','تجهيز خطابات مفردات المرتب وتحديد طريقة التسليم.','Prepare salary statements and delivery method.']
+ ]},
+ {ar:'التواصل والمتابعة',en:'Communication & follow-up',items:[
+  ['support','الدعم الفني','Technical support','استقبال تذاكر التطبيق وأجهزة الكمبيوتر وتوجيهها للمختص.','Receive and route application and IT support tickets.'],
+  ['complaints','الشكاوى والمقترحات','Complaints & suggestions','متابعة الشكاوى والمقترحات وفق ضوابط السرية.','Handle complaints and suggestions with confidentiality controls.'],
+  ['chat','محادثات الموارد البشرية','HR conversations','صندوق محادثات مشترك لفريق الموارد البشرية.','Shared HR team conversation inbox.']
+ ]},
+ {ar:'الخدمات الطبية',en:'Medical services',items:[
+  ['clinic','العيادة والطابور الطبي','Clinic & medical queue','الحجوزات وأرقام الدور والقرارات الإدارية الناتجة عن الكشف.','Appointments, queue numbers and administrative outcomes.']
+ ]}
 ];
 function lm29ServiceCenter(){
  const el=document.getElementById('hr-service-center-view');if(!el)return;
  const ar=currentLang==='ar';
- el.innerHTML=`<div class="mb-5"><h1 class="text-2xl font-bold text-sky-200">${hrText('مركز خدمات الموظفين','Employee Service Center')}</h1><p class="text-sm text-slate-400 mt-2">${hrText('مركز تنقل وتجهيز لمسارات الاعتماد. الطلبات الحالية تظل في صفحاتها الأصلية، ولا يتم اعتماد أي طلب من هذه الصفحة.','Navigation and workflow foundation. Existing requests remain in their original pages; no approvals are performed here.')}</p></div><div class="grid grid-cols-1 md:grid-cols-3 gap-4">${lm29Services.map(([id,a,e,page])=>`<article class="glass-card rounded-2xl p-5 border border-sky-500/20"><h2 class="font-bold text-sky-200 mb-2">${escapeHtml(ar?a:e)}</h2><p class="text-xs text-slate-400 mb-4">${page?hrText('الوظيفة الحالية متاحة','Existing module available'):hrText('مسار قيد الإعداد — غير مفعل','Workflow planned — not enabled')}</p>${page?`<button type="button" class="portal-action-btn rounded-xl px-4 py-2" onclick="showHRPage('${page}')">${hrText('فتح التاب الحالي','Open existing tab')}</button>`:`<span class="inline-block rounded-xl px-4 py-2 border border-slate-600 text-slate-400 text-xs">${hrText('بانتظار الربط','Pending integration')}</span>`}</article>`).join('')}</div><div class="glass-card rounded-2xl p-5 mt-5 text-sm text-amber-200">${hrText('التفويضات واستثناء الموظف 2 معتمدة كمواصفات فقط؛ لم تُفعّل في قاعدة البيانات.','Delegation and employee 2 exception are design-approved only; no database rules changed.')}</div>`;
+ el.innerHTML=`<div class="mb-5"><h1 class="text-2xl font-bold text-sky-200">${hrText('مركز خدمات الموظفين','Employee Service Center')}</h1><p class="text-sm text-slate-400 mt-2">${hrText('الخدمات التي لا تملك تابًا مستقلًا فقط. افتح القسم للاطلاع على خدماته داخل نفس الصفحة.','Only services without their own module. Expand a section to view its services on this page.')}</p></div><div class="space-y-4">${lm29ServiceGroups.map((group,gi)=>`<details class="glass-card rounded-2xl border border-sky-500/20 overflow-hidden" ${gi===0?'open':''}><summary class="cursor-pointer p-5 text-lg font-bold text-sky-200 select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400">${escapeHtml(ar?group.ar:group.en)} <span class="text-xs font-normal text-slate-400">(${group.items.length})</span></summary><div class="px-5 pb-5 grid grid-cols-1 md:grid-cols-2 gap-3">${group.items.map(([id,titleAr,titleEn,descAr,descEn])=>`<section class="rounded-xl border border-slate-600/50 bg-slate-900/30 p-4" data-service="${id}"><h3 class="font-semibold text-sky-100 mb-2">${escapeHtml(ar?titleAr:titleEn)}</h3><p class="text-sm text-slate-300">${escapeHtml(ar?descAr:descEn)}</p><p class="text-xs text-amber-200 mt-3">${hrText('الوظيفة قيد البناء — لا توجد إجراءات مفعّلة بعد','Under development — no actions enabled yet')}</p></section>`).join('')}</div></details>`).join('')}</div><div class="glass-card rounded-2xl p-5 mt-5 text-sm text-amber-200">${hrText('التفويضات واستثناء الموظف 2 معتمدة كمواصفات فقط؛ لم تُفعّل في قاعدة البيانات.','Delegation and employee 2 exception are design-approved only; no database rules changed.')}</div>`;
 }
 const lm29JobDrafts=[];
 function lm29Recruitment(){
