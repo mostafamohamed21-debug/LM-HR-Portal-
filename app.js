@@ -831,9 +831,9 @@ const hrText=(ar,en)=>currentLang==='ar'?ar:en;
 function showHRPage(page){
     if(page!=='employees' && fahdHasUnsavedChanges()&&!window.fahdNavigationApproved){fahdGuardNavigation(()=>showHRPage(page));return;}
 
-    if(!['dashboard','employees','payroll','notifications','attendance','leave-balances','appraisal','permissions','bradford'].includes(page))return;
+    if(!['dashboard','employees','payroll','notifications','attendance','leave-balances','appraisal','permissions','bradford','service-center','recruitment'].includes(page))return;
     hrActivePage=page;
-    ['dashboard','payroll','notifications','attendance','leave-balances','appraisal','permissions','bradford'].forEach(p=>document.getElementById('hr-'+p+'-view')?.classList.toggle('hidden',p!==page));
+    ['dashboard','payroll','notifications','attendance','leave-balances','appraisal','permissions','bradford','service-center','recruitment'].forEach(p=>document.getElementById('hr-'+p+'-view')?.classList.toggle('hidden',p!==page));
     const list=document.getElementById('employees-list-view'),profile=document.getElementById('employee-profile-view');
     if(page==='employees'){if(activeEmployeeCode!==null){if(profile){profile.classList.remove('hidden');profile.style.display='block';}if(list){list.classList.add('hidden');list.style.display='none';}}else{if(list){list.classList.remove('hidden');list.style.display='block';}if(profile){profile.classList.add('hidden');profile.style.display='none';}}}
     else {if(list){list.classList.add('hidden');list.style.display='none';}if(profile){profile.classList.add('hidden');profile.style.display='none';}}
@@ -844,6 +844,8 @@ function hrCard(label,value,foot=''){return `<div class="hr-kpi"><p class="text-
 function renderHRWorkspace(){
     document.querySelectorAll('.hr-nav [data-ar]').forEach(el=>{el.textContent=el.dataset[currentLang]});
     if(hrActivePage==='dashboard'){renderRichDashboard();}
+    if(hrActivePage==='service-center') lm29ServiceCenter();
+    if(hrActivePage==='recruitment') lm29Recruitment();
     if(hrActivePage==='appraisal') lm8Appraisal();
     else if(['attendance','leave-balances','permissions','bradford'].includes(hrActivePage)) renderHRFeature(hrActivePage);
     if(hrActivePage==='payroll'){
@@ -2788,3 +2790,41 @@ function lm24Renew(emp){
  },lm22Text('حفظ التجديد','Save renewal'));
  });
 }
+
+
+// Phase 29: UI-only additions. No Firebase writes, ESS modifications, or changes to approval rules.
+const lm29Services=[
+ ['leave','الإجازات','Leave requests','leave-balances'],
+ ['permission','الأذونات','Personal permissions','permissions'],
+ ['attendance','الحضور والتصحيحات','Attendance & corrections','attendance'],
+ ['notifications','الإشعارات والطلبات الحالية','Existing requests & notifications','notifications'],
+ ['mission','المأموريات','Missions',null],
+ ['advance','السلف المالية','Financial advances',null],
+ ['documents','مستندات الموظفين','Employee documents',null],
+ ['support','الدعم الفني','IT support',null],
+ ['complaints','الشكاوى والمقترحات','Complaints & suggestions',null],
+ ['chat','محادثات HR','HR conversations',null],
+ ['clinic','العيادة الطبية','Medical clinic',null]
+];
+function lm29ServiceCenter(){
+ const el=document.getElementById('hr-service-center-view');if(!el)return;
+ const ar=currentLang==='ar';
+ el.innerHTML=`<div class="mb-5"><h1 class="text-2xl font-bold text-sky-200">${hrText('مركز خدمات الموظفين','Employee Service Center')}</h1><p class="text-sm text-slate-400 mt-2">${hrText('مركز تنقل وتجهيز لمسارات الاعتماد. الطلبات الحالية تظل في صفحاتها الأصلية، ولا يتم اعتماد أي طلب من هذه الصفحة.','Navigation and workflow foundation. Existing requests remain in their original pages; no approvals are performed here.')}</p></div><div class="grid grid-cols-1 md:grid-cols-3 gap-4">${lm29Services.map(([id,a,e,page])=>`<article class="glass-card rounded-2xl p-5 border border-sky-500/20"><h2 class="font-bold text-sky-200 mb-2">${escapeHtml(ar?a:e)}</h2><p class="text-xs text-slate-400 mb-4">${page?hrText('الوظيفة الحالية متاحة','Existing module available'):hrText('مسار قيد الإعداد — غير مفعل','Workflow planned — not enabled')}</p>${page?`<button type="button" class="portal-action-btn rounded-xl px-4 py-2" onclick="showHRPage('${page}')">${hrText('فتح التاب الحالي','Open existing tab')}</button>`:`<span class="inline-block rounded-xl px-4 py-2 border border-slate-600 text-slate-400 text-xs">${hrText('بانتظار الربط','Pending integration')}</span>`}</article>`).join('')}</div><div class="glass-card rounded-2xl p-5 mt-5 text-sm text-amber-200">${hrText('التفويضات واستثناء الموظف 2 معتمدة كمواصفات فقط؛ لم تُفعّل في قاعدة البيانات.','Delegation and employee 2 exception are design-approved only; no database rules changed.')}</div>`;
+}
+const lm29JobDrafts=[];
+function lm29Recruitment(){
+ const el=document.getElementById('hr-recruitment-view');if(!el)return;
+ el.innerHTML=`<h1 class="text-2xl font-bold text-sky-200 mb-2">${hrText('التوظيف والاستقطاب','Recruitment')}</h1><p class="text-slate-400 text-sm mb-5">${hrText('هيكل محلي لإعداد إعلانات الوظائف؛ لا يتم النشر أو إرسال البيانات إلى ESS أو Firebase. المسودات مؤقتة وتختفي عند تحديث الصفحة.','Local job drafting only. Nothing is published or sent to ESS/Firebase. Drafts are temporary and disappear on refresh.')}</p><div class="glass-card rounded-2xl p-5 mb-5"><h2 class="text-lg font-bold mb-4">${hrText('إضافة مسودة وظيفة','Create job draft')}</h2><form id="lm29-job-form" class="grid grid-cols-1 md:grid-cols-2 gap-4" onsubmit="lm29AddJob(event)"><label class="text-sm">${hrText('المسمى الوظيفي','Job title')}<input name="title" maxlength="120" required class="w-full mt-2 p-3 rounded-xl bg-slate-900 border border-sky-500/30"></label><label class="text-sm">${hrText('الإدارة','Department')}<input name="department" maxlength="120" required class="w-full mt-2 p-3 rounded-xl bg-slate-900 border border-sky-500/30"></label><label class="text-sm">${hrText('نوع الإعلان','Audience')}<select name="audience" class="w-full mt-2 p-3 rounded-xl bg-slate-900 border border-sky-500/30"><option value="internal">${hrText('داخلي','Internal')}</option><option value="external">${hrText('خارجي','External')}</option><option value="both">${hrText('داخلي وخارجي','Both')}</option></select></label><label class="text-sm">${hrText('عدد الشواغر','Vacancies')}<input name="count" type="number" min="1" max="1000" value="1" required class="w-full mt-2 p-3 rounded-xl bg-slate-900 border border-sky-500/30"></label><label class="text-sm">${hrText('تاريخ انتهاء الإعلان','Closing date')}<input name="deadline" type="date" required class="w-full mt-2 p-3 rounded-xl bg-slate-900 border border-sky-500/30"></label><label class="text-sm md:col-span-2">${hrText('المتطلبات','Requirements')}<textarea name="requirements" maxlength="2000" rows="3" required class="w-full mt-2 p-3 rounded-xl bg-slate-900 border border-sky-500/30"></textarea></label><div class="md:col-span-2"><button type="submit" class="portal-action-btn px-5 py-3 rounded-xl">${hrText('إضافة مسودة محلية','Add local draft')}</button></div></form></div><div class="glass-card rounded-2xl p-5"><h2 class="font-bold text-sky-200 mb-3">${hrText('مسودات هذه الجلسة','Session drafts')}</h2><div id="lm29-job-list" class="space-y-3" aria-live="polite"></div></div>`;
+ lm29RenderJobs();
+}
+function lm29AddJob(event){
+ event.preventDefault();const form=event.currentTarget;if(!form.reportValidity())return;
+ const data=new FormData(form);const job={title:String(data.get('title')||'').trim(),department:String(data.get('department')||'').trim(),audience:String(data.get('audience')||''),count:Number(data.get('count')),deadline:String(data.get('deadline')||''),requirements:String(data.get('requirements')||'').trim()};
+ if(!job.title||!job.department||!job.requirements||!Number.isInteger(job.count)||job.count<1||job.count>1000||!/^\d{4}-\d{2}-\d{2}$/.test(job.deadline))return;
+ lm29JobDrafts.push(job);form.reset();lm29RenderJobs();
+}
+function lm29RenderJobs(){
+ const el=document.getElementById('lm29-job-list');if(!el)return;
+ el.innerHTML=lm29JobDrafts.length?lm29JobDrafts.map((j,i)=>`<div class="border border-sky-500/20 rounded-xl p-4"><div class="font-bold text-sky-200">${escapeHtml(j.title)}</div><div class="text-xs text-slate-300 mt-2">${escapeHtml(j.department)} · ${escapeHtml(j.audience)} · ${j.count} · ${escapeHtml(j.deadline)}</div><p class="text-xs text-slate-400 mt-2 whitespace-pre-wrap">${escapeHtml(j.requirements)}</p><button type="button" class="text-rose-300 text-xs mt-3 underline" onclick="lm29RemoveJob(${i})">${hrText('حذف المسودة','Delete draft')}</button></div>`).join(''):`<p class="text-slate-400 text-sm">${hrText('لا توجد مسودات حتى الآن','No drafts yet')}</p>`;
+}
+function lm29RemoveJob(i){if(!Number.isInteger(i)||i<0||i>=lm29JobDrafts.length)return;lm29JobDrafts.splice(i,1);lm29RenderJobs();}
