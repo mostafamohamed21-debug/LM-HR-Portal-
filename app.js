@@ -2838,12 +2838,15 @@ function lmGpsRender(){
   lmGpsEvidence=snap.val()||{};
   const rows=Object.entries(lmGpsEvidence).map(([id,r])=>({id,r:r||{}})).sort((a,b)=>Number(b.r.createdAt||0)-Number(a.r.createdAt||0));
   if(!rows.length){el.textContent=hrText('لا توجد طلبات بصمة مسجلة','No punch requests recorded');return;}
-  el.innerHTML=`<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr>${[hrText('الموظف','Employee'),hrText('الحركة','Punch'),hrText('التاريخ','Date'),hrText('الحالة','Status'),hrText('الدليل','Evidence'),hrText('القرار','Decision')].map(t=>`<th class="p-2 text-start">${t}</th>`).join('')}</tr></thead><tbody>${rows.map(({id,r})=>{
+  el.innerHTML=`<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr>${[hrText('الموظف','Employee'),hrText('الحركة','Punch'),hrText('التاريخ','Date'),hrText('الحالة','Status'),hrText('الدليل','Evidence'),hrText('الموقع','Location'),hrText('القرار','Decision')].map(t=>`<th class="p-2 text-start">${t}</th>`).join('')}</tr></thead><tbody>${rows.map(({id,r})=>{
    const status=String(r.verificationStatus||'PENDING_REVIEW');
    const pending=status==='PENDING_REVIEW'||status==='HELD';
    const selfie=typeof r.selfieData==='string'&&/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(r.selfieData)?`<button class="ess-selfie-open" data-selfie-id="${escapeHtml(id)}"><img class="ess-selfie-thumb" src="${r.selfieData}" alt="Selfie"></button>`:'—';
+   const lat=Number(r.location?.lat), lng=Number(r.location?.lng);
+   const validGps=r.location&&r.location.lat!==null&&r.location.lat!==undefined&&r.location.lng!==null&&r.location.lng!==undefined&&Number.isFinite(lat)&&Number.isFinite(lng)&&Math.abs(lat)<=90&&Math.abs(lng)<=180;
+   const gps=validGps?`<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lat+','+lng)}" target="_blank" rel="noopener noreferrer" title="${hrText('عرض موقع البصمة على خرائط جوجل','Open punch location in Google Maps')}" aria-label="${hrText('عرض موقع البصمة على خرائط جوجل','Open punch location in Google Maps')}" class="inline-flex items-center justify-center rounded-lg border border-sky-600 px-2 py-1 text-sky-300">📍</a>`:'—';
    const buttons=pending?`<button class="portal-action-btn px-3 py-1 mr-1" onclick="essReviewAttendance('2','${escapeHtml(id)}','APPROVED')">${hrText('اعتماد','Approve')}</button><button class="portal-ghost-btn px-3 py-1 mr-1" onclick="essReviewAttendance('2','${escapeHtml(id)}','REJECTED')">${hrText('رفض','Reject')}</button><button class="portal-ghost-btn px-3 py-1" onclick="essReviewAttendance('2','${escapeHtml(id)}','HELD')">${hrText('تعليق','Hold')}</button>`:'—';
-   return `<tr class="border-t border-slate-700"><td class="p-2">2</td><td class="p-2">${escapeHtml(r.punchType||'—')}</td><td class="p-2">${escapeHtml(r.clientDate||'')} ${escapeHtml(r.clientTime||'')}</td><td class="p-2">${escapeHtml(status)}</td><td class="p-2">${selfie}</td><td class="p-2">${buttons}</td></tr>`;
+   return `<tr class="border-t border-slate-700"><td class="p-2">2</td><td class="p-2">${escapeHtml(r.punchType||'—')}</td><td class="p-2">${escapeHtml(r.clientDate||'')} ${escapeHtml(r.clientTime||'')}</td><td class="p-2">${escapeHtml(status)}</td><td class="p-2">${selfie}</td><td class="p-2">${gps}</td><td class="p-2">${buttons}</td></tr>`;
   }).join('')}</tbody></table></div>`;
  };
  lmGpsRef.on('value',lmGpsCallback,e=>{const el=document.getElementById('lm-gps-review');if(el)el.textContent='Firebase: '+(e.code||e.message)});
@@ -2874,3 +2877,54 @@ function lmUnifiedAlertsDraw(){
  const errors=Object.keys(essRequestErrors);
  el.innerHTML=(errors.length?`<p class="text-amber-300">${hrText('تعذر قراءة','Read failed')}: ${errors.map(escapeHtml).join(', ')}</p>`:'')+(alerts.length?alerts.slice(0,50).map(a=>`<div class="border-b border-slate-700 p-3 flex justify-between items-center gap-3"><span>${escapeHtml(a.label)} — ${hrText('موظف','Employee')} ${escapeHtml(a.code)}</span>${a.path==='attendance_requests'?`<button class="portal-action-btn px-3 py-1" onclick="showHRPage('attendance')">${hrText('مراجعة','Review')}</button>`:`<span class="text-amber-300">${hrText('بانتظار المعالجة في التاب المختص','Pending handling in relevant tab')}</span>`}</div>`).join(''):`<p>${hrText('لا توجد طلبات معلقة','No pending requests')}</p>`);
 }
+
+
+// Attendance workspace UI: real source records, no payroll/shift calculations.
+const lmAttWorkspace={rows:[],loading:false};
+function lmAttSafe(v){return escapeHtml(String(v??''));}
+function lmAttDate(r){return String(r.date||r.clientDate||r.timestamp||'').slice(0,10);}
+function lmAttStamp(r){const n=Number(r.createdAt||r.approvedAt||0);return n||Date.parse(String(r.timestamp||r.clientDate||''))||0;}
+function lmAttSource(r){return r.origin==='ess'?'ESS GPS':r.origin==='device'?'ZKTeco'+(r.device?' #'+r.device:''):'غير محدد';}
+function lmAttWorkspaceLayout(){
+ const d=document.getElementById('hr-attendance-view');if(!d)return;
+ const imp=d.querySelector('#hr-import-file-attendance')?.closest('.hr-panel');
+ const gps=d.querySelector('#lm-gps-review')?.closest('.hr-panel');
+ if(!imp||!gps)return;
+ // Keep the existing import engine and approval controls intact.
+ const heading=d.querySelector('h1');const subtitle=heading?.nextElementSibling;
+ if(subtitle)subtitle.textContent=hrText('سجلات حقيقية من ESS وأجهزة البصمة؛ حسابات الورديات والإضافي مؤجلة','Actual ESS and device records; shift and overtime calculations are pending');
+ if(heading)heading.after(imp);else d.prepend(imp);
+ let ws=d.querySelector('#lm-att-workspace');
+ if(!ws){ws=document.createElement('section');ws.id='lm-att-workspace';ws.className='hr-panel mb-5';ws.innerHTML=`<div class="flex flex-wrap justify-between items-center gap-3 mb-4"><div><h2 class="font-bold text-sky-300 text-lg">${hrText('سجل الحضور الموحد','Unified attendance register')}</h2><p class="text-xs text-slate-400">${hrText('عرض السجلات الأصلية دون احتساب ساعات إضافية أو جزاءات','Source records only; no overtime or penalties calculated')}</p></div><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmAttLoad()">${hrText('تحديث البيانات','Refresh')}</button></div>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5" id="lm-att-kpis"></div>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4"><label class="text-sm">${hrText('كود الموظف','Employee code')}<input id="lm-att-code" class="hr-feature-input mt-1 w-full" placeholder="778" oninput="lmAttFilter()"></label><label class="text-sm">${hrText('من تاريخ','From')}<input id="lm-att-from" type="date" class="hr-feature-input mt-1 w-full" onchange="lmAttFilter()"></label><label class="text-sm">${hrText('إلى تاريخ','To')}<input id="lm-att-to" type="date" class="hr-feature-input mt-1 w-full" onchange="lmAttFilter()"></label><label class="text-sm">${hrText('المصدر','Source')}<select id="lm-att-source" class="hr-feature-input mt-1 w-full" onchange="lmAttFilter()"><option value="all">${hrText('كل المصادر','All sources')}</option><option value="ess">ESS GPS</option><option value="device">ZKTeco</option><option value="unknown">${hrText('غير محدد','Unknown')}</option></select></label></div>
+<div class="flex flex-wrap gap-2 mb-3"><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmAttExport()">${hrText('تصدير السجلات المعروضة CSV','Export filtered CSV')}</button><span id="lm-att-count" class="text-xs text-slate-400 self-center"></span></div><div id="lm-att-table" aria-live="polite" class="overflow-x-auto text-sm text-slate-300">${hrText('جاري التحميل','Loading')}</div><p class="text-xs text-amber-200 mt-3">${hrText('ساعات العمل والإضافي والتأخير: بانتظار اعتماد منطق الورديات وربط أزواج الدخول والخروج. لا يتم تخمينها.','Work, overtime and lateness hours await approved shift and punch-pairing rules.')}</p>`;imp.after(ws);}
+ ws.after(gps);
+ lmAttLoad();
+}
+async function lmAttLoad(){
+ const el=document.getElementById('lm-att-table');if(!el||lmAttWorkspace.loading)return;
+ if(!portalIsAdmin()){el.textContent=hrText('غير مصرح بعرض السجلات','Not authorized');return;}
+ lmAttWorkspace.loading=true;el.textContent=hrText('جاري قراءة سجلات Firebase','Reading Firebase records');
+ const rows=[],errors=[];
+ const add=(r)=>{if(r&&typeof r==='object')rows.push(r)};
+ try{
+  const jobs=[['attendance_requests/2','ess'],['approved_attendance/2','approved'],['hr_imports/attendance','imports']];
+  const results=await Promise.allSettled(jobs.map(([path])=>db.ref(path).once('value')));
+  results.forEach((res,i)=>{
+   const [path,kind]=jobs[i];if(res.status!=='fulfilled'){errors.push(path);return;}
+   const val=res.value.val()||{};
+   if(kind==='ess')Object.entries(val).forEach(([id,r])=>add({id,code:'2',date:r.clientDate,time:r.clientTime,punch:r.punchType,status:r.verificationStatus||'PENDING_REVIEW',origin:'ess',createdAt:r.createdAt}));
+   if(kind==='approved')Object.entries(val).forEach(([id,r])=>{if(!val||typeof r!=='object')return; /* Approved ledger is an approval of an ESS request, not a second punch. */});
+   if(kind==='imports')Object.entries(val).forEach(([batchId,batch])=>Object.entries(batch?.records||{}).forEach(([i,r])=>{if(!r||typeof r!=='object')return;const source=String(r.source||'').toLowerCase();add({id:batchId+':'+i,code:r.code,date:String(r.timestamp||'').slice(0,10),timestamp:r.timestamp,punch:r.type,status:'IMPORTED',origin:/zkteco|device|finger|zk|[1-4]/.test(source)?'device':'unknown',device:/^[1-4]$/.test(source)?source:'',createdAt:Date.parse(String(r.timestamp||''))||0});}));
+  });
+ }catch(e){errors.push(e.message||'read failed')}
+ lmAttWorkspace.rows=rows.sort((a,b)=>lmAttStamp(b)-lmAttStamp(a));lmAttWorkspace.loading=false;
+ const warn=document.getElementById('lm-att-count');if(warn&&errors.length)warn.textContent=hrText('تعذر قراءة بعض المصادر: ','Some sources unavailable: ')+errors.join(', ');
+ lmAttFilter();
+}
+function lmAttFiltered(){const code=document.getElementById('lm-att-code')?.value.trim()||'',from=document.getElementById('lm-att-from')?.value||'',to=document.getElementById('lm-att-to')?.value||'',src=document.getElementById('lm-att-source')?.value||'all';return lmAttWorkspace.rows.filter(r=>{const date=lmAttDate(r);return (!code||String(r.code||'').includes(code))&&(!from||(date&&date>=from))&&(!to||(date&&date<=to))&&(src==='all'||r.origin===src)});}
+function lmAttFilter(){const el=document.getElementById('lm-att-table');if(!el)return;const rows=lmAttFiltered(),kpi=document.getElementById('lm-att-kpis'),count=document.getElementById('lm-att-count');const cards=[[hrText('السجلات المعروضة','Records'),rows.length],[hrText('بصمات ESS','ESS punches'),rows.filter(r=>r.origin==='ess').length],[hrText('بصمات الأجهزة','Device punches'),rows.filter(r=>r.origin==='device').length],[hrText('بانتظار المراجعة','Pending review'),rows.filter(r=>r.status==='PENDING_REVIEW'||r.status==='HELD').length]];if(kpi)kpi.innerHTML=cards.map(([label,n])=>`<div class="rounded-xl border border-sky-500/20 bg-slate-900/40 p-3"><p class="text-xs text-slate-400">${label}</p><strong class="text-2xl text-sky-200">${n}</strong></div>`).join('');if(count)count.textContent=rows.length+' '+hrText('سجل مطابق للفلاتر','matching records');el.innerHTML=rows.length?`<table class="hr-feature-table w-full"><thead><tr>${[hrText('الكود','Code'),hrText('التاريخ','Date'),hrText('الوقت','Time'),hrText('الحركة','Punch'),hrText('المصدر','Source'),hrText('الحالة','Status')].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.slice(0,500).map(r=>`<tr><td>${lmAttSafe(r.code)}</td><td>${lmAttSafe(lmAttDate(r))}</td><td>${lmAttSafe(r.time||String(r.timestamp||'').slice(11,19))}</td><td>${lmAttSafe(r.punch||'—')}</td><td>${lmAttSafe(lmAttSource(r))}</td><td>${lmAttSafe(r.status)}</td></tr>`).join('')}</tbody></table>${rows.length>500?'<p class="text-xs mt-2">Showing first 500 records; export includes all filtered records.</p>':''}`:`<p class="text-slate-400 p-4">${hrText('لا توجد سجلات مطابقة','No matching records')}</p>`;}
+function lmAttExport(){const rows=lmAttFiltered();if(!rows.length)return;const cols=['code','date','time','punch','origin','device','status','id'];const esc=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const csv='\uFEFF'+[cols.join(','),...rows.map(r=>cols.map(k=>esc(k==='date'?lmAttDate(r):r[k])).join(','))].join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='attendance_filtered.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+const lmAttOriginalRender=renderHRFeature;
+renderHRFeature=function(page){lmAttOriginalRender(page);if(page==='attendance')lmAttWorkspaceLayout();};
