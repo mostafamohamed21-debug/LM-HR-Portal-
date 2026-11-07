@@ -859,7 +859,7 @@ function renderHRWorkspace(){
         const d=document.getElementById('hr-notifications-view');if(!d)return;
         d.innerHTML=`<h1 class="text-2xl font-extrabold mb-5">${hrText('الإشعارات والطلبات','Notifications & Requests')}</h1><div class="glass-card rounded-2xl p-6 mb-5"><h2 class="font-bold text-sky-300 mb-3">${hrText('تنبيهات طلبات ESS','ESS request alerts')}</h2><div id="ess-request-panel" class="text-slate-300 text-sm">${hrText('جاري فحص اتصال ESS...','Checking ESS connection...')}</div></div><div class="glass-card rounded-2xl p-6"><h2 class="font-bold text-sky-300 mb-3">${hrText('إنشاء إشعار إداري','Compose HR notification')}</h2><label class="block text-sm mb-1">${hrText('العنوان','Title')}</label><input id="hr-notify-title" maxlength="120" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-3" placeholder="${hrText('عنوان الإشعار','Notification title')}"><label class="block text-sm mb-1">${hrText('الرسالة','Message')}</label><textarea id="hr-notify-body" maxlength="1000" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-3" placeholder="${hrText('نص الرسالة','Message body')}"></textarea><label class="block text-sm mb-1">${hrText('إرسال إلى','Audience')}</label><select id="hr-notify-target" onchange="hrNotificationAudienceChanged()" class="w-full p-3 rounded-xl bg-slate-900 border border-sky-500/30 mb-3"><option value="all">${hrText('الشركة بالكامل','Entire company')}</option><option value="department">${hrText('إدارة كاملة','Department')}</option><option value="employees">${hrText('موظفون محددون','Selected employees')}</option></select><div id="hr-notify-target-fields" class="mb-3"></div><label class="flex items-center gap-3 mb-4 text-sm"><input id="hr-notify-ack" type="checkbox" class="w-5 h-5 accent-sky-500">${hrText('هذا الإشعار يتطلب إقرار الموظف بالاطلاع','Employee acknowledgement required')}</label><button type="button" onclick="hrPreviewNotification()" class="portal-action-btn px-5 py-3 rounded-xl">${hrText('معاينة المستلمين','Preview recipients')}</button> <button type="button" id="hr-notify-send" onclick="hrSendNotification()" class="portal-action-btn px-5 py-3 rounded-xl ml-2" style="background:#0878ad">${hrText('إرسال الإشعار','Send notification')}</button><div id="hr-notify-preview" class="mt-4 text-sm text-slate-300" aria-live="polite"></div><p class="text-xs text-amber-300 mt-3">${hrText('الإشعارات الداخلية تعمل من قاعدة Portal المشتركة؛ لا يلزم حساب ESS إداري منفصل.','Internal notifications use the shared Portal database; no separate ESS admin account is needed.')}</p></div>`;
         hrNotificationAudienceChanged();
-        setTimeout(essRenderRequestPanel,0);
+        setTimeout(()=>{essRenderRequestPanel();lmGpsRender();},0);
     }
 }
 document.addEventListener('DOMContentLoaded',()=>showHRPage('dashboard'));
@@ -964,7 +964,7 @@ function hrFeatureNotice(ar,en){return `<div class="hr-panel border-amber-500/30
 function renderHRFeature(page){
  const d=document.getElementById('hr-'+page+'-view');if(!d)return;
  const pending=hrFeatureNotice('بانتظار ربط ESS الآمن ومراجعة صلاحيات الوصول. لا توجد بيانات حضور أو إجازات فعلية معروضة حاليًا.','Awaiting secure ESS integration and access review. No actual attendance or leave data is displayed yet.');
- if(page==='attendance') d.innerHTML=hrFeatureShell(hrText('الحضور والانصراف','Attendance & departure'),hrText('استيراد السجلات الفعلية من Excel / CSV','Import real attendance records from Excel / CSV'),`<div class="hr-panel mb-5"><h2 class="font-bold text-sky-300 mb-3">${hrText('طلبات بصمة GPS في انتظار المراجعة','GPS punch requests awaiting review')}</h2><div id="lm-gps-review" class="text-sm text-slate-300">${hrText('جاري تحميل الطلبات...','Loading requests...')}</div></div>`+hrImportUI('attendance'));
+ if(page==='attendance') d.innerHTML=hrFeatureShell(hrText('الحضور والانصراف','Attendance & departure'),hrText('استيراد السجلات الفعلية من Excel / CSV','Import real attendance records from Excel / CSV'),hrImportUI('attendance'));
  if(page==='leave-balances')d.innerHTML=hrFeatureShell(hrText('أرصدة الإجازات','Leave balances'),hrText('استيراد أرصدة الإجازات الفعلية من Excel / CSV','Import actual leave balances from Excel / CSV'),hrImportUI('leave-balances'));
  if(page==='permissions'){d.innerHTML=hrPermissionPage();hrPermissionInitDate();hrPermissionWatch();}
 
@@ -2857,30 +2857,47 @@ function lmGpsRender(){
  lmGpsRef.on('value',lmGpsCallback,e=>{const el=document.getElementById('lm-gps-review');if(el)el.textContent='Firebase: '+(e.code||e.message)});
 }
 const lmOriginalRenderHRFeature=renderHRFeature;
-renderHRFeature=function(page){lmOriginalRenderHRFeature(page);if(page==='attendance')lmGpsRender();else lmGpsDetach();};
+renderHRFeature=function(page){lmOriginalRenderHRFeature(page);lmGpsDetach();};
 // Alerts: link to the attendance tab; other ESS requests remain visible here.
 essRenderRequestPanel=function(){
  const panel=document.getElementById('ess-request-panel');if(!panel)return;
  essStopListeners();
  if(!portalIsAdmin()){panel.textContent=hrText('هذه الصفحة متاحة لمسؤول Portal فقط','Portal admin only');return;}
- panel.innerHTML=`<p class="mb-3 text-slate-400">${hrText('طلبات الحضور تُراجع من تاب الحضور والانصراف. هنا تنبيهات الطلبات الأخرى.','Attendance punches are reviewed in Attendance. Other request alerts appear here.')}</p><button type="button" class="portal-action-btn px-4 py-2 mb-3" onclick="showHRPage('attendance')">${hrText('فتح مراجعة البصمات','Open punch review')}</button><div id="ess-requests-content"></div>`;
+ panel.innerHTML=`<p class="mb-4 text-sm text-slate-300">${hrText('الطلبات مرتبة من الأقدم للأحدث حسب وقت تقديمها الأصلي. الاعتمادات من نفس السجل، دون نسخ الطلبات.','Requests are ordered oldest first by original submission time. Approvals use the original records.')}</p><div class="flex flex-wrap gap-3 mb-4"><label class="text-sm">${hrText('نوع الطلب','Request type')}<select id="lm-alert-kind" class="hr-feature-input mt-1" onchange="lmUnifiedAlertsDraw()"><option value="">${hrText('جميع الأنواع','All types')}</option>${essPaths.map(([path,ar,en])=>`<option value="${path}">${hrText(ar,en)}</option>`).join('')}</select></label><label class="text-sm">${hrText('بحث بالكود','Search by code')}<input id="lm-alert-code" class="hr-feature-input mt-1" oninput="lmUnifiedAlertsDraw()" placeholder="2"></label></div><div id="ess-requests-content" aria-live="polite"></div><div class="hr-panel mt-5"><h2 class="font-bold text-sky-300 mb-3">${hrText('مراجعة بصمات GPS','GPS punch review')}</h2><p class="text-xs text-slate-400 mb-3">${hrText('قرارات البصمات من مركز الإشعارات فقط؛ سجلات الحضور في تاب الحضور والانصراف.','Punch decisions are handled here; attendance records remain in the Attendance tab.')}</p><div id="lm-gps-review" class="text-sm text-slate-300">${hrText('جاري تحميل الطلبات...','Loading requests...')}</div></div>`;
  essRequestState={};essRequestErrors={};
  for(const [path] of essPaths){
   const ref=db.ref(path);const cb=s=>{essRequestState[path]=s.val()||{};delete essRequestErrors[path];lmUnifiedAlertsDraw();};
-  const err=e=>{essRequestErrors[path]=e.code||e.message;lmUnifiedAlertsDraw()};
+  const err=e=>{essRequestErrors[path]=e.code||e.message;lmUnifiedAlertsDraw();};
   ref.on('value',cb,err);essRequestUnsubscribers.push(()=>ref.off('value',cb));
  }
 };
 function lmUnifiedAlertsDraw(){
  const el=document.getElementById('ess-requests-content');if(!el)return;
+ const kind=document.getElementById('lm-alert-kind')?.value||'';
+ const codeFilter=(document.getElementById('lm-alert-code')?.value||'').trim();
  const alerts=[];
- for(const [path,ar,en] of essPaths){for(const [code,byId] of Object.entries(essRequestState[path]||{})){for(const [id,r] of Object.entries(byId||{})){
-  if(!r||typeof r!=='object'||!lmPendingStatus(path,r))continue;
-  alerts.push({path,code,id,r,label:hrText(ar,en),time:Number(r.createdAt||r.timestamp||0)});
- }}}
- alerts.sort((a,b)=>b.time-a.time);
- const errors=Object.keys(essRequestErrors);
- el.innerHTML=(errors.length?`<p class="text-amber-300">${hrText('تعذر قراءة','Read failed')}: ${errors.map(escapeHtml).join(', ')}</p>`:'')+(alerts.length?alerts.slice(0,50).map(a=>`<div class="border-b border-slate-700 p-3 flex justify-between items-center gap-3"><span>${escapeHtml(a.label)} — ${hrText('موظف','Employee')} ${escapeHtml(a.code)}</span>${a.path==='attendance_requests'?`<button class="portal-action-btn px-3 py-1" onclick="showHRPage('attendance')">${hrText('مراجعة','Review')}</button>`:`<span class="text-amber-300">${hrText('بانتظار المعالجة في التاب المختص','Pending handling in relevant tab')}</span>`}</div>`).join(''):`<p>${hrText('لا توجد طلبات معلقة','No pending requests')}</p>`);
+ for(const [path,ar,en] of essPaths){
+  if(kind&&kind!==path)continue;
+  for(const [code,byId] of Object.entries(essRequestState[path]||{})){
+   if(codeFilter&&!String(code).includes(codeFilter))continue;
+   for(const [id,r] of Object.entries(byId||{})){
+    if(!r||typeof r!=='object'||!lmPendingStatus(path,r))continue;
+    alerts.push({path,code,id,r,label:hrText(ar,en),time:Number(r.createdAt||r.timestamp||0)});
+   }
+  }
+ }
+ alerts.sort((a,b)=>a.time-b.time||a.code.localeCompare(b.code)||a.id.localeCompare(b.id));
+ const errors=Object.entries(essRequestErrors);
+ const warning=errors.length?`<p class="text-amber-300 mb-3">${hrText('تعذر قراءة بعض المسارات','Some paths could not be read')}: ${errors.map(([p,e])=>escapeHtml(p+': '+e)).join('، ')}</p>`:'';
+ const pageFor={permission_requests:'permissions',leave_requests:'leave-balances',loan_requests:'service-center',mission_requests:'missions',suggestions_and_complaints:'complaints',attendance_requests:'notifications'};
+ const dateFormat=new Intl.DateTimeFormat(currentLang==='ar'?'ar-EG':'en-GB',{dateStyle:'medium',timeStyle:'short'});
+ const rows=alerts.slice(0,100).map((a,i)=>{
+  const date=a.time>0?dateFormat.format(new Date(a.time)):hrText('وقت غير مسجل','No timestamp');
+  const destination=pageFor[a.path]||'notifications';
+  const action=a.path==='attendance_requests'?`<span class="text-sky-300 text-xs">${hrText('المراجعة بالأسفل','Review below')}</span>`:`<button type="button" class="portal-ghost-btn px-3 py-1" onclick="showHRPage('${destination}')">${hrText('فتح التاب المختص','Open module')}</button>`;
+  return `<tr class="border-b border-slate-700/40"><td class="p-3">${i+1}</td><td class="p-3">${escapeHtml(a.label)}</td><td class="p-3">${escapeHtml(a.code)}</td><td class="p-3" dir="auto">${escapeHtml(date)}</td><td class="p-3">${action}</td></tr>`;
+ }).join('');
+ el.innerHTML=warning+`<p class="text-sm mb-3">${hrText('طلبات معلقة','Pending requests')}: <strong>${alerts.length}</strong>${alerts.length>100?' — '+hrText('عرض أول 100','Showing first 100'):''}</p>`+(alerts.length?`<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr>${[hrText('الترتيب','Order'),hrText('النوع','Type'),hrText('الموظف','Employee'),hrText('وقت التقديم','Submitted at'),hrText('الإجراء','Action')].map(x=>`<th class="p-3 text-start border-b border-slate-600">${x}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`:`<p class="text-slate-400">${hrText('لا توجد طلبات معلقة مطابقة','No matching pending requests')}</p>`);
 }
 
 
@@ -2893,8 +2910,7 @@ function lmAttSource(r){return r.origin==='ess'?'ESS GPS':r.origin==='device'?'Z
 function lmAttWorkspaceLayout(){
  const d=document.getElementById('hr-attendance-view');if(!d)return;
  const imp=d.querySelector('#hr-import-file-attendance')?.closest('.hr-panel');
- const gps=d.querySelector('#lm-gps-review')?.closest('.hr-panel');
- if(!imp||!gps)return;
+ if(!imp)return;
  // Keep the existing import engine and approval controls intact.
  const heading=d.querySelector('h1');const subtitle=heading?.nextElementSibling;
  if(subtitle)subtitle.textContent=hrText('سجلات حقيقية من ESS وأجهزة البصمة؛ حسابات الورديات والإضافي مؤجلة','Actual ESS and device records; shift and overtime calculations are pending');
@@ -2904,7 +2920,6 @@ function lmAttWorkspaceLayout(){
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5" id="lm-att-kpis"></div>
 <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4"><label class="text-sm">${hrText('كود الموظف','Employee code')}<input id="lm-att-code" class="hr-feature-input mt-1 w-full" placeholder="778" oninput="lmAttFilter()"></label><label class="text-sm">${hrText('من تاريخ','From')}<input id="lm-att-from" type="date" class="hr-feature-input mt-1 w-full" onchange="lmAttFilter()"></label><label class="text-sm">${hrText('إلى تاريخ','To')}<input id="lm-att-to" type="date" class="hr-feature-input mt-1 w-full" onchange="lmAttFilter()"></label><label class="text-sm">${hrText('المصدر','Source')}<select id="lm-att-source" class="hr-feature-input mt-1 w-full" onchange="lmAttFilter()"><option value="all">${hrText('كل المصادر','All sources')}</option><option value="ess">ESS GPS</option><option value="device">ZKTeco</option><option value="unknown">${hrText('غير محدد','Unknown')}</option></select></label></div>
 <div class="flex flex-wrap gap-2 mb-3"><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmAttExport()">${hrText('تصدير السجلات المعروضة CSV','Export filtered CSV')}</button><span id="lm-att-count" class="text-xs text-slate-400 self-center"></span></div><div id="lm-att-table" aria-live="polite" class="overflow-x-auto text-sm text-slate-300">${hrText('جاري التحميل','Loading')}</div><p class="text-xs text-amber-200 mt-3">${hrText('ساعات العمل والإضافي والتأخير: بانتظار اعتماد منطق الورديات وربط أزواج الدخول والخروج. لا يتم تخمينها.','Work, overtime and lateness hours await approved shift and punch-pairing rules.')}</p>`;imp.after(ws);}
- ws.after(gps);
  lmAttLoad();
 }
 async function lmAttLoad(){
