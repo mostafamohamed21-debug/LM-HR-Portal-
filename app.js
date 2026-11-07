@@ -831,9 +831,9 @@ const hrText=(ar,en)=>currentLang==='ar'?ar:en;
 function showHRPage(page){
     if(page!=='employees' && fahdHasUnsavedChanges()&&!window.fahdNavigationApproved){fahdGuardNavigation(()=>showHRPage(page));return;}
 
-    if(!['dashboard','employees','payroll','notifications','attendance','leave-balances','appraisal','permissions','bradford','service-center','recruitment','missions'].includes(page))return;
+    if(!['dashboard','employees','payroll','notifications','attendance','leave-balances','appraisal','permissions','bradford','service-center','recruitment','missions','clinic','complaints','chat'].includes(page))return;
     hrActivePage=page;
-    ['dashboard','payroll','notifications','attendance','leave-balances','appraisal','permissions','bradford','service-center','recruitment','missions'].forEach(p=>document.getElementById('hr-'+p+'-view')?.classList.toggle('hidden',p!==page));
+    ['dashboard','payroll','notifications','attendance','leave-balances','appraisal','permissions','bradford','service-center','recruitment','missions','clinic','complaints','chat'].forEach(p=>document.getElementById('hr-'+p+'-view')?.classList.toggle('hidden',p!==page));
     const list=document.getElementById('employees-list-view'),profile=document.getElementById('employee-profile-view');
     if(page==='employees'){if(activeEmployeeCode!==null){if(profile){profile.classList.remove('hidden');profile.style.display='block';}if(list){list.classList.add('hidden');list.style.display='none';}}else{if(list){list.classList.remove('hidden');list.style.display='block';}if(profile){profile.classList.add('hidden');profile.style.display='none';}}}
     else {if(list){list.classList.add('hidden');list.style.display='none';}if(profile){profile.classList.add('hidden');profile.style.display='none';}}
@@ -845,6 +845,7 @@ function renderHRWorkspace(){
     document.querySelectorAll('.hr-nav [data-ar]').forEach(el=>{el.textContent=el.dataset[currentLang]});
     if(hrActivePage==='dashboard'){renderRichDashboard();}
     if(hrActivePage==='service-center') lm29ServiceCenter();
+    if(['clinic','complaints','chat'].includes(hrActivePage)) lmPhase2Standalone(hrActivePage);
     if(hrActivePage==='missions') lmMissionPage();
     if(hrActivePage==='recruitment') lm29Recruitment();
     if(hrActivePage==='appraisal') lm8Appraisal();
@@ -2788,20 +2789,22 @@ function lm24Renew(emp){
 // Phase 29: UI-only additions. No Firebase writes, ESS modifications, or changes to approval rules.
 const lm29ServiceGroups=[
  {ar:'الخدمات الإدارية والمالية',en:'Administrative & financial services',items:[
-  ['mission','المأموريات','Missions','استقبال ومراجعة طلبات المأموريات، ثم تنفيذ استثناء الموقع بعد الاعتماد.','Mission requests, approvals and location exceptions.'],
-  ['advance','السلف المالية','Financial advances','مراجعة طلبات السلف وإجراءات المستندات والصرف.','Advance requests, paperwork and disbursement workflow.'],
-  ['documents','مستندات الملف الوظيفي','Personnel file documents','طلبات استلام الأصول ومواعيد إعادتها.','Original-document requests and return tracking.'],
-  ['salary-letter','مفردات المرتب','Salary statements','تجهيز خطابات مفردات المرتب وتحديد طريقة التسليم.','Prepare salary statements and delivery method.']
- ]},
- {ar:'التواصل والمتابعة',en:'Communication & follow-up',items:[
-  ['support','الدعم الفني','Technical support','استقبال تذاكر التطبيق وأجهزة الكمبيوتر وتوجيهها للمختص.','Receive and route application and IT support tickets.'],
-  ['complaints','الشكاوى والمقترحات','Complaints & suggestions','متابعة الشكاوى والمقترحات وفق ضوابط السرية.','Handle complaints and suggestions with confidentiality controls.'],
-  ['chat','محادثات الموارد البشرية','HR conversations','صندوق محادثات مشترك لفريق الموارد البشرية.','Shared HR team conversation inbox.']
- ]},
- {ar:'الخدمات الطبية',en:'Medical services',items:[
-  ['clinic','العيادة والطابور الطبي','Clinic & medical queue','الحجوزات وأرقام الدور والقرارات الإدارية الناتجة عن الكشف.','Appointments, queue numbers and administrative outcomes.']
+  ['salary-letter','مفردات المرتب','Salary statement','طلب مفردات مرتب من ملف الموظف.','Request a salary statement.'],
+  ['advance','سلفة مالية','Financial advance','طلب سلفة مالية ومتابعة إجراءاتها.','Request a financial advance.'],
+  ['documents','طلب أصول أوراق من ملفي','Request original documents from my file','طلب استلام أصول أوراق من الملف الوظيفي.','Request original personnel-file documents.'],
+  ['support','طلب دعم فني','Technical support request','طلب دعم فني للتطبيق أو الأجهزة.','Request IT support for apps or devices.']
  ]}
 ];
+function lmPhase2Standalone(page){
+ const el=document.getElementById('hr-'+page+'-view');if(!el)return;
+ const items={
+ clinic:['العيادة','Clinic','تاب مستقل مخصص لإدارة العيادة. لم يتم تفعيل قراءة أو كتابة بيانات طبية أو صلاحياتها بعد.','Dedicated clinic module. Medical data access and permissions are not enabled yet.'],
+ complaints:['الشكاوى والمقترحات','Complaints & Suggestions','تاب مستقل للشكاوى والمقترحات. لحماية السرية، لن يتم عرض بيانات الشكاوى قبل اعتماد صلاحيات الوصول الخاصة بها.','Dedicated complaints module. Records will not be exposed until confidentiality permissions are reviewed.'],
+ chat:['الشات','Chat','تاب مستقل للمحادثات. إرسال الرسائل وتخزينها لم يتم تفعيله بعد.','Dedicated chat module. Sending and storing messages is not enabled yet.']
+ };
+ const item=items[page];if(!item)return;
+ el.innerHTML=`<div class="mb-5"><h1 class="text-2xl font-bold text-sky-200">${hrText(item[0],item[1])}</h1></div><div class="glass-card rounded-2xl p-6 border border-sky-500/20"><p class="text-slate-200">${hrText(item[2],item[3])}</p><p class="text-sm text-amber-200 mt-4">${hrText('الواجهة جاهزة للتوسع — لا توجد عمليات على Firebase من هذه الصفحة.','UI ready for future work — this page performs no Firebase operations.')}</p></div>`;
+}
 function lm29ServiceCenter(){
  const el=document.getElementById('hr-service-center-view');if(!el)return;
  const ar=currentLang==='ar';
