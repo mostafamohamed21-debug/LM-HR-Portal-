@@ -2922,6 +2922,38 @@ function lmAttSafe(v){return escapeHtml(String(v??''));}
 function lmAttDate(r){return String(r.date||r.clientDate||r.timestamp||'').slice(0,10);}
 function lmAttStamp(r){const n=Number(r.createdAt||r.approvedAt||0);return n||Date.parse(String(r.timestamp||r.clientDate||''))||0;}
 function lmAttSource(r){return r.origin==='ess'?'ESS GPS':r.origin==='device'?'ZKTeco'+(r.device?' #'+r.device:''):'غير محدد';}
+// Local ZKTeco bridge: explicit user-triggered read-only pull, staged for existing Firebase import approval.
+async function lmZkPull(){
+ const status=document.getElementById('lm-zk-status'),button=document.getElementById('lm-zk-pull');
+ if(!portalIsAdmin()){if(status)status.textContent=hrText('يلزم حساب إدارة البورتال','Portal admin required');return;}
+ const day=document.getElementById('lm-zk-day')?.value;
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(day||'')){if(status)status.textContent=hrText('اختر تاريخًا صحيحًا','Select a valid date');return;}
+ const departments=[...(document.getElementById('lm-zk-dept')?.selectedOptions||[])].map(o=>o.value).filter(Boolean);
+ const employees=[...(document.getElementById('lm-zk-employees')?.selectedOptions||[])].map(o=>o.value).filter(Boolean);
+ if(button)button.disabled=true;if(status)status.textContent=hrText('جاري الاتصال بالأجهزة الأربعة...','Connecting to four devices...');
+ try{
+  const res=await fetch('http://127.0.0.1:4371/api/punches?date='+encodeURIComponent(day),{signal:AbortSignal.timeout(85000)});
+  if(!res.ok)throw Error('Bridge HTTP '+res.status);
+  const data=await res.json();if(!Array.isArray(data.records))throw Error('Invalid bridge response');
+  const deptOf=e=>String(e?.department||e?.departmentAr||e?.department_ar||e?.dept||'').trim();
+  const allowed=new Set((Array.isArray(allEmployees)?allEmployees:[]).filter(e=>(!departments.length||departments.includes(deptOf(e)))&&(!employees.length||employees.includes(String(getEmployeeCode(e))))).map(e=>String(getEmployeeCode(e))));
+  if(!Array.isArray(allEmployees)||!allEmployees.length)throw Error('Employee directory not loaded');
+  const rows=data.records.filter(r=>allowed.has(String(r.code)));
+  const parsed=rows.length?hrImportRows('attendance',rows):{result:[],errors:[]};
+  hrImportState.attendance={records:parsed.result,errors:parsed.errors,filename:'ZKTeco_'+day+'.csv'};
+  const preview=document.getElementById('hr-import-preview-attendance');
+  if(preview)preview.innerHTML='<p>'+hrEscape(hrText('معاينة السحب المباشر','Direct pull preview'))+': '+parsed.result.length+' '+hrEscape(hrText('بصمة مطابقة','matching punches'))+' / '+data.records.length+' '+hrEscape(hrText('بصمة مسحوبة','pulled punches'))+'</p>'+ (parsed.errors.length?'<p class="text-rose-300">'+parsed.errors.slice(0,10).map(hrEscape).join('; ')+'</p>':'')+'<div class="overflow-x-auto"><table class="hr-feature-table"><thead><tr><th>Code</th><th>Timestamp</th><th>Source</th></tr></thead><tbody>'+parsed.result.slice(0,15).map(r=>'<tr><td>'+hrEscape(r.code)+'</td><td>'+hrEscape(r.timestamp)+'</td><td>'+hrEscape(r.source)+'</td></tr>').join('')+'</tbody></table></div>'+(parsed.result.length&&!parsed.errors.length?'<button class="portal-action-btn px-4 py-2 mt-3 rounded-xl" onclick="hrCommitImport(\'attendance\')">'+hrText('اعتماد وحفظ الدفعة في Firebase','Review and save batch to Firebase')+'</button>':'');
+  if(status)status.textContent=(data.devices||[]).map(d=>'#'+d.id+': '+(d.ok?d.count+' OK':'ERROR '+d.error)).join(' | ')+(data.devices?.some(d=>!d.ok)?' — '+hrText('بعض الأجهزة لم تستجب','Some devices failed'):'');
+ }catch(e){if(status)status.textContent=hrText('فشل الاتصال بالـBridge المحلي: ','Local bridge unavailable: ')+e.message+' — '+hrText('شغّل npm start على جهاز متصل بالأجهزة','Run npm start on the device-connected PC');}
+ finally{if(button)button.disabled=false;}
+}
+function lmZkPopulate(){
+ const dep=document.getElementById('lm-zk-dept'),emp=document.getElementById('lm-zk-employees');if(!dep||!emp)return;
+ const list=Array.isArray(allEmployees)?allEmployees:[];
+ const departments=[...new Set(list.map(e=>String(e?.department||e?.departmentAr||e?.department_ar||e?.dept||'').trim()).filter(Boolean))].sort();
+ dep.innerHTML=departments.map(v=>'<option value="'+hrEscape(v)+'">'+hrEscape(v)+'</option>').join('');
+ emp.innerHTML=list.map(e=>{const c=String(getEmployeeCode(e)||'');return c?'<option value="'+hrEscape(c)+'">'+hrEscape(c)+' — '+hrEscape(e.nameAr||e.name||e.fullName||'')+'</option>':''}).join('');
+}
 function lmAttWorkspaceLayout(){
  const d=document.getElementById('hr-attendance-view');if(!d)return;
  const imp=d.querySelector('#hr-import-file-attendance')?.closest('.hr-panel');
@@ -2931,6 +2963,9 @@ function lmAttWorkspaceLayout(){
  if(subtitle)subtitle.textContent=hrText('سجلات حقيقية من ESS وأجهزة البصمة؛ حسابات الورديات والإضافي مؤجلة','Actual ESS and device records; shift and overtime calculations are pending');
  if(heading)heading.after(imp);else d.prepend(imp);
  let ws=d.querySelector('#lm-att-workspace');
+ let zk=d.querySelector('#lm-zk-panel');
+ if(!zk){zk=document.createElement('section');zk.id='lm-zk-panel';zk.className='hr-panel mb-5';zk.innerHTML=`<h2 class="font-bold text-sky-300 mb-2">${hrText('السحب المباشر من أجهزة البصمة','Live ZKTeco device pull')}</h2><div class="lm-filter-grid"><label>${hrText('تاريخ السحب','Pull date')}<input type="date" id="lm-zk-day"></label><label>${hrText('الإدارات (اختيار متعدد)','Departments (multi-select)')}<select id="lm-zk-dept" multiple size="4"></select></label><label>${hrText('الموظفون (اختيار متعدد)','Employees (multi-select)')}<select id="lm-zk-employees" multiple size="4"></select></label></div><div class="lm-filter-actions"><button type="button" id="lm-zk-pull" onclick="lmZkPull()">${hrText('سحب فعلي من الأجهزة الأربعة','Pull from all four devices')}</button><button type="button" onclick="document.querySelectorAll('#lm-zk-panel select').forEach(s=>[...s.options].forEach(o=>o.selected=false))">${hrText('مسح الاختيارات','Clear selections')}</button></div><p class="text-xs text-slate-400 mt-2">${hrText('عدم تحديد موظفين أو إدارات يعني الكل. السحب للمعاينة أولًا، والحفظ يحتاج تأكيدًا. يجب تشغيل Bridge محليًا.','No selection means all. Preview first, save requires confirmation. Local bridge must be running.')}</p><p id="lm-zk-status" class="text-xs text-sky-300 mt-2" aria-live="polite"></p>`;imp.after(zk);}
+ const dayInput=document.getElementById('lm-zk-day');if(dayInput&&!dayInput.value){const f=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'});const parts=f.formatToParts(new Date());const v=k=>parts.find(x=>x.type===k).value;dayInput.value=v('year')+'-'+v('month')+'-'+v('day');}lmZkPopulate();
  if(!ws){ws=document.createElement('section');ws.id='lm-att-workspace';ws.className='hr-panel mb-5';ws.innerHTML=`<div class="flex flex-wrap justify-between items-center gap-3 mb-4"><div><h2 class="font-bold text-sky-300 text-lg" id="lm-att-mode-title">${hrText('حركات اليوم','Today punches')}</h2><p class="text-xs text-slate-400">${hrText('عرض السجلات الأصلية دون احتساب ساعات إضافية أو جزاءات','Source records only; no overtime or penalties calculated')}</p></div><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmAttLoad()">${hrText('تحديث البيانات','Refresh')}</button></div>
 <div class="flex flex-wrap gap-2 mb-4"><button type="button" class="portal-action-btn" onclick="lmAttMode('today')">${hrText('حركات اليوم','Today')}</button><button type="button" class="portal-ghost-btn" onclick="lmAttMode('report')">${hrText('تقرير الحضور والانصراف','Attendance history report')}</button></div><div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5" id="lm-att-kpis"></div>
 <div id="lm-att-filters" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4"><label class="text-sm">${hrText('كود الموظف','Employee code')}<input id="lm-att-code" class="hr-feature-input mt-1 w-full" placeholder="778" oninput="lmAttFilter()"></label><label class="text-sm">${hrText('من تاريخ','From')}<input id="lm-att-from" type="date" class="hr-feature-input mt-1 w-full" onchange="lmAttFilter()"></label><label class="text-sm">${hrText('إلى تاريخ','To')}<input id="lm-att-to" type="date" class="hr-feature-input mt-1 w-full" onchange="lmAttFilter()"></label><label class="text-sm">${hrText('المصدر','Source')}<select id="lm-att-source" class="hr-feature-input mt-1 w-full" onchange="lmAttFilter()"><option value="all">${hrText('كل المصادر','All sources')}</option><option value="ess">ESS GPS</option><option value="device">ZKTeco</option><option value="unknown">${hrText('غير محدد','Unknown')}</option></select></label></div>
