@@ -3194,3 +3194,83 @@ async function lmLeaveReqDecide(code,id,status){if(!portalIsAdmin()||!/^[0-9]+$/
 document.addEventListener('click',e=>{const b=e.target.closest?.('[data-leave-action]');if(b)lmLeaveReqDecide(b.dataset.code,b.dataset.id,b.dataset.leaveAction)});
 function lmLeaveReqExport(){const rows=lmLeaveReqFiltered(),keys=['code','name','type','startDate','endDate','notes','status','reviewedAt','reviewedBy'],q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const csv='\ufeff'+[keys.join(','),...rows.map(({code,r})=>keys.map(k=>q(k==='code'?code:r[k])).join(','))].join('\r\n'),a=document.createElement('a'),u=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.href=u;a.download='leave_requests.csv';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
 (function(){const prior=renderHRFeature;renderHRFeature=function(page){const result=prior(page);if(page==='leave-balances'){const root=document.getElementById('hr-leave-balances-view');if(root){root.insertAdjacentHTML('afterbegin',lmLeaveReqPanel());lmLeaveReqWatch();}}return result;};})();
+
+
+/* Integrated shift workspace — V5.5.1: no external v5-shifts.js dependency. */
+/* Lacto Misr V5 Shift Workspace — no payroll changes. */
+const LMV5_MANAGERS=Object.freeze({'4':'production','458':'assurance','16':'control','15':'engineering'});
+const LMV5_DEPT_LABELS={production:['الإنتاج','Production'],assurance:['تأكيد الجودة','Quality Assurance'],control:['رقابة الجودة','Quality Control'],engineering:['الهندسية والتطوير والمشروعات','Engineering, Development & Projects']};
+const LMV5_SHIFTS={A:{hours:7},B:{monthly:154},C:{monthly:132},D:{days:19}};
+const lmV5ShiftState={plans:{},audit:{},rows:[],loading:false};
+function lmV5ShiftT(ar,en){return currentLang==='ar'?ar:en;}
+function lmV5ShiftDay(s){return /^\d{4}-\d{2}-\d{2}$/.test(String(s||''))?s:'';}
+function lmV5ShiftDate(s){const x=lmV5ShiftDay(s);return x?new Date(x+'T00:00:00Z'):null;}
+function lmV5ShiftAdd(date,n){const d=lmV5ShiftDate(date);if(!d)return '';d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
+function lmV5ShiftTime(date,clock){const m=/^(\d\d):(\d\d)$/.exec(clock||'');if(!lmV5ShiftDay(date)||!m)return NaN;return Date.parse(date+'T'+clock+':00+02:00');}
+function lmV5ShiftKey(code,date){return String(code).replace(/[.#$\[\]/]/g,'_')+'_'+date;}
+function lmV5ShiftDept(emp){const d=lmV5Dept(emp);return lmV5Norm(d.ar||d.en);}
+function lmV5ShiftScope(emp){const d=lmV5ShiftDept(emp);if(/انتاج|production/.test(d))return 'production';if(/تاكيد.*جود|assurance/.test(d))return 'assurance';if(/رقاب.*جود|control/.test(d))return 'control';if(/هندس|تطوير|مشروع|engineering|development|project/.test(d))return 'engineering';return ''}
+function lmV5ShiftAllowed(emp){if(portalIsAdmin())return true;return false;} // no client-only manager authorization
+function lmV5ShiftTemplate(shift,pattern,date){if(shift==='A')return {start:'09:00',end:'16:00',overnight:false};if(shift==='B')return pattern==='night'?{start:'21:00',end:'09:00',overnight:true}:pattern==='long'?{start:'09:00',end:'21:00',overnight:false}:{start:'09:00',end:'16:00',overnight:false};if(shift==='C'||shift==='D')return pattern==='night'?{start:'21:00',end:'09:00',overnight:true}:{start:'09:00',end:'21:00',overnight:false};return null;}
+function lmV5ShiftEval(plan,raw){
+ if(!plan||plan.cancelled)return {status:plan?.cancelled?'CANCELLED':'NO_PLAN',hours:0,first:null,last:null,extra:null};
+ if(plan.kind==='REST'||plan.kind==='LEAVE')return {status:plan.kind,hours:0,first:null,last:null,extra:null};
+ const tpl=lmV5ShiftTemplate(plan.shift,plan.pattern,plan.date);if(!tpl)return {status:'INVALID',hours:0};
+ const start=lmV5ShiftTime(plan.date,tpl.start),end=lmV5ShiftTime(tpl.overnight?lmV5ShiftAdd(plan.date,1):plan.date,tpl.end);
+ // Window of shift with small tolerances. Never pair two punches outside the same shift.
+ const stamps=[...new Set(raw.filter(r=>String(r.code)===String(plan.code)).map(r=>Date.parse(String(r.timestamp||(r.date+'T'+r.time)))).filter(n=>Number.isFinite(n)&&n>=start-60*60*1000&&n<=end+60*60*1000))].sort((a,b)=>a-b);
+ if(!stamps.length)return {status:'NO_PUNCH',hours:0,first:null,last:null,extra:null};
+ if(stamps.length<2)return {status:'SINGLE_PUNCH',hours:0,first:new Date(stamps[0]).toISOString(),last:null,extra:null};
+ const first=stamps[0],last=stamps[stamps.length-1],hours=Math.max(0,(last-first)/3600000);
+ let extra=null;
+ if(plan.shift==='A'){
+  const extraStart=lmV5ShiftTime(plan.date,'17:00'),extraEnd=lmV5ShiftTime(plan.date,'21:00');
+  extra=Math.max(0,Math.min(last,extraEnd)-Math.max(first,extraStart))/3600000;
+ }
+ // B/C monthly overtime cannot be inferred from a single day; D uses credited days, not hours.
+ return {status:'PAIRED',hours:Math.round(hours*100)/100,first:new Date(first).toISOString(),last:new Date(last).toISOString(),extra:extra===null?null:Math.round(extra*100)/100,punches:stamps.length};
+}
+function lmV5ShiftClose(){document.getElementById('lm-v5-shift-modal')?.remove();}
+function lmV5ShiftOpen(){
+ if(!portalIsAdmin()){lmDialog(lmV5ShiftT('تحتاج صلاحية إدارية موثقة. صلاحيات المديرين ستُفعّل بعد إنشاء حسابات Firebase Auth وربطها.','Verified admin required. Manager access requires Firebase Auth identity mapping.'));return;}
+ lmV5ShiftClose();const wrap=document.createElement('div');wrap.id='lm-v5-shift-modal';wrap.style.cssText='position:fixed;inset:0;z-index:100001;background:rgba(1,8,20,.88);display:flex;align-items:center;justify-content:center;padding:14px';wrap.setAttribute('role','dialog');wrap.setAttribute('aria-modal','true');
+ wrap.innerHTML=`<div dir="${currentLang==='ar'?'rtl':'ltr'}" style="background:#0e1b31;border:1px solid #2676a0;border-radius:18px;padding:20px;width:min(1180px,98vw);max-height:94vh;overflow:auto;color:#e2e8f0"><div class="flex justify-between items-center mb-3"><h2 class="font-bold text-sky-300 text-xl">${lmV5ShiftT('إدارة الورديات — V5','Shift management — V5')}</h2><button type="button" class="portal-ghost-btn" onclick="lmV5ShiftClose()">✕</button></div><p class="text-amber-300 text-xs mb-3">${lmV5ShiftT('وضع تجريبي: حسابات الساعات تقديرية ولا تُرحّل إلى المرتبات. التغييرات تحفظ في سجل منفصل بعد تأكيدك.','Pilot: hours are provisional, not payroll. Plans save separately after confirmation.')}</p><div class="grid grid-cols-1 md:grid-cols-5 gap-2 mb-3"><label>${lmV5ShiftT('الإدارة','Department')}<select class="hr-feature-input w-full" id="lm-v5-dept" onchange="lmV5ShiftRefresh()"></select></label><label>${lmV5ShiftT('ابحث بالكود أو الاسم','Code / name')}<input class="hr-feature-input w-full" id="lm-v5-search" oninput="lmV5ShiftRefresh()" placeholder="109"></label><label>${lmV5ShiftT('من','From')}<input class="hr-feature-input w-full" id="lm-v5-from" type="date" onchange="lmV5ShiftRefresh()"></label><label>${lmV5ShiftT('إلى','To')}<input class="hr-feature-input w-full" id="lm-v5-to" type="date" onchange="lmV5ShiftRefresh()"></label><label>${lmV5ShiftT('الوردية','Shift')}<select class="hr-feature-input w-full" id="lm-v5-type"><option>A</option><option>B</option><option>C</option><option>D</option></select></label></div><div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3"><label>${lmV5ShiftT('النمط','Pattern')}<select class="hr-feature-input w-full" id="lm-v5-pattern"><option value="short">09:00–16:00</option><option value="long">09:00–21:00</option><option value="night">21:00–09:00</option></select></label><label>${lmV5ShiftT('الإجراء','Action')}<select class="hr-feature-input w-full" id="lm-v5-action"><option value="WORK">${lmV5ShiftT('تعيين/تغيير وردية','Assign/change shift')}</option><option value="CANCEL">${lmV5ShiftT('إلغاء وردية','Cancel shift')}</option><option value="REST">${lmV5ShiftT('راحة','Rest')}</option><option value="LEAVE">${lmV5ShiftT('إجازة','Leave')}</option></select></label><label class="md:col-span-2">${lmV5ShiftT('سبب التغيير أو الإلغاء','Reason')}<input class="hr-feature-input w-full" id="lm-v5-reason" maxlength="250" placeholder="${lmV5ShiftT('سبب إلزامي','Required reason')}"></label></div><div class="flex flex-wrap gap-2 mb-3"><button class="portal-action-btn px-4 py-2" onclick="lmV5ShiftApply()">${lmV5ShiftT('تطبيق على الموظفين المحددين','Apply to selected employees')}</button><button class="portal-ghost-btn px-4 py-2" onclick="lmV5ShiftExport()">${lmV5ShiftT('تصدير تقرير CSV','Export CSV')}</button><button class="portal-ghost-btn px-4 py-2" onclick="lmV5ShiftLoad()">${lmV5ShiftT('تحديث البيانات','Refresh')}</button></div><div id="lm-v5-message" class="text-xs text-sky-300 mb-2"></div><div id="lm-v5-table" class="overflow-x-auto text-sm"></div></div>`;
+ wrap.addEventListener('click',e=>{if(e.target===wrap)lmV5ShiftClose()});document.body.append(wrap);
+ const de=document.getElementById('lm-v5-dept');de.innerHTML='<option value="">'+lmV5ShiftT('كل الإدارات','All departments')+'</option>'+Object.entries(LMV5_DEPT_LABELS).map(([k,v])=>'<option value="'+k+'">'+hrEscape(v[currentLang==='ar'?0:1])+'</option>').join('');
+ const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());document.getElementById('lm-v5-from').value=today;document.getElementById('lm-v5-to').value=today;lmV5ShiftLoad();
+}
+async function lmV5ShiftLoad(){const msg=document.getElementById('lm-v5-message');if(!msg)return;msg.textContent=lmV5ShiftT('جاري تحميل الورديات...','Loading shifts...');try{const [a,b]=await Promise.all([db.ref('shift_plans').once('value'),db.ref('shift_audit').limitToLast(100).once('value')]);lmV5ShiftState.plans=a.val()||{};lmV5ShiftState.audit=b.val()||{};msg.textContent='';lmV5ShiftRefresh()}catch(e){msg.textContent=lmV5ShiftT('تعذر القراءة: ','Read failed: ')+e.message;}}
+function lmV5ShiftEmployees(){const dept=document.getElementById('lm-v5-dept')?.value||'',q=lmV5Norm(document.getElementById('lm-v5-search')?.value||'');return (allEmployees||[]).filter(e=>{const code=getEmployeeCode(e);return code&&lmV5ShiftAllowed(e)&&(!dept||lmV5ShiftScope(e)===dept)&&(!q||lmV5Norm(code).includes(q)||lmV5Norm(e['اسم الموظف ']||'').includes(q)||lmV5Norm(e['emp_name _en']||'').includes(q));});}
+function lmV5ShiftRefresh(){const table=document.getElementById('lm-v5-table');if(!table)return;const emps=lmV5ShiftEmployees(),from=document.getElementById('lm-v5-from')?.value,to=document.getElementById('lm-v5-to')?.value;let dates=[];if(lmV5ShiftDay(from)&&lmV5ShiftDay(to)&&from<=to){for(let d=from;d<=to&&dates.length<32;d=lmV5ShiftAdd(d,1))dates.push(d)}if(lmV5ShiftDate(from)&&lmV5ShiftDate(to)&&(lmV5ShiftDate(to)-lmV5ShiftDate(from))/86400000>=32){table.textContent=lmV5ShiftT('الحد الأقصى 32 يومًا','Maximum range 32 days');return;}if(!dates.length){table.textContent=lmV5ShiftT('اختر نطاق تاريخ صحيحًا حتى 32 يومًا','Choose a valid range up to 32 days');return;}
+ const rows=[];for(const e of emps)for(const date of dates){const code=getEmployeeCode(e),key=lmV5ShiftKey(code,date);rows.push({code,date,name:getEmployeeName(e),dept:lmV5ShiftScope(e),plan:lmV5ShiftState.plans[key]||null});}
+ lmV5ShiftState.rows=rows;table.innerHTML='<p class="text-xs text-slate-400 mb-2">'+rows.length+' '+lmV5ShiftT('صف · حدد الموظفين المطلوب تعديلهم','rows · select employees to edit')+'</p><table class="hr-feature-table w-full"><thead><tr>'+[lmV5ShiftT('تحديد','Select'),lmV5ShiftT('الكود','Code'),lmV5ShiftT('الموظف','Employee'),lmV5ShiftT('التاريخ','Date'),lmV5ShiftT('الوردية','Shift'),lmV5ShiftT('الحالة','Status'),lmV5ShiftT('السبب','Reason')].map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+rows.slice(0,400).map((r,i)=>'<tr><td><input type="checkbox" class="lm-v5-check" value="'+i+'"></td><td>'+hrEscape(r.code)+'</td><td>'+hrEscape(r.name)+'</td><td>'+r.date+'</td><td>'+hrEscape(r.plan?.shift||'—')+' '+hrEscape(r.plan?.pattern||'')+'</td><td>'+hrEscape(r.plan?.kind||'—')+'</td><td>'+hrEscape(r.plan?.reason||'')+'</td></tr>').join('')+'</tbody></table>'+(rows.length>400?'<p class="text-amber-300">'+lmV5ShiftT('أول 400 صف فقط؛ ضيق الفلاتر للتعديل','Showing 400 rows; narrow filters to edit')+'</p>':'');}
+async function lmV5ShiftApply(){const msg=document.getElementById('lm-v5-message');if(!portalIsAdmin())return;const indexes=[...document.querySelectorAll('.lm-v5-check:checked')].map(x=>Number(x.value)),rows=indexes.map(i=>lmV5ShiftState.rows[i]).filter(Boolean);if(!rows.length){msg.textContent=lmV5ShiftT('حدد موظفًا واحدًا على الأقل','Select employees');return;}if(rows.length>100){msg.textContent=lmV5ShiftT('الحد الأقصى 100 تعديل في المرة','Maximum 100 changes');return;}
+ const shift=document.getElementById('lm-v5-type').value,pattern=document.getElementById('lm-v5-pattern').value,action=document.getElementById('lm-v5-action').value,reason=document.getElementById('lm-v5-reason').value.trim();if(reason.length<4){msg.textContent=lmV5ShiftT('اكتب سببًا واضحًا (4 أحرف على الأقل)','Enter a reason (at least 4 characters)');return;}
+ if(shift==='A'&&pattern!=='short'&&action==='WORK'){msg.textContent=lmV5ShiftT('الوردية A أساسية 09–16، والإضافي 17–21؛ اختر النمط القصير','Shift A is 09–16, overtime 17–21; select short');return;}
+ if(shift==='C'&&pattern==='short'&&action==='WORK'){msg.textContent=lmV5ShiftT('الوردية C تتطلب 12 ساعة صباحًا أو ليلًا','Shift C requires 12-hour day/night');return;}
+ const ok=await lmDialog(lmV5ShiftT('تأكيد حفظ '+rows.length+' تعديل وردية مع تسجيل التدقيق؟','Save '+rows.length+' shift changes with audit trail?'),true);if(!ok)return;
+ msg.textContent=lmV5ShiftT('جاري الحفظ...','Saving...');const updates={};const uid=portalAuth.currentUser.uid,now=firebase.database.ServerValue.TIMESTAMP;
+ for(const r of rows){const key=lmV5ShiftKey(r.code,r.date),previous=lmV5ShiftState.plans[key]||null,plan={code:r.code,date:r.date,shift,pattern,kind:action,cancelled:action==='CANCEL',reason,department:r.dept,updatedBy:uid,updatedByCode:'778',updatedAt:now};updates['shift_plans/'+key]=plan;const auditKey=db.ref('shift_audit').push().key;updates['shift_audit/'+auditKey]={key,code:r.code,date:r.date,previous:previous||{},next:plan,actorUid:uid,actorCode:'778',at:now,reason};}
+ try{await db.ref().update(updates);msg.textContent=lmV5ShiftT('تم الحفظ مع سجل التدقيق','Saved with audit trail');await lmV5ShiftLoad()}catch(e){msg.textContent=lmV5ShiftT('فشل الحفظ: ','Save failed: ')+e.message;}}
+function lmV5ShiftExport(){const rows=lmV5ShiftState.rows||[];if(!rows.length)return;const cols=['code','name','department','date','shift','pattern','kind','reason'];const q=x=>'"'+String(x??'').replace(/"/g,'""')+'"';const csv='\ufeff'+[cols.join(','),...rows.map(r=>[r.code,r.name,r.dept,r.date,r.plan?.shift,r.plan?.pattern,r.plan?.kind,r.plan?.reason].map(q).join(','))].join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='shift_plans_v5.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+
+/* V5.5 deterministic shift rules: calculations only, never payroll posting. */
+function lmV55ShiftMonthly(shift, entries){
+ const items=Array.isArray(entries)?entries:[];
+ const worked=items.reduce((n,x)=>n+(x.status==='PAIRED'&&Number.isFinite(Number(x.hours))?Math.max(0,Number(x.hours)):0),0);
+ const missing=items.filter(x=>x.status==='SINGLE_PUNCH'||x.status==='NO_PUNCH'||x.status==='INVALID').length;
+ const round=n=>Math.round(n*100)/100;
+ if(shift==='A')return {shift,workedHours:round(worked),overtimeHours:round(items.reduce((n,x)=>n+(Number(x.extra)||0),0)),incompleteDays:missing,ready:missing===0&&items.length>0};
+ if(shift==='B'||shift==='C'){
+  const target=shift==='B'?154:132;
+  const cancelled=shift==='C'?items.filter(x=>x.status==='CANCELLED').length:0;
+  const restRecall=shift==='C'?items.reduce((n,x)=>n+(x.restRecall===true?Math.max(0,Number(x.hours)||0):0),0):0;
+  return {shift,targetHours:target,workedHours:round(worked),overtimeHours:round(Math.max(0,worked-target)-cancelled*7),cancelledShifts:cancelled,restRecallHours:round(restRecall),incompleteDays:missing,ready:missing===0&&items.length>0};
+ }
+ if(shift==='D'){
+  const credited=items.filter(x=>['PAIRED','LEAVE','REST','CANCELLED','SICK'].includes(x.status)).length;
+  return {shift,targetDays:19,creditedDays:Math.min(19,credited),differenceDays:19-credited,workedHours:round(worked),overtimeHours:null,incompleteDays:missing,ready:missing===0&&credited>=19};
+ }
+ return {shift,error:'UNKNOWN_SHIFT',ready:false};
+}
+
