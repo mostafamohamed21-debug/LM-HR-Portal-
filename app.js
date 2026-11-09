@@ -2934,8 +2934,9 @@ async function lmZkPull(){
  if(!portalIsAdmin()){status.textContent=hrText('يلزم حساب الإدارة','Admin required');return;}
  const from=document.getElementById('lm-zk-from')?.value,to=document.getElementById('lm-zk-to')?.value;
  if(!from||!to||from>to){status.textContent=hrText('راجع تاريخ البداية والنهاية','Check date range');return;}
- const departments=[...(document.getElementById('lm-zk-dept')?.selectedOptions||[])].map(o=>o.value).filter(Boolean);
- const employees=[...(document.getElementById('lm-zk-employees')?.selectedOptions||[])].map(o=>o.value).filter(Boolean);
+ const matching=lmV5MatchingEmployees();
+ const allowed=new Set(matching.map(e=>String(getEmployeeCode(e))));
+ const allCodes=new Set((allEmployees||[]).map(e=>String(getEmployeeCode(e))));
  const devices=[...document.querySelectorAll('.lm-zk-device:checked')].map(e=>e.value);
  if(!devices.length){status.textContent=hrText('اختر جهازًا واحدًا على الأقل','Select a device');return;}
  button.disabled=true;status.textContent=hrText('جاري سحب السجلات...','Pulling records...');
@@ -2944,35 +2945,68 @@ async function lmZkPull(){
   const res=await fetch(LM_ZK_BRIDGE+'/api/punches?'+qs,{signal:AbortSignal.timeout(180000)});
   if(!res.ok)throw Error('Bridge HTTP '+res.status);
   const data=await res.json();if(!Array.isArray(data.records))throw Error('Invalid bridge response');
-  const deptOf=e=>String(e?.department||e?.departmentAr||e?.department_ar||e?.dept||'').trim();
-  const allowed=new Set((Array.isArray(allEmployees)?allEmployees:[]).filter(e=>(!departments.length||departments.includes(deptOf(e)))&&(!employees.length||employees.includes(String(getEmployeeCode(e))))).map(e=>String(getEmployeeCode(e))));
   if(!Array.isArray(allEmployees)||!allEmployees.length)throw Error('Employee directory not loaded');
-  const rows=data.records.filter(r=>allowed.has(String(r.code)));
-  const parsed=rows.length?hrImportRows('attendance',rows):{result:[],errors:[]};
+  const valid=data.records.filter(r=>allCodes.has(String(r.code||'').trim()));
+  const rows=valid.filter(r=>allowed.has(String(r.code||'').trim()));
+  const unknown=data.records.length-valid.length,filtered=valid.length-rows.length;
+  const unique=new Map();for(const r of rows){const key=[String(r.code).trim(),String(r.timestamp).trim(),String(r.type||'')].join('|');if(!unique.has(key))unique.set(key,r);}
+  const duplicates=rows.length-unique.size;
+  const clean=[...unique.values()];
+  const parsed=clean.length?hrImportRows('attendance',clean):{result:[],errors:[]};
   hrImportState.attendance={records:parsed.result,errors:parsed.errors,filename:'ZKTeco_'+from+'_'+to+'.csv'};
   const preview=document.getElementById('hr-import-preview-attendance');
-  if(preview)preview.innerHTML='<p>'+hrEscape(hrText('معاينة السحب','Pull preview'))+': '+parsed.result.length+' / '+data.records.length+'</p>'+(parsed.errors.length?'<p class="text-rose-300">'+parsed.errors.slice(0,10).map(hrEscape).join('; ')+'</p>':'')+'<div class="overflow-x-auto"><table class="hr-feature-table"><thead><tr><th>Code</th><th>Timestamp</th><th>Source</th></tr></thead><tbody>'+parsed.result.slice(0,30).map(r=>'<tr><td>'+hrEscape(r.code)+'</td><td>'+hrEscape(r.timestamp)+'</td><td>'+hrEscape(r.source)+'</td></tr>').join('')+'</tbody></table></div>'+(parsed.result.length&&!parsed.errors.length?'<button class="portal-action-btn px-4 py-2 mt-3 rounded-xl" onclick="hrCommitImport(\'attendance\')">'+hrText('مراجعة وحفظ الدفعة في Firebase','Review and save to Firebase')+'</button>':'');
+  if(preview)preview.innerHTML='<p>'+hrEscape(hrText('معاينة السحب','Pull preview'))+': '+parsed.result.length+' / '+data.records.length+'</p><p class="text-xs text-amber-200">'+hrText('أكواد غير موجودة','Unknown employee codes')+': '+unknown+' · '+hrText('خارج الفلاتر','Filtered out')+': '+filtered+' · '+hrText('مكرر مطابق','Exact duplicates')+': '+duplicates+' · '+hrText('أخطاء البيانات','Validation errors')+': '+parsed.errors.length+'</p>'+(parsed.errors.length?'<p class="text-rose-300">'+parsed.errors.slice(0,10).map(hrEscape).join('; ')+'</p>':'')+'<div class="overflow-x-auto"><table class="hr-feature-table"><thead><tr><th>Code</th><th>Timestamp</th><th>Source</th></tr></thead><tbody>'+parsed.result.slice(0,30).map(r=>'<tr><td>'+hrEscape(r.code)+'</td><td>'+hrEscape(r.timestamp)+'</td><td>'+hrEscape(r.source)+'</td></tr>').join('')+'</tbody></table></div>'+(parsed.result.length&&!parsed.errors.length?'<button class="portal-action-btn px-4 py-2 mt-3 rounded-xl" onclick="hrCommitImport(\'attendance\')">'+hrText('مراجعة وحفظ الدفعة في Firebase','Review and save to Firebase')+'</button>':'');
   status.textContent=(data.devices||[]).map(d=>'#'+d.id+': '+(d.ok?d.count+' OK':'ERROR '+d.error)).join(' | ');
   document.getElementById('lm-zk-devices-status').textContent=status.textContent;
  }catch(e){status.textContent=hrText('تعذر السحب: ','Pull failed: ')+e.message;}
  finally{button.disabled=false;}
 }
+// V5: normalized bilingual department matching; source is the live Firebase employee directory.
+function lmV5Dept(emp){
+ const fields=['الإدارة ','الإدارة','department ','department','departmentAr','department_ar','dept'];
+ const first=(names)=>names.map(k=>String(emp?.[k]??'').trim()).find(v=>v&&v!=='--')||'';
+ return {ar:first(fields.slice(0,2)),en:first(fields.slice(2))};
+}
+function lmV5Norm(v){return String(v??'').normalize('NFKC').trim().toLocaleLowerCase().replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/\s+/g,' ');}
+function lmV5DeptGroups(){
+ const map=new Map();
+ for(const e of (allEmployees||[])){
+  const d=lmV5Dept(e),key=lmV5Norm(d.ar||d.en);if(!key)continue;
+  if(!map.has(key))map.set(key,{key,ar:d.ar,en:d.en,codes:new Set()});
+  const item=map.get(key);if(!item.ar&&d.ar)item.ar=d.ar;if(!item.en&&d.en)item.en=d.en;
+  item.codes.add(String(getEmployeeCode(e)));
+ }
+ return [...map.values()].sort((a,b)=>(a.ar||a.en).localeCompare(b.ar||b.en,'ar'));
+}
+function lmV5MatchingEmployees(){
+ const dept=document.getElementById('lm-zk-dept')?.value||'',search=lmV5Norm(document.getElementById('lm-zk-search')?.value||'');
+ const selected=lmV5DeptGroups().find(d=>d.key===dept);
+ return (allEmployees||[]).filter(e=>{
+  const code=String(getEmployeeCode(e)||'').trim();if(!code)return false;
+  if(selected&&!selected.codes.has(code))return false;
+  return !search||lmV5Norm(code).includes(search)||lmV5Norm(getEmployeeName(e)).includes(search)||lmV5Norm(e['اسم الموظف ']||e['اسم الموظف']||'').includes(search)||lmV5Norm(e['emp_name _en']||'').includes(search);
+ });
+}
+function lmV5RefreshEmployeeHints(){
+ const el=document.getElementById('lm-zk-employee-hints');if(!el)return;
+ const matches=lmV5MatchingEmployees();el.innerHTML=matches.slice(0,100).map(e=>'<option value="'+hrEscape(getEmployeeCode(e))+'">'+hrEscape(getEmployeeName(e))+'</option>').join('');
+ const count=document.getElementById('lm-zk-match-count');if(count)count.textContent=matches.length+' '+hrText('موظف مطابق','matching employees');
+}
 function lmZkPopulate(){
- const dep=document.getElementById('lm-zk-dept'),emp=document.getElementById('lm-zk-employees');if(!dep||!emp)return;
- const list=Array.isArray(allEmployees)?allEmployees:[];
- const departments=[...new Set(list.map(e=>String(e?.department||e?.departmentAr||e?.department_ar||e?.dept||'').trim()).filter(Boolean))].sort();
- dep.innerHTML=departments.map(v=>'<option value="'+hrEscape(v)+'">'+hrEscape(v)+'</option>').join('');
- emp.innerHTML=list.map(e=>{const c=String(getEmployeeCode(e)||'');return c?'<option value="'+hrEscape(c)+'">'+hrEscape(c)+' — '+hrEscape(e.nameAr||e.name||e.fullName||'')+'</option>':''}).join('');
+ const dep=document.getElementById('lm-zk-dept');if(!dep)return;
+ const old=dep.value;
+ dep.innerHTML='<option value="">'+hrText('جميع الإدارات','All departments')+'</option>'+lmV5DeptGroups().map(d=>'<option value="'+hrEscape(d.key)+'">'+hrEscape((currentLang==='ar'?d.ar||d.en:d.en||d.ar))+'</option>').join('');
+ dep.value=old;lmV5RefreshEmployeeHints();
 }
 function lmZkModal(kind){
  const overlay=document.getElementById('lm-zk-overlay');if(!overlay)return;
  overlay.hidden=false;overlay.style.display='flex';
  document.getElementById('lm-zk-pull-view').hidden=kind!=='pull';
  document.getElementById('lm-zk-import-view').hidden=kind!=='import';
- if(kind==='pull')lmZkCheckHealth();
+ if(kind==='pull'){lmZkPopulate();lmZkCheckHealth();}const panel=overlay.firstElementChild;if(panel)panel.dir=currentLang==='ar'?'rtl':'ltr';
 }
 function lmZkClose(){const el=document.getElementById('lm-zk-overlay');if(el){el.hidden=true;el.style.display='none';}}
-function lmZkClear(){document.querySelectorAll('#lm-zk-overlay select option').forEach(o=>o.selected=false);}
+function lmZkClear(){const d=document.getElementById('lm-zk-dept'),q=document.getElementById('lm-zk-search');if(d)d.value='';if(q)q.value='';lmV5RefreshEmployeeHints();}
 function lmAttWorkspaceLayout(){
  const d=document.getElementById('hr-attendance-view');if(!d)return;
  const imp=d.querySelector('#hr-import-file-attendance')?.closest('.hr-panel');if(!imp)return;
@@ -2981,14 +3015,14 @@ function lmAttWorkspaceLayout(){
  let toolbar=d.querySelector('#lm-att-toolbar');
  if(!toolbar){
   toolbar=document.createElement('section');toolbar.id='lm-att-toolbar';toolbar.className='hr-panel mb-4';
-  toolbar.innerHTML=`<div class="flex flex-wrap justify-between items-center gap-3"><div><h2 class="font-bold text-sky-300 text-lg">${hrText('إدارة البصمات','Fingerprint management')}</h2><span id="lm-zk-health" class="text-xs text-amber-300">${hrText('جاري فحص Bridge','Checking bridge')}</span></div><div class="flex flex-wrap gap-2"><button type="button" class="portal-action-btn px-3 py-2 rounded-xl" onclick="lmZkModal('pull')">${hrText('سحب البصمات','Pull punches')}</button><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmZkModal('import')">${hrText('استيراد Excel / CSV','Import Excel / CSV')}</button><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmAttMode('report');document.getElementById('lm-att-filters').style.display='grid'">${hrText('فلاتر التقرير','Report filters')}</button><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmAttExport()">${hrText('تصدير CSV','Export CSV')}</button></div></div>`;
+  toolbar.innerHTML=`<div class="flex flex-wrap justify-between items-center gap-3"><div><h2 class="font-bold text-sky-300 text-lg">${hrText('إدارة البصمات','Fingerprint management')}</h2><span id="lm-zk-health" class="text-xs text-amber-300">${hrText('جاري فحص Bridge','Checking bridge')}</span></div><div class="flex flex-wrap gap-2"><button type="button" class="portal-action-btn px-3 py-2 rounded-xl" onclick="lmZkModal('pull')">${hrText('سحب البصمات','Pull punches')}</button><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmZkModal('import')">${hrText('استيراد Excel / CSV','Import Excel / CSV')}</button><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmAttMode('report');document.getElementById('lm-att-filters').style.display='grid'">${hrText('فلاتر التقرير','Report filters')}</button><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmAttExport()">${hrText('تصدير CSV','Export CSV')}</button><button type="button" class="portal-action-btn px-3 py-2 rounded-xl" onclick="lmV5ShiftOpen()">${hrText('إدارة الورديات','Shift management')}</button></div></div>`;
   if(heading)heading.after(toolbar);else d.prepend(toolbar);
  }
  imp.style.display='none';
  let overlay=document.getElementById('lm-zk-overlay');
  if(!overlay){
   overlay=document.createElement('div');overlay.id='lm-zk-overlay';overlay.hidden=true;overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.style.cssText='display:none;position:fixed;inset:0;z-index:99999;background:rgba(2,8,23,.82);align-items:center;justify-content:center;padding:18px';
-  overlay.innerHTML=`<div style="background:#0d1a30;color:#e2e8f0;border:1px solid #2b638a;border-radius:18px;padding:20px;width:min(920px,96vw);max-height:90vh;overflow:auto;direction:rtl"><div class="flex justify-between items-center mb-4"><h2 class="text-lg font-bold text-sky-300">${hrText('إدارة استيراد البصمات','Fingerprint import')}</h2><button type="button" class="portal-ghost-btn" onclick="lmZkClose()" aria-label="Close">✕</button></div><div id="lm-zk-pull-view"><p class="text-xs text-slate-400 mb-3">${hrText('تحديد الجهاز يعني تضمينه في السحب؛ لا يقطع الاتصال الفعلي بالجهاز.','Device selection controls the pull, not physical connection.')}</p><div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">${[1,2,3,4].map(i=>`<label class="hr-panel p-3 text-center"><input class="lm-zk-device" type="checkbox" value="${i}" checked> ${hrText('جهاز','Device')} ${i}</label>`).join('')}</div><p id="lm-zk-devices-status" class="text-xs text-sky-300 mb-3"></p><div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3"><label>${hrText('من تاريخ','From')}<input id="lm-zk-from" class="hr-feature-input w-full" type="date"></label><label>${hrText('إلى تاريخ','To')}<input id="lm-zk-to" class="hr-feature-input w-full" type="date"></label><label>${hrText('الإدارات (متعدد)','Departments')}<select id="lm-zk-dept" class="hr-feature-input w-full" multiple size="4"></select></label><label>${hrText('الموظفون (متعدد)','Employees')}<select id="lm-zk-employees" class="hr-feature-input w-full" multiple size="4"></select></label></div><div class="flex flex-wrap gap-2"><button type="button" id="lm-zk-pull" class="portal-action-btn px-4 py-2" onclick="lmZkPull()">${hrText('سحب من الأجهزة المحددة','Pull selected devices')}</button><button type="button" class="portal-ghost-btn" onclick="lmZkCheckHealth()">${hrText('فحص Bridge','Check bridge')}</button><button type="button" class="portal-ghost-btn" onclick="lmZkClear()">${hrText('مسح فلاتر الموظفين','Clear employee filters')}</button></div><p id="lm-zk-status" class="text-xs text-sky-300 mt-3" aria-live="polite"></p><div id="lm-zk-preview-holder" class="mt-3"></div></div><div id="lm-zk-import-view" hidden></div></div>`;
+  overlay.innerHTML=`<div style="background:#0d1a30;color:#e2e8f0;border:1px solid #2b638a;border-radius:18px;padding:20px;width:min(920px,96vw);max-height:90vh;overflow:auto;direction:${currentLang==='ar'?'rtl':'ltr'}"><div class="flex justify-between items-center mb-4"><h2 class="text-lg font-bold text-sky-300">${hrText('إدارة استيراد البصمات','Fingerprint import')}</h2><button type="button" class="portal-ghost-btn" onclick="lmZkClose()" aria-label="Close">✕</button></div><div id="lm-zk-pull-view"><p class="text-xs text-slate-400 mb-3">${hrText('تحديد الجهاز يعني تضمينه في السحب؛ لا يقطع الاتصال الفعلي بالجهاز.','Device selection controls the pull, not physical connection.')}</p><div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">${[1,2,3,4].map(i=>`<label class="hr-panel p-3 text-center"><input class="lm-zk-device" type="checkbox" value="${i}" checked> ${hrText('جهاز','Device')} ${i}</label>`).join('')}</div><p id="lm-zk-devices-status" class="text-xs text-sky-300 mb-3"></p><div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3"><label>${hrText('من تاريخ','From')}<input id="lm-zk-from" class="hr-feature-input w-full" type="date"></label><label>${hrText('إلى تاريخ','To')}<input id="lm-zk-to" class="hr-feature-input w-full" type="date"></label><label>${hrText('الإدارة','Department')}<select id="lm-zk-dept" class="hr-feature-input w-full" onchange="lmV5RefreshEmployeeHints()"></select></label><label>${hrText('كود الموظف أو اسمه','Employee code or name')}<input id="lm-zk-search" class="hr-feature-input w-full" list="lm-zk-employee-hints" placeholder="109" oninput="lmV5RefreshEmployeeHints()"><datalist id="lm-zk-employee-hints"></datalist><small id="lm-zk-match-count" class="text-sky-300"></small></label></div><div class="flex flex-wrap gap-2"><button type="button" id="lm-zk-pull" class="portal-action-btn px-4 py-2" onclick="lmZkPull()">${hrText('سحب من الأجهزة المحددة','Pull selected devices')}</button><button type="button" class="portal-ghost-btn" onclick="lmZkCheckHealth()">${hrText('فحص Bridge','Check bridge')}</button><button type="button" class="portal-ghost-btn" onclick="lmZkClear()">${hrText('مسح فلاتر الموظفين','Clear employee filters')}</button></div><p id="lm-zk-status" class="text-xs text-sky-300 mt-3" aria-live="polite"></p><div id="lm-zk-preview-holder" class="mt-3"></div></div><div id="lm-zk-import-view" hidden></div></div>`;
   overlay.addEventListener('click',e=>{if(e.target===overlay)lmZkClose()});
   document.body.append(overlay);
   document.addEventListener('keydown',e=>{if(e.key==='Escape')lmZkClose()});
@@ -2999,7 +3033,8 @@ function lmAttWorkspaceLayout(){
  for(const id of ['lm-zk-from','lm-zk-to']){const el=document.getElementById(id);if(el&&!el.value)el.value=today;}
  lmZkPopulate();lmZkCheckHealth();
  let ws=d.querySelector('#lm-att-workspace');
- if(!ws){ws=document.createElement('section');ws.id='lm-att-workspace';ws.className='hr-panel mb-5';ws.innerHTML=`<div class="flex flex-wrap justify-between items-center gap-3 mb-4"><div><h2 class="font-bold text-sky-300 text-lg" id="lm-att-mode-title">${hrText('حركات اليوم','Today punches')}</h2><p class="text-xs text-slate-400">${hrText('السجلات الأصلية؛ المعالجة النهائية للورديات لاحقًا','Original records; shift pairing pending')}</p></div><div class="flex gap-2"><button class="portal-ghost-btn" onclick="lmAttMode('today')">${hrText('اليوم','Today')}</button><button class="portal-ghost-btn" onclick="lmAttMode('report')">${hrText('كل السجلات','All records')}</button></div></div><div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4" id="lm-att-kpis"></div><div id="lm-att-filters" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4" style="display:none"><label>${hrText('كود الموظف','Employee code')}<input id="lm-att-code" class="hr-feature-input w-full" oninput="lmAttFilter()"></label><label>${hrText('من تاريخ','From')}<input id="lm-att-from" type="date" class="hr-feature-input w-full" onchange="lmAttFilter()"></label><label>${hrText('إلى تاريخ','To')}<input id="lm-att-to" type="date" class="hr-feature-input w-full" onchange="lmAttFilter()"></label><label>${hrText('المصدر','Source')}<select id="lm-att-source" class="hr-feature-input w-full" onchange="lmAttFilter()"><option value="all">${hrText('الكل','All')}</option><option value="device">ZKTeco</option><option value="ess">ESS</option></select></label></div><span id="lm-att-count" class="text-xs text-slate-400"></span><div id="lm-att-table" aria-live="polite" class="overflow-x-auto text-sm text-slate-300 mt-3">${hrText('جاري التحميل','Loading')}</div>`;toolbar.after(ws);}
+ if(!ws){ws=document.createElement('section');ws.id='lm-att-workspace';ws.className='hr-panel mb-5';ws.innerHTML=`<div class="flex flex-wrap justify-between items-center gap-3 mb-4"><div><h2 class="font-bold text-sky-300 text-lg" id="lm-att-mode-title">${hrText('حركات اليوم','Today punches')}</h2><p class="text-xs text-slate-400">${hrText('السجلات الأصلية؛ المعالجة النهائية للورديات لاحقًا','Original records; shift pairing pending')}</p></div><div class="flex gap-2"><button class="portal-ghost-btn" onclick="lmAttMode('today')">${hrText('اليوم','Today')}</button><button class="portal-ghost-btn" onclick="lmAttMode('report')">${hrText('كل السجلات','All records')}</button></div></div><div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4" id="lm-att-kpis"></div><div id="lm-att-filters" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4" style="display:none"><label>${hrText('الإدارة','Department')}<select id="lm-att-dept" class="hr-feature-input w-full" onchange="lmAttFilter()"></select></label><label>${hrText('كود الموظف','Employee code')}<input id="lm-att-code" class="hr-feature-input w-full" oninput="lmAttFilter()"></label><label>${hrText('من تاريخ','From')}<input id="lm-att-from" type="date" class="hr-feature-input w-full" onchange="lmAttFilter()"></label><label>${hrText('إلى تاريخ','To')}<input id="lm-att-to" type="date" class="hr-feature-input w-full" onchange="lmAttFilter()"></label><label>${hrText('المصدر','Source')}<select id="lm-att-source" class="hr-feature-input w-full" onchange="lmAttFilter()"><option value="all">${hrText('الكل','All')}</option><option value="device">ZKTeco</option><option value="ess">ESS</option></select></label></div><span id="lm-att-count" class="text-xs text-slate-400"></span><div id="lm-att-table" aria-live="polite" class="overflow-x-auto text-sm text-slate-300 mt-3">${hrText('جاري التحميل','Loading')}</div>`;toolbar.after(ws);}
+ const reportDept=document.getElementById('lm-att-dept');if(reportDept){reportDept.innerHTML='<option value="">'+hrText('كل الإدارات','All departments')+'</option>'+lmV5DeptGroups().map(d=>'<option value="'+hrEscape(d.key)+'">'+hrEscape(currentLang==='ar'?d.ar||d.en:d.en||d.ar)+'</option>').join('');}
  lmAttMode(lmAttWorkspace.mode);lmAttLoad();
 }
 async function lmAttLoad(){
@@ -3023,7 +3058,7 @@ async function lmAttLoad(){
  const warn=document.getElementById('lm-att-count');if(warn&&errors.length)warn.textContent=hrText('تعذر قراءة بعض المصادر: ','Some sources unavailable: ')+errors.join(', ');
  lmAttFilter();
 }
-function lmAttFiltered(){const code=document.getElementById('lm-att-code')?.value.trim()||'',from=document.getElementById('lm-att-from')?.value||'',to=document.getElementById('lm-att-to')?.value||'',src=document.getElementById('lm-att-source')?.value||'all';return lmAttWorkspace.rows.filter(r=>{const date=lmAttDate(r);if(lmAttWorkspace.mode==='today'&&date!==[new Date().getFullYear(),String(new Date().getMonth()+1).padStart(2,'0'),String(new Date().getDate()).padStart(2,'0')].join('-'))return false;return (!code||String(r.code||'').includes(code))&&(!from||(date&&date>=from))&&(!to||(date&&date<=to))&&(src==='all'||r.origin===src)});}
+function lmAttFiltered(){const code=document.getElementById('lm-att-code')?.value.trim()||'',from=document.getElementById('lm-att-from')?.value||'',to=document.getElementById('lm-att-to')?.value||'',src=document.getElementById('lm-att-source')?.value||'all',dept=document.getElementById('lm-att-dept')?.value||'';const selected=lmV5DeptGroups().find(d=>d.key===dept);return lmAttWorkspace.rows.filter(r=>{const date=lmAttDate(r);if(lmAttWorkspace.mode==='today'&&date!==new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()) )return false;return (!selected||selected.codes.has(String(r.code||'')))&&(!code||String(r.code||'').includes(code))&&(!from||(date&&date>=from))&&(!to||(date&&date<=to))&&(src==='all'||r.origin===src)});}
 function lmAttFilter(){const el=document.getElementById('lm-att-table');if(!el)return;const rows=lmAttFiltered(),kpi=document.getElementById('lm-att-kpis'),count=document.getElementById('lm-att-count');const cards=[[hrText('السجلات المعروضة','Records'),rows.length],[hrText('بصمات ESS','ESS punches'),rows.filter(r=>r.origin==='ess').length],[hrText('بصمات الأجهزة','Device punches'),rows.filter(r=>r.origin==='device').length],[hrText('بانتظار المراجعة','Pending review'),rows.filter(r=>r.status==='PENDING_REVIEW'||r.status==='HELD').length]];if(kpi)kpi.innerHTML=cards.map(([label,n])=>`<div class="rounded-xl border border-sky-500/20 bg-slate-900/40 p-3"><p class="text-xs text-slate-400">${label}</p><strong class="text-2xl text-sky-200">${n}</strong></div>`).join('');if(count)count.textContent=rows.length+' '+hrText('سجل مطابق للفلاتر','matching records');el.innerHTML=rows.length?`<table class="hr-feature-table w-full"><thead><tr>${[hrText('الكود','Code'),hrText('التاريخ','Date'),hrText('الوقت','Time'),hrText('الحركة','Punch'),hrText('المصدر','Source'),hrText('الحالة','Status')].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.slice(0,500).map(r=>`<tr><td>${lmAttSafe(r.code)}</td><td>${lmAttSafe(lmAttDate(r))}</td><td>${lmAttSafe(r.time||String(r.timestamp||'').slice(11,19))}</td><td>${lmAttSafe(r.punch||'—')}</td><td>${lmAttSafe(lmAttSource(r))}</td><td>${lmAttSafe(r.status)}</td></tr>`).join('')}</tbody></table>${rows.length>500?'<p class="text-xs mt-2">Showing first 500 records; export includes all filtered records.</p>':''}`:`<p class="text-slate-400 p-4">${hrText('لا توجد سجلات مطابقة','No matching records')}</p>`;}
 function lmAttExport(){const rows=lmAttFiltered();if(!rows.length)return;const cols=['code','date','time','punch','origin','device','status','id'];const esc=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const csv='\uFEFF'+[cols.join(','),...rows.map(r=>cols.map(k=>esc(k==='date'?lmAttDate(r):r[k])).join(','))].join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='attendance_filtered.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 const lmAttOriginalRender=renderHRFeature;
