@@ -2917,7 +2917,7 @@ function lmUnifiedAlertsDraw(){
 
 // Attendance workspace UI: real source records, no payroll/shift calculations.
 const lmAttWorkspace={rows:[],loading:false,mode:'today'};
-function lmAttMode(mode){lmAttWorkspace.mode=mode==='report'?'report':'today';const filters=document.getElementById('lm-att-filters');if(filters)filters.style.display=lmAttWorkspace.mode==='today'?'none':'';const title=document.getElementById('lm-att-mode-title');if(title)title.textContent=lmAttWorkspace.mode==='today'?hrText('حركات اليوم','Today punches'):hrText('تقرير الحضور والانصراف','Attendance history report');lmAttFilter();}
+function lmAttMode(mode){lmAttWorkspace.mode=mode==='report'?'report':'today';const filters=document.getElementById('lm-att-filters');if(filters)filters.style.display=lmAttWorkspace.mode==='today'?'none':'grid';const title=document.getElementById('lm-att-mode-title');if(title)title.textContent=lmAttWorkspace.mode==='today'?hrText('حركات اليوم','Today punches'):hrText('تقرير الحضور والانصراف','Attendance history report');lmAttFilter();}
 function lmAttSafe(v){return escapeHtml(String(v??''));}
 function lmAttDate(r){return String(r.date||r.clientDate||r.timestamp||'').slice(0,10);}
 function lmAttStamp(r){const n=Number(r.createdAt||r.approvedAt||0);return n||Date.parse(String(r.timestamp||r.clientDate||''))||0;}
@@ -2931,14 +2931,17 @@ async function lmZkCheckHealth(){
 // Local ZKTeco bridge: explicit user-triggered read-only pull, staged for existing Firebase import approval.
 async function lmZkPull(){
  const status=document.getElementById('lm-zk-status'),button=document.getElementById('lm-zk-pull');
- if(!portalIsAdmin()){if(status)status.textContent=hrText('يلزم حساب إدارة البورتال','Portal admin required');return;}
- const day=document.getElementById('lm-zk-day')?.value;
- if(!/^\d{4}-\d{2}-\d{2}$/.test(day||'')){if(status)status.textContent=hrText('اختر تاريخًا صحيحًا','Select a valid date');return;}
+ if(!portalIsAdmin()){status.textContent=hrText('يلزم حساب الإدارة','Admin required');return;}
+ const from=document.getElementById('lm-zk-from')?.value,to=document.getElementById('lm-zk-to')?.value;
+ if(!from||!to||from>to){status.textContent=hrText('راجع تاريخ البداية والنهاية','Check date range');return;}
  const departments=[...(document.getElementById('lm-zk-dept')?.selectedOptions||[])].map(o=>o.value).filter(Boolean);
  const employees=[...(document.getElementById('lm-zk-employees')?.selectedOptions||[])].map(o=>o.value).filter(Boolean);
- if(button)button.disabled=true;if(status)status.textContent=hrText('جاري الاتصال بالأجهزة الأربعة...','Connecting to four devices...');
+ const devices=[...document.querySelectorAll('.lm-zk-device:checked')].map(e=>e.value);
+ if(!devices.length){status.textContent=hrText('اختر جهازًا واحدًا على الأقل','Select a device');return;}
+ button.disabled=true;status.textContent=hrText('جاري سحب السجلات...','Pulling records...');
  try{
-  const res=await fetch(LM_ZK_BRIDGE+'/api/punches?date='+encodeURIComponent(day),{signal:AbortSignal.timeout(85000)});
+  const qs=new URLSearchParams({from,to,devices:devices.join(',')});
+  const res=await fetch(LM_ZK_BRIDGE+'/api/punches?'+qs,{signal:AbortSignal.timeout(180000)});
   if(!res.ok)throw Error('Bridge HTTP '+res.status);
   const data=await res.json();if(!Array.isArray(data.records))throw Error('Invalid bridge response');
   const deptOf=e=>String(e?.department||e?.departmentAr||e?.department_ar||e?.dept||'').trim();
@@ -2946,12 +2949,13 @@ async function lmZkPull(){
   if(!Array.isArray(allEmployees)||!allEmployees.length)throw Error('Employee directory not loaded');
   const rows=data.records.filter(r=>allowed.has(String(r.code)));
   const parsed=rows.length?hrImportRows('attendance',rows):{result:[],errors:[]};
-  hrImportState.attendance={records:parsed.result,errors:parsed.errors,filename:'ZKTeco_'+day+'.csv'};
+  hrImportState.attendance={records:parsed.result,errors:parsed.errors,filename:'ZKTeco_'+from+'_'+to+'.csv'};
   const preview=document.getElementById('hr-import-preview-attendance');
-  if(preview)preview.innerHTML='<p>'+hrEscape(hrText('معاينة السحب المباشر','Direct pull preview'))+': '+parsed.result.length+' '+hrEscape(hrText('بصمة مطابقة','matching punches'))+' / '+data.records.length+' '+hrEscape(hrText('بصمة مسحوبة','pulled punches'))+'</p>'+ (parsed.errors.length?'<p class="text-rose-300">'+parsed.errors.slice(0,10).map(hrEscape).join('; ')+'</p>':'')+'<div class="overflow-x-auto"><table class="hr-feature-table"><thead><tr><th>Code</th><th>Timestamp</th><th>Source</th></tr></thead><tbody>'+parsed.result.slice(0,15).map(r=>'<tr><td>'+hrEscape(r.code)+'</td><td>'+hrEscape(r.timestamp)+'</td><td>'+hrEscape(r.source)+'</td></tr>').join('')+'</tbody></table></div>'+(parsed.result.length&&!parsed.errors.length?'<button class="portal-action-btn px-4 py-2 mt-3 rounded-xl" onclick="hrCommitImport(\'attendance\')">'+hrText('اعتماد وحفظ الدفعة في Firebase','Review and save batch to Firebase')+'</button>':'');
-  if(status)status.textContent=(data.devices||[]).map(d=>'#'+d.id+': '+(d.ok?d.count+' OK':'ERROR '+d.error)).join(' | ')+(data.devices?.some(d=>!d.ok)?' — '+hrText('بعض الأجهزة لم تستجب','Some devices failed'):'');
- }catch(e){if(status)status.textContent=hrText('فشل الاتصال بالـBridge المحلي: ','Local bridge unavailable: ')+e.message+' — '+hrText('شغّل npm start على جهاز متصل بالأجهزة','Run npm start on the device-connected PC');}
- finally{if(button)button.disabled=false;}
+  if(preview)preview.innerHTML='<p>'+hrEscape(hrText('معاينة السحب','Pull preview'))+': '+parsed.result.length+' / '+data.records.length+'</p>'+(parsed.errors.length?'<p class="text-rose-300">'+parsed.errors.slice(0,10).map(hrEscape).join('; ')+'</p>':'')+'<div class="overflow-x-auto"><table class="hr-feature-table"><thead><tr><th>Code</th><th>Timestamp</th><th>Source</th></tr></thead><tbody>'+parsed.result.slice(0,30).map(r=>'<tr><td>'+hrEscape(r.code)+'</td><td>'+hrEscape(r.timestamp)+'</td><td>'+hrEscape(r.source)+'</td></tr>').join('')+'</tbody></table></div>'+(parsed.result.length&&!parsed.errors.length?'<button class="portal-action-btn px-4 py-2 mt-3 rounded-xl" onclick="hrCommitImport(\'attendance\')">'+hrText('مراجعة وحفظ الدفعة في Firebase','Review and save to Firebase')+'</button>':'');
+  status.textContent=(data.devices||[]).map(d=>'#'+d.id+': '+(d.ok?d.count+' OK':'ERROR '+d.error)).join(' | ');
+  document.getElementById('lm-zk-devices-status').textContent=status.textContent;
+ }catch(e){status.textContent=hrText('تعذر السحب: ','Pull failed: ')+e.message;}
+ finally{button.disabled=false;}
 }
 function lmZkPopulate(){
  const dep=document.getElementById('lm-zk-dept'),emp=document.getElementById('lm-zk-employees');if(!dep||!emp)return;
@@ -2960,26 +2964,42 @@ function lmZkPopulate(){
  dep.innerHTML=departments.map(v=>'<option value="'+hrEscape(v)+'">'+hrEscape(v)+'</option>').join('');
  emp.innerHTML=list.map(e=>{const c=String(getEmployeeCode(e)||'');return c?'<option value="'+hrEscape(c)+'">'+hrEscape(c)+' — '+hrEscape(e.nameAr||e.name||e.fullName||'')+'</option>':''}).join('');
 }
+function lmZkModal(kind){
+ const overlay=document.getElementById('lm-zk-overlay');if(!overlay)return;
+ overlay.hidden=false;overlay.style.display='flex';
+ document.getElementById('lm-zk-pull-view').hidden=kind!=='pull';
+ document.getElementById('lm-zk-import-view').hidden=kind!=='import';
+ if(kind==='pull')lmZkCheckHealth();
+}
+function lmZkClose(){const el=document.getElementById('lm-zk-overlay');if(el){el.hidden=true;el.style.display='none';}}
+function lmZkClear(){document.querySelectorAll('#lm-zk-overlay select option').forEach(o=>o.selected=false);}
 function lmAttWorkspaceLayout(){
  const d=document.getElementById('hr-attendance-view');if(!d)return;
- const imp=d.querySelector('#hr-import-file-attendance')?.closest('.hr-panel');
- if(!imp)return;
- // Keep the existing import engine and approval controls intact.
+ const imp=d.querySelector('#hr-import-file-attendance')?.closest('.hr-panel');if(!imp)return;
  const heading=d.querySelector('h1');const subtitle=heading?.nextElementSibling;
- if(subtitle)subtitle.textContent=hrText('سجلات حقيقية من ESS وأجهزة البصمة؛ حسابات الورديات والإضافي مؤجلة','Actual ESS and device records; shift and overtime calculations are pending');
- if(heading)heading.after(imp);else d.prepend(imp);
- let ws=d.querySelector('#lm-att-workspace');
- let zk=d.querySelector('#lm-zk-panel');
- if(!zk){
-  zk=document.createElement('section');zk.id='lm-zk-panel';zk.className='hr-panel mb-5';
-  zk.innerHTML=`<div class="flex flex-wrap justify-between items-center gap-3 mb-3"><div><h2 class="font-bold text-sky-300 text-lg">${hrText('السحب المباشر من أجهزة البصمة الأربعة','Live pull from four fingerprint devices')}</h2><p class="text-xs text-slate-400">${hrText('سحب حقيقي للمعاينة ثم حفظ اختياري بعد المراجعة','Live device pull; preview before optional save')}</p></div><span id="lm-zk-health" class="text-xs text-amber-300">${hrText('جاري فحص الاتصال','Checking bridge')}</span></div><div class="lm-filter-grid"><label>${hrText('تاريخ البصمات','Punch date')}<input class="hr-feature-input" type="date" id="lm-zk-day"></label><label>${hrText('الإدارات (اختيار متعدد)','Departments')}<select class="hr-feature-input" id="lm-zk-dept" multiple size="4"></select></label><label>${hrText('الموظفون (اختيار متعدد)','Employees')}<select class="hr-feature-input" id="lm-zk-employees" multiple size="4"></select></label></div><div class="lm-filter-actions mt-3"><button type="button" class="portal-action-btn px-5 py-3 rounded-xl" id="lm-zk-pull" onclick="lmZkPull()">${hrText('سحب فعلي من الأجهزة الأربعة','Pull from all four devices')}</button><button type="button" class="portal-ghost-btn px-4 py-2 rounded-xl" onclick="document.querySelectorAll('#lm-zk-panel select').forEach(s=>[...s.options].forEach(o=>o.selected=false))">${hrText('مسح الاختيارات','Clear selection')}</button><button type="button" class="portal-ghost-btn px-4 py-2 rounded-xl" onclick="lmZkCheckHealth()">${hrText('فحص اتصال Bridge','Check bridge')}</button></div><p class="text-xs text-slate-400 mt-3">${hrText('عدم تحديد موظفين أو إدارات يعني الكل. السجلات لا تحفظ إلا بعد التأكيد.','No selection means all. Saving requires confirmation.')}</p><p id="lm-zk-status" class="text-xs text-sky-300 mt-2" aria-live="polite"></p>`;
-  imp.after(zk);
+ if(subtitle)subtitle.textContent=hrText('إدارة البصمات وسجلات الحضور','Fingerprint and attendance management');
+ let toolbar=d.querySelector('#lm-att-toolbar');
+ if(!toolbar){
+  toolbar=document.createElement('section');toolbar.id='lm-att-toolbar';toolbar.className='hr-panel mb-4';
+  toolbar.innerHTML=`<div class="flex flex-wrap justify-between items-center gap-3"><div><h2 class="font-bold text-sky-300 text-lg">${hrText('إدارة البصمات','Fingerprint management')}</h2><span id="lm-zk-health" class="text-xs text-amber-300">${hrText('جاري فحص Bridge','Checking bridge')}</span></div><div class="flex flex-wrap gap-2"><button type="button" class="portal-action-btn px-3 py-2 rounded-xl" onclick="lmZkModal('pull')">${hrText('سحب البصمات','Pull punches')}</button><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmZkModal('import')">${hrText('استيراد Excel / CSV','Import Excel / CSV')}</button><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmAttMode('report');document.getElementById('lm-att-filters').style.display='grid'">${hrText('فلاتر التقرير','Report filters')}</button><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmAttExport()">${hrText('تصدير CSV','Export CSV')}</button></div></div>`;
+  if(heading)heading.after(toolbar);else d.prepend(toolbar);
  }
- const dayInput=document.getElementById('lm-zk-day');if(dayInput&&!dayInput.value){const f=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'});const parts=f.formatToParts(new Date());const v=k=>parts.find(x=>x.type===k).value;dayInput.value=v('year')+'-'+v('month')+'-'+v('day');}lmZkPopulate();lmZkCheckHealth();
- if(!ws){ws=document.createElement('section');ws.id='lm-att-workspace';ws.className='hr-panel mb-5';ws.innerHTML=`<div class="flex flex-wrap justify-between items-center gap-3 mb-4"><div><h2 class="font-bold text-sky-300 text-lg" id="lm-att-mode-title">${hrText('حركات اليوم','Today punches')}</h2><p class="text-xs text-slate-400">${hrText('عرض السجلات الأصلية دون احتساب ساعات إضافية أو جزاءات','Source records only; no overtime or penalties calculated')}</p></div><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmAttLoad()">${hrText('تحديث البيانات','Refresh')}</button></div>
-<div class="flex flex-wrap gap-2 mb-4"><button type="button" class="portal-action-btn" onclick="lmAttMode('today')">${hrText('حركات اليوم','Today')}</button><button type="button" class="portal-ghost-btn" onclick="lmAttMode('report')">${hrText('تقرير الحضور والانصراف','Attendance history report')}</button></div><div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5" id="lm-att-kpis"></div>
-<div id="lm-att-filters" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4"><label class="text-sm">${hrText('كود الموظف','Employee code')}<input id="lm-att-code" class="hr-feature-input mt-1 w-full" placeholder="778" oninput="lmAttFilter()"></label><label class="text-sm">${hrText('من تاريخ','From')}<input id="lm-att-from" type="date" class="hr-feature-input mt-1 w-full" onchange="lmAttFilter()"></label><label class="text-sm">${hrText('إلى تاريخ','To')}<input id="lm-att-to" type="date" class="hr-feature-input mt-1 w-full" onchange="lmAttFilter()"></label><label class="text-sm">${hrText('المصدر','Source')}<select id="lm-att-source" class="hr-feature-input mt-1 w-full" onchange="lmAttFilter()"><option value="all">${hrText('كل المصادر','All sources')}</option><option value="ess">ESS GPS</option><option value="device">ZKTeco</option><option value="unknown">${hrText('غير محدد','Unknown')}</option></select></label></div>
-<div class="flex flex-wrap gap-2 mb-3"><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmAttExport()">${hrText('تصدير السجلات المعروضة CSV','Export filtered CSV')}</button><span id="lm-att-count" class="text-xs text-slate-400 self-center"></span></div><div id="lm-att-table" aria-live="polite" class="overflow-x-auto text-sm text-slate-300">${hrText('جاري التحميل','Loading')}</div><p class="text-xs text-amber-200 mt-3">${hrText('ساعات العمل والإضافي والتأخير: بانتظار اعتماد منطق الورديات وربط أزواج الدخول والخروج. لا يتم تخمينها.','Work, overtime and lateness hours await approved shift and punch-pairing rules.')}</p>`;imp.after(ws);}
+ imp.style.display='none';
+ let overlay=document.getElementById('lm-zk-overlay');
+ if(!overlay){
+  overlay=document.createElement('div');overlay.id='lm-zk-overlay';overlay.hidden=true;overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.style.cssText='display:none;position:fixed;inset:0;z-index:99999;background:rgba(2,8,23,.82);align-items:center;justify-content:center;padding:18px';
+  overlay.innerHTML=`<div style="background:#0d1a30;color:#e2e8f0;border:1px solid #2b638a;border-radius:18px;padding:20px;width:min(920px,96vw);max-height:90vh;overflow:auto;direction:rtl"><div class="flex justify-between items-center mb-4"><h2 class="text-lg font-bold text-sky-300">${hrText('إدارة استيراد البصمات','Fingerprint import')}</h2><button type="button" class="portal-ghost-btn" onclick="lmZkClose()" aria-label="Close">✕</button></div><div id="lm-zk-pull-view"><p class="text-xs text-slate-400 mb-3">${hrText('تحديد الجهاز يعني تضمينه في السحب؛ لا يقطع الاتصال الفعلي بالجهاز.','Device selection controls the pull, not physical connection.')}</p><div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">${[1,2,3,4].map(i=>`<label class="hr-panel p-3 text-center"><input class="lm-zk-device" type="checkbox" value="${i}" checked> ${hrText('جهاز','Device')} ${i}</label>`).join('')}</div><p id="lm-zk-devices-status" class="text-xs text-sky-300 mb-3"></p><div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3"><label>${hrText('من تاريخ','From')}<input id="lm-zk-from" class="hr-feature-input w-full" type="date"></label><label>${hrText('إلى تاريخ','To')}<input id="lm-zk-to" class="hr-feature-input w-full" type="date"></label><label>${hrText('الإدارات (متعدد)','Departments')}<select id="lm-zk-dept" class="hr-feature-input w-full" multiple size="4"></select></label><label>${hrText('الموظفون (متعدد)','Employees')}<select id="lm-zk-employees" class="hr-feature-input w-full" multiple size="4"></select></label></div><div class="flex flex-wrap gap-2"><button type="button" id="lm-zk-pull" class="portal-action-btn px-4 py-2" onclick="lmZkPull()">${hrText('سحب من الأجهزة المحددة','Pull selected devices')}</button><button type="button" class="portal-ghost-btn" onclick="lmZkCheckHealth()">${hrText('فحص Bridge','Check bridge')}</button><button type="button" class="portal-ghost-btn" onclick="lmZkClear()">${hrText('مسح فلاتر الموظفين','Clear employee filters')}</button></div><p id="lm-zk-status" class="text-xs text-sky-300 mt-3" aria-live="polite"></p><div id="lm-zk-preview-holder" class="mt-3"></div></div><div id="lm-zk-import-view" hidden></div></div>`;
+  overlay.addEventListener('click',e=>{if(e.target===overlay)lmZkClose()});
+  document.body.append(overlay);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')lmZkClose()});
+ }
+ document.getElementById('lm-zk-import-view').append(imp);imp.style.display='';
+ const preview=imp.querySelector('#hr-import-preview-attendance');if(preview)document.getElementById('lm-zk-preview-holder').append(preview);
+ const f=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'});const parts=f.formatToParts(new Date());const v=k=>parts.find(x=>x.type===k).value;const today=v('year')+'-'+v('month')+'-'+v('day');
+ for(const id of ['lm-zk-from','lm-zk-to']){const el=document.getElementById(id);if(el&&!el.value)el.value=today;}
+ lmZkPopulate();lmZkCheckHealth();
+ let ws=d.querySelector('#lm-att-workspace');
+ if(!ws){ws=document.createElement('section');ws.id='lm-att-workspace';ws.className='hr-panel mb-5';ws.innerHTML=`<div class="flex flex-wrap justify-between items-center gap-3 mb-4"><div><h2 class="font-bold text-sky-300 text-lg" id="lm-att-mode-title">${hrText('حركات اليوم','Today punches')}</h2><p class="text-xs text-slate-400">${hrText('السجلات الأصلية؛ المعالجة النهائية للورديات لاحقًا','Original records; shift pairing pending')}</p></div><div class="flex gap-2"><button class="portal-ghost-btn" onclick="lmAttMode('today')">${hrText('اليوم','Today')}</button><button class="portal-ghost-btn" onclick="lmAttMode('report')">${hrText('كل السجلات','All records')}</button></div></div><div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4" id="lm-att-kpis"></div><div id="lm-att-filters" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4" style="display:none"><label>${hrText('كود الموظف','Employee code')}<input id="lm-att-code" class="hr-feature-input w-full" oninput="lmAttFilter()"></label><label>${hrText('من تاريخ','From')}<input id="lm-att-from" type="date" class="hr-feature-input w-full" onchange="lmAttFilter()"></label><label>${hrText('إلى تاريخ','To')}<input id="lm-att-to" type="date" class="hr-feature-input w-full" onchange="lmAttFilter()"></label><label>${hrText('المصدر','Source')}<select id="lm-att-source" class="hr-feature-input w-full" onchange="lmAttFilter()"><option value="all">${hrText('الكل','All')}</option><option value="device">ZKTeco</option><option value="ess">ESS</option></select></label></div><span id="lm-att-count" class="text-xs text-slate-400"></span><div id="lm-att-table" aria-live="polite" class="overflow-x-auto text-sm text-slate-300 mt-3">${hrText('جاري التحميل','Loading')}</div>`;toolbar.after(ws);}
  lmAttMode(lmAttWorkspace.mode);lmAttLoad();
 }
 async function lmAttLoad(){
