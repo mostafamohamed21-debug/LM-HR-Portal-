@@ -128,16 +128,16 @@ const translations = {
 function getEmployeeName(emp) {
     if (!emp) return '--';
     if (currentLang === 'ar') {
-        return getField(emp, 'اسم الموظف ', 'اسم الموظف', 'name') || '--';
+        return getField(emp, 'اسم الموظف ', 'اسم الموظف', 'name_ar') || '--';
     } else {
-        return getField(emp, 'emp_name _en', 'name', 'employee_name_en') || '--';
+        return getField(emp, 'emp_name _en', 'employee_name_en', 'name_en') || '--';
     }
 }
 
 function getEmployeeDept(emp) {
     if (!emp) return '--';
     if (currentLang === 'ar') {
-        return getField(emp, 'الإدارة ', 'الإدارة', 'department') || '--';
+        return getField(emp, 'الإدارة ', 'الإدارة') || '--';
     } else {
         return getField(emp, 'department ', 'department', 'dept') || '--';
     }
@@ -146,9 +146,9 @@ function getEmployeeDept(emp) {
 function getEmployeeJob(emp) {
     if (!emp) return '--';
     if (currentLang === 'ar') {
-        return getField(emp, 'الوظيفة', 'الوظيفة ', 'jobTitle', 'job') || '--';
+        return getField(emp, 'الوظيفة', 'الوظيفة ') || '--';
     } else {
-        return getField(emp, 'job title ', 'jobTitle', 'job title', 'job') || '--';
+        return getField(emp, 'job title ', 'job title') || '--';
     }
 }
 
@@ -161,9 +161,17 @@ const fieldLabels = {
 };
 
 function tr(key) { return translations[currentLang][key] || key; }
+// Read-only key normalization: never rename Firebase keys or overwrite their values.
+function lmNormalizeFieldKey(key) { return String(key ?? '').normalize('NFKC').replace(/\s+/g,' ').trim().toLocaleLowerCase(); }
 function getField(emp, ...keys) {
+    if (!emp || typeof emp !== 'object') return '';
     for (const key of keys) {
-        if (emp && emp[key] !== undefined && emp[key] !== null && String(emp[key]).trim() !== '') return emp[key];
+        if (Object.prototype.hasOwnProperty.call(emp,key) && emp[key] != null && String(emp[key]).trim() !== '') return emp[key];
+    }
+    const normalized = new Map(Object.keys(emp).map(key=>[lmNormalizeFieldKey(key),key]));
+    for (const key of keys) {
+        const realKey=normalized.get(lmNormalizeFieldKey(key));
+        if (realKey !== undefined && emp[realKey] != null && String(emp[realKey]).trim() !== '') return emp[realKey];
     }
     return '';
 }
@@ -171,13 +179,32 @@ function getEmployeeCode(emp) { return String(getField(emp, 'الكود', 'code'
 
 function existingKey(obj, keys, fallback) {
     for (const key of keys) if (Object.prototype.hasOwnProperty.call(obj || {}, key)) return key;
+    const normalized=new Map(Object.keys(obj||{}).map(key=>[lmNormalizeFieldKey(key),key]));
+    for (const key of keys) {const found=normalized.get(lmNormalizeFieldKey(key));if(found!==undefined)return found;}
     return fallback || keys[0];
 }
 function putMapped(obj, source, keys, value, fallback) {
     const key = existingKey(source, keys, fallback);
     obj[key] = value;
 }
-
+// Paired fields must never cross-write the opposite language during profile editing.
+const LM_PROFILE_LANGUAGE_KEYS = {
+ 'prof-name':{ar:['اسم الموظف ','اسم الموظف','name_ar'],en:['emp_name _en','employee_name_en','name_en']},
+ 'prof-dept':{ar:['الإدارة ','الإدارة'],en:['department ','department']},
+ 'prof-job':{ar:['الوظيفة','الوظيفة '],en:['job title ','job title']},
+ 'prof-manager':{ar:['المدير المباشر ','المدير المباشر'],en:['direct manager ','direct manager']},
+ 'prof-qual':{ar:['المؤهل'],en:['qualification']},
+ 'prof-qual-auth':{ar:['جهة المؤهل ','جهة المؤهل'],en:['qulification issuing authority','qualification issuing authority']},
+ 'prof-insurance':{ar:['الحالة التأمينية ','الحالة التأمينية'],en:['insurance status ','insurance status']},
+ 'prof-pob':{ar:['مكان الميلاد'],en:['pob']}
+};
+function lmPutProfileLanguageField(updated, employee, inputId) {
+ const keys=LM_PROFILE_LANGUAGE_KEYS[inputId][currentLang];
+ const normalized=new Set(keys.map(lmNormalizeFieldKey));
+ const actual=Object.keys(employee).find(k=>normalized.has(lmNormalizeFieldKey(k)));
+ // Do not create a new language field silently when a record has no matching key.
+ if(actual) updated[actual]=document.getElementById(inputId).value;
+}
 function displayKey(key) {
     if (fieldLabels[key]) return fieldLabels[key][currentLang==='ar'?0:1];
     const cleaned = String(key).replace(/_/g,' ').trim();
@@ -242,6 +269,7 @@ function setLanguage(lang) {
     document.querySelectorAll("[data-ar][data-en]:not(.hr-nav [data-ar])").forEach(el=>{el.textContent=el.getAttribute("data-"+currentLang);});
     if (document.getElementById('add-employee-modal') && !document.getElementById('add-employee-modal').classList.contains('hidden')) buildAddEmployeeForm();
     if(typeof lmUpdateHeaderIdentity==='function') lmUpdateHeaderIdentity();
+    if(typeof lmV54RefreshAttendanceLanguage==='function') lmV54RefreshAttendanceLanguage();
 
 }
 
@@ -565,18 +593,18 @@ async function executeSave(){
     const emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(activeEmployeeCode)); if(!emp)return;
     const updatedData={};
     putMapped(updatedData, emp, ['الكود','code','employeeCode','empCode'], activeEmployeeCode, 'code');
-    putMapped(updatedData, emp, ['اسم الموظف ','اسم الموظف','name','emp_name _en'], document.getElementById('prof-name').value, 'name');
-    putMapped(updatedData, emp, ['الإدارة ','الإدارة','department','dept'], document.getElementById('prof-dept').value, 'department');
-    putMapped(updatedData, emp, ['الوظيفة','الوظيفة ','jobTitle','job title','job'], document.getElementById('prof-job').value, 'jobTitle');
-    putMapped(updatedData, emp, ['المدير المباشر ','المدير المباشر','directManager','direct manager'], document.getElementById('prof-manager').value, 'directManager');
+    lmPutProfileLanguageField(updatedData,emp,'prof-name');
+    lmPutProfileLanguageField(updatedData,emp,'prof-dept');
+    lmPutProfileLanguageField(updatedData,emp,'prof-job');
+    lmPutProfileLanguageField(updatedData,emp,'prof-manager');
     putMapped(updatedData, emp, ['تاريخ التعيين ','تاريخ التعيين','hireDate','date_of_hiring '], document.getElementById('prof-hire').value, 'hireDate');
     putMapped(updatedData, emp, ['سنوات الخدمة ','سنوات الخدمة','yearsService','years service'], document.getElementById('prof-service').value, 'yearsService');
-    putMapped(updatedData, emp, ['المؤهل','qualification'], document.getElementById('prof-qual').value, 'qualification');
-    putMapped(updatedData, emp, ['جهة المؤهل ','جهة المؤهل','qualAuth','qulification issuing authority','issuer'], document.getElementById('prof-qual-auth').value, 'qualAuth');
+    lmPutProfileLanguageField(updatedData,emp,'prof-qual');
+    lmPutProfileLanguageField(updatedData,emp,'prof-qual-auth');
     putMapped(updatedData, emp, ['تاريخ الميلاد','dob'], document.getElementById('prof-dob').value, 'dob');
     putMapped(updatedData, emp, ['السن حتى تاريخه ','السن حتى تاريخه','age','age to date'], fahdAge(document.getElementById('prof-dob').value)||document.getElementById('prof-age').value, 'age');
-    putMapped(updatedData, emp, ['الحالة التأمينية ','الحالة التأمينية','insuranceStatus','insurance status'], document.getElementById('prof-insurance').value, 'insuranceStatus');
-    putMapped(updatedData, emp, ['مكان الميلاد','pob'], document.getElementById('prof-pob').value, 'pob');
+    lmPutProfileLanguageField(updatedData,emp,'prof-insurance');
+    lmPutProfileLanguageField(updatedData,emp,'prof-pob');
     putMapped(updatedData, emp, ['photoUrl','photo','رابط الصورة'], document.getElementById('profile-img').src, 'photoUrl');
     document.querySelectorAll('#dynamic-fields-container [data-firebase-key]').forEach(input=>{
         const key=input.getAttribute('data-firebase-key'); if(isValidFirebaseKey(key) && !/password|pass|كلمة المرور/i.test(key)) updatedData[key]=input.value;
@@ -2921,7 +2949,7 @@ function lmAttMode(mode){lmAttWorkspace.mode=mode==='report'?'report':'today';co
 function lmAttSafe(v){return escapeHtml(String(v??''));}
 function lmAttDate(r){return String(r.date||r.clientDate||r.timestamp||'').slice(0,10);}
 function lmAttStamp(r){const n=Number(r.createdAt||r.approvedAt||0);return n||Date.parse(String(r.timestamp||r.clientDate||''))||0;}
-function lmAttSource(r){return r.origin==='ess'?'ESS GPS':r.origin==='device'?'ZKTeco'+(r.device?' #'+r.device:''):'غير محدد';}
+function lmAttSource(r){return r.origin==='ess'?'ESS GPS':r.origin==='device'?'ZKTeco'+(r.device?' #'+r.device:''):hrText('غير محدد','Unknown');}
 const LM_ZK_BRIDGE='http://127.0.0.1:4371';
 async function lmZkCheckHealth(){
  const el=document.getElementById('lm-zk-health');if(!el)return;
@@ -2946,6 +2974,7 @@ async function lmZkPull(){
   if(!res.ok)throw Error('Bridge HTTP '+res.status);
   const data=await res.json();if(!Array.isArray(data.records))throw Error('Invalid bridge response');
   if(!Array.isArray(allEmployees)||!allEmployees.length)throw Error('Employee directory not loaded');
+  const incomplete=(data.complete!==true)||!Array.isArray(data.devices)||devices.some(id=>!data.devices.some(d=>String(d.id)===String(id)&&d.ok===true));
   const valid=data.records.filter(r=>allCodes.has(String(r.code||'').trim()));
   const rows=valid.filter(r=>allowed.has(String(r.code||'').trim()));
   const unknown=data.records.length-valid.length,filtered=valid.length-rows.length;
@@ -2953,12 +2982,12 @@ async function lmZkPull(){
   const duplicates=rows.length-unique.size;
   const clean=[...unique.values()];
   const parsed=clean.length?hrImportRows('attendance',clean):{result:[],errors:[]};
-  hrImportState.attendance={records:parsed.result,errors:parsed.errors,filename:'ZKTeco_'+from+'_'+to+'.csv'};
+  hrImportState.attendance={records:incomplete?[]:parsed.result,errors:parsed.errors,filename:'ZKTeco_'+from+'_'+to+'.csv'};
   const preview=document.getElementById('hr-import-preview-attendance');
-  if(preview)preview.innerHTML='<p>'+hrEscape(hrText('معاينة السحب','Pull preview'))+': '+parsed.result.length+' / '+data.records.length+'</p><p class="text-xs text-amber-200">'+hrText('أكواد غير موجودة','Unknown employee codes')+': '+unknown+' · '+hrText('خارج الفلاتر','Filtered out')+': '+filtered+' · '+hrText('مكرر مطابق','Exact duplicates')+': '+duplicates+' · '+hrText('أخطاء البيانات','Validation errors')+': '+parsed.errors.length+'</p>'+(parsed.errors.length?'<p class="text-rose-300">'+parsed.errors.slice(0,10).map(hrEscape).join('; ')+'</p>':'')+'<div class="overflow-x-auto"><table class="hr-feature-table"><thead><tr><th>Code</th><th>Timestamp</th><th>Source</th></tr></thead><tbody>'+parsed.result.slice(0,30).map(r=>'<tr><td>'+hrEscape(r.code)+'</td><td>'+hrEscape(r.timestamp)+'</td><td>'+hrEscape(r.source)+'</td></tr>').join('')+'</tbody></table></div>'+(parsed.result.length&&!parsed.errors.length?'<button class="portal-action-btn px-4 py-2 mt-3 rounded-xl" onclick="hrCommitImport(\'attendance\')">'+hrText('مراجعة وحفظ الدفعة في Firebase','Review and save to Firebase')+'</button>':'');
-  status.textContent=(data.devices||[]).map(d=>'#'+d.id+': '+(d.ok?d.count+' OK':'ERROR '+d.error)).join(' | ');
+  if(preview)preview.innerHTML='<p>'+hrEscape(hrText('معاينة السحب','Pull preview'))+': '+parsed.result.length+' / '+data.records.length+'</p><p class="text-xs text-amber-200">'+hrText('أكواد غير موجودة','Unknown employee codes')+': '+unknown+' · '+hrText('خارج الفلاتر','Filtered out')+': '+filtered+' · '+hrText('مكرر مطابق','Exact duplicates')+': '+duplicates+' · '+hrText('أخطاء البيانات','Validation errors')+': '+parsed.errors.length+'</p>'+(parsed.errors.length?'<p class="text-rose-300">'+parsed.errors.slice(0,10).map(hrEscape).join('; ')+'</p>':'')+'<div class="overflow-x-auto"><table class="hr-feature-table"><thead><tr><th>Code</th><th>Timestamp</th><th>Source</th></tr></thead><tbody>'+parsed.result.slice(0,30).map(r=>'<tr><td>'+hrEscape(r.code)+'</td><td>'+hrEscape(r.timestamp)+'</td><td>'+hrEscape(r.source)+'</td></tr>').join('')+'</tbody></table></div>'+(!incomplete&&parsed.result.length&&!parsed.errors.length?'<button class="portal-action-btn px-4 py-2 mt-3 rounded-xl" onclick="hrCommitImport(\'attendance\')">'+hrText('مراجعة وحفظ الدفعة في Firebase','Review and save to Firebase')+'</button>':'');
+  status.textContent=(incomplete?hrText('تحذير: سحب غير مكتمل، الحفظ معطل. ','Warning: incomplete pull; saving disabled. '):'')+(data.devices||[]).map(d=>'#'+d.id+': '+(d.ok?d.count+' OK':hrText('خطأ: ','Error: ')+d.error)).join(' | ');
   document.getElementById('lm-zk-devices-status').textContent=status.textContent;
- }catch(e){status.textContent=hrText('تعذر السحب: ','Pull failed: ')+e.message;}
+ }catch(e){hrImportState.attendance={records:[],errors:[String(e.message||e)],filename:''};status.textContent=hrText('تعذر السحب: ','Pull failed: ')+e.message;}
  finally{button.disabled=false;}
 }
 // V5: normalized bilingual department matching; source is the live Firebase employee directory.
@@ -3059,8 +3088,34 @@ async function lmAttLoad(){
  lmAttFilter();
 }
 function lmAttFiltered(){const code=document.getElementById('lm-att-code')?.value.trim()||'',from=document.getElementById('lm-att-from')?.value||'',to=document.getElementById('lm-att-to')?.value||'',src=document.getElementById('lm-att-source')?.value||'all',dept=document.getElementById('lm-att-dept')?.value||'';const selected=lmV5DeptGroups().find(d=>d.key===dept);return lmAttWorkspace.rows.filter(r=>{const date=lmAttDate(r);if(lmAttWorkspace.mode==='today'&&date!==new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()) )return false;return (!selected||selected.codes.has(String(r.code||'')))&&(!code||String(r.code||'').includes(code))&&(!from||(date&&date>=from))&&(!to||(date&&date<=to))&&(src==='all'||r.origin===src)});}
-function lmAttFilter(){const el=document.getElementById('lm-att-table');if(!el)return;const rows=lmAttFiltered(),kpi=document.getElementById('lm-att-kpis'),count=document.getElementById('lm-att-count');const cards=[[hrText('السجلات المعروضة','Records'),rows.length],[hrText('بصمات ESS','ESS punches'),rows.filter(r=>r.origin==='ess').length],[hrText('بصمات الأجهزة','Device punches'),rows.filter(r=>r.origin==='device').length],[hrText('بانتظار المراجعة','Pending review'),rows.filter(r=>r.status==='PENDING_REVIEW'||r.status==='HELD').length]];if(kpi)kpi.innerHTML=cards.map(([label,n])=>`<div class="rounded-xl border border-sky-500/20 bg-slate-900/40 p-3"><p class="text-xs text-slate-400">${label}</p><strong class="text-2xl text-sky-200">${n}</strong></div>`).join('');if(count)count.textContent=rows.length+' '+hrText('سجل مطابق للفلاتر','matching records');el.innerHTML=rows.length?`<table class="hr-feature-table w-full"><thead><tr>${[hrText('الكود','Code'),hrText('التاريخ','Date'),hrText('الوقت','Time'),hrText('الحركة','Punch'),hrText('المصدر','Source'),hrText('الحالة','Status')].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.slice(0,500).map(r=>`<tr><td>${lmAttSafe(r.code)}</td><td>${lmAttSafe(lmAttDate(r))}</td><td>${lmAttSafe(r.time||String(r.timestamp||'').slice(11,19))}</td><td>${lmAttSafe(r.punch||'—')}</td><td>${lmAttSafe(lmAttSource(r))}</td><td>${lmAttSafe(r.status)}</td></tr>`).join('')}</tbody></table>${rows.length>500?'<p class="text-xs mt-2">Showing first 500 records; export includes all filtered records.</p>':''}`:`<p class="text-slate-400 p-4">${hrText('لا توجد سجلات مطابقة','No matching records')}</p>`;}
+function lmAttFilter(){const el=document.getElementById('lm-att-table');if(!el)return;const rows=lmAttFiltered(),kpi=document.getElementById('lm-att-kpis'),count=document.getElementById('lm-att-count');const cards=[[hrText('السجلات المعروضة','Records'),rows.length],[hrText('بصمات ESS','ESS punches'),rows.filter(r=>r.origin==='ess').length],[hrText('بصمات الأجهزة','Device punches'),rows.filter(r=>r.origin==='device').length],[hrText('بانتظار المراجعة','Pending review'),rows.filter(r=>r.status==='PENDING_REVIEW'||r.status==='HELD').length]];if(kpi)kpi.innerHTML=cards.map(([label,n])=>`<div class="rounded-xl border border-sky-500/20 bg-slate-900/40 p-3"><p class="text-xs text-slate-400">${label}</p><strong class="text-2xl text-sky-200">${n}</strong></div>`).join('');if(count)count.textContent=rows.length+' '+hrText('سجل مطابق للفلاتر','matching records');el.innerHTML=rows.length?`<table class="hr-feature-table w-full"><thead><tr>${[hrText('الكود','Code'),hrText('التاريخ','Date'),hrText('الوقت','Time'),hrText('الحركة','Punch'),hrText('المصدر','Source'),hrText('الحالة','Status')].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.slice(0,500).map(r=>`<tr><td>${lmAttSafe(r.code)}</td><td>${lmAttSafe(lmAttDate(r))}</td><td>${lmAttSafe(r.time||String(r.timestamp||'').slice(11,19))}</td><td>${lmAttSafe(r.punch||'—')}</td><td>${lmAttSafe(lmAttSource(r))}</td><td>${lmAttSafe(r.status)}</td></tr>`).join('')}</tbody></table>${rows.length>500?'<p class="text-xs mt-2">'+hrText('يتم عرض أول 500 سجل، ويشمل التصدير جميع السجلات المطابقة.','Showing first 500 records; export includes all filtered records.')+'</p>':''}`:`<p class="text-slate-400 p-4">${hrText('لا توجد سجلات مطابقة','No matching records')}</p>`;}
 function lmAttExport(){const rows=lmAttFiltered();if(!rows.length)return;const cols=['code','date','time','punch','origin','device','status','id'];const esc=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const csv='\uFEFF'+[cols.join(','),...rows.map(r=>cols.map(k=>esc(k==='date'?lmAttDate(r):r[k])).join(','))].join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='attendance_filtered.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+
+// V5.4: refresh dynamic attendance controls on a language switch, retaining entered filters.
+function lmV54RefreshAttendanceLanguage(){
+ const modal=document.getElementById('lm-zk-overlay');
+ if(modal){
+   const active=modal.style.display!=='none'&&!modal.hidden;
+   const selected=modal.querySelector('#lm-zk-dept')?.value;
+   const heading=modal.querySelector('#lm-zk-pull-view h2');
+   if(heading&&heading.dataset.ar&&heading.dataset.en)heading.textContent=heading.dataset[currentLang];
+   modal.querySelectorAll('[data-ar][data-en]').forEach(el=>{el.textContent=el.dataset[currentLang];});
+   const panel=modal.firstElementChild;if(panel)panel.dir=currentLang==='ar'?'rtl':'ltr';
+   if(typeof lmZkPopulate==='function'){lmZkPopulate();const dept=modal.querySelector('#lm-zk-dept');if(dept&&selected)dept.value=selected;}
+   if(active&&typeof lmZkCheckHealth==='function')lmZkCheckHealth();
+ }
+ const section=document.getElementById('lm-att-workspace');
+ if(section){
+   const mode=document.getElementById('lm-att-mode-title');
+   if(mode)mode.textContent=lmAttWorkspace.mode==='today'?hrText('حركات اليوم','Today punches'):hrText('تقرير الحضور والانصراف','Attendance history report');
+   const select=document.getElementById('lm-att-dept');
+   if(select){const old=select.value;select.innerHTML='<option value="">'+hrText('كل الإدارات','All departments')+'</option>'+lmV5DeptGroups().map(d=>'<option value="'+hrEscape(d.key)+'">'+hrEscape(currentLang==='ar'?d.ar||d.en:d.en||d.ar)+'</option>').join('');select.value=old;}
+   const source=document.getElementById('lm-att-source');if(source){const all=source.querySelector('option[value="all"]');if(all)all.textContent=hrText('الكل','All');}
+   section.querySelectorAll('[data-ar][data-en]').forEach(el=>el.textContent=el.dataset[currentLang]);
+   lmAttFilter();
+ }
+}
+
 const lmAttOriginalRender=renderHRFeature;
 renderHRFeature=function(page){lmAttOriginalRender(page);if(page==='attendance')lmAttWorkspaceLayout();};
 
