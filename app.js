@@ -1285,7 +1285,7 @@ const ESS_ATTENDANCE_PILOT_CODES=new Set(['2']);
 const ESS_PILOT_TTL=86400000;
 let essPilotSweepRunning=false;
 function essPilotReady(){return portalIsAdmin() && essAuth.currentUser?.uid===ESS_ADMIN_UID;}
-function essCairoDay(ts){const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(ts));const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));return `${p.year}-${p.month}-${p.day}`;}
+function essCairoDay(ts){return LactoAttendanceDay.dayKey(ts);}
 // Idempotent repair: a previously approved request is still copied to the immutable ledger.
 async function essFinalizeApproved(code,id){
  if(!essPilotReady()||String(code)!=='2'||!/^[-\w]+$/.test(id))throw Error('UNAUTHORIZED');
@@ -3262,7 +3262,7 @@ function lmV5ShiftClose(){document.getElementById('lm-v5-shift-modal')?.remove()
 function lmV5ShiftOpen(){
  if(!portalIsAdmin()){lmDialog(lmV5ShiftT('تحتاج صلاحية إدارية موثقة. صلاحيات المديرين ستُفعّل بعد إنشاء حسابات Firebase Auth وربطها.','Verified admin required. Manager access requires Firebase Auth identity mapping.'));return;}
  lmV5ShiftClose();const wrap=document.createElement('div');wrap.id='lm-v5-shift-modal';wrap.style.cssText='position:fixed;inset:0;z-index:100001;background:rgba(1,8,20,.88);display:flex;align-items:center;justify-content:center;padding:14px';wrap.setAttribute('role','dialog');wrap.setAttribute('aria-modal','true');
- wrap.innerHTML=`<div dir="${currentLang==='ar'?'rtl':'ltr'}" style="background:#0e1b31;border:1px solid #2676a0;border-radius:18px;padding:20px;width:min(1180px,98vw);max-height:94vh;overflow:auto;color:#e2e8f0"><div class="flex justify-between items-center mb-3"><h2 class="font-bold text-sky-300 text-xl">${lmV5ShiftT('إدارة الورديات — V5','Shift management — V5')}</h2><button type="button" class="portal-ghost-btn" onclick="lmV5ShiftClose()">✕</button></div><p class="text-amber-300 text-xs mb-3">${lmV5ShiftT('وضع تجريبي: حسابات الساعات تقديرية ولا تُرحّل إلى المرتبات. التغييرات تحفظ في سجل منفصل بعد تأكيدك.','Pilot: hours are provisional, not payroll. Plans save separately after confirmation.')}</p><div class="grid grid-cols-1 md:grid-cols-5 gap-2 mb-3"><label>${lmV5ShiftT('الإدارة','Department')}<select class="hr-feature-input w-full" id="lm-v5-dept" onchange="lmV5ShiftRefresh()"></select></label><label>${lmV5ShiftT('ابحث بالكود أو الاسم','Code / name')}<input class="hr-feature-input w-full" id="lm-v5-search" oninput="lmV5ShiftRefresh()" placeholder="109"></label><label>${lmV5ShiftT('من','From')}<input class="hr-feature-input w-full" id="lm-v5-from" type="date" onchange="lmV5ShiftRefresh()"></label><label>${lmV5ShiftT('إلى','To')}<input class="hr-feature-input w-full" id="lm-v5-to" type="date" onchange="lmV5ShiftRefresh()"></label><label>${lmV5ShiftT('الوردية','Shift')}<select class="hr-feature-input w-full" id="lm-v5-type"><option>A</option><option>B</option><option>C</option><option>D</option></select></label></div><div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3"><label>${lmV5ShiftT('النمط','Pattern')}<select class="hr-feature-input w-full" id="lm-v5-pattern"><option value="short">09:00–16:00</option><option value="long">09:00–21:00</option><option value="night">21:00–09:00</option></select></label><label>${lmV5ShiftT('الإجراء','Action')}<select class="hr-feature-input w-full" id="lm-v5-action"><option value="WORK">${lmV5ShiftT('تعيين/تغيير وردية','Assign/change shift')}</option><option value="CANCEL">${lmV5ShiftT('إلغاء وردية','Cancel shift')}</option><option value="CANCEL_REST">${lmV5ShiftT('إلغاء راحة','Cancel rest')}</option></select></label><label class="md:col-span-2">${lmV5ShiftT('سبب التغيير أو الإلغاء','Reason')}<input class="hr-feature-input w-full" id="lm-v5-reason" maxlength="250" placeholder="${lmV5ShiftT('سبب إلزامي','Required reason')}"></label></div><div class="flex flex-wrap gap-2 mb-3"><button class="portal-action-btn px-4 py-2" onclick="lmV5ShiftApply()">${lmV5ShiftT('تطبيق على الموظفين المحددين','Apply to selected employees')}</button><button class="portal-ghost-btn px-4 py-2" onclick="lmV5ShiftExport()">${lmV5ShiftT('تصدير تقرير CSV','Export CSV')}</button><button class="portal-ghost-btn px-4 py-2" onclick="lmV5ShiftLoad()">${lmV5ShiftT('تحديث البيانات','Refresh')}</button></div><div id="lm-v5-message" class="text-xs text-sky-300 mb-2"></div><div id="lm-v5-table" class="overflow-x-auto text-sm"></div></div>`;
+ wrap.innerHTML=`<div dir="${currentLang==='ar'?'rtl':'ltr'}" style="background:#0e1b31;border:1px solid #2676a0;border-radius:18px;padding:20px;width:min(1180px,98vw);max-height:94vh;overflow:auto;color:#e2e8f0"><div class="flex justify-between items-center mb-3"><h2 class="font-bold text-sky-300 text-xl">${lmV5ShiftT('إدارة الورديات — V5','Shift management — V5')}</h2><button type="button" class="portal-ghost-btn" onclick="lmV5ShiftClose()">✕</button></div><p class="text-amber-300 text-xs mb-3">${lmV5ShiftT('وضع تجريبي: حسابات الساعات تقديرية ولا تُرحّل إلى المرتبات. التغييرات تحفظ في سجل منفصل بعد تأكيدك.','Pilot: hours are provisional, not payroll. Plans save separately after confirmation.')}</p><div class="grid grid-cols-1 md:grid-cols-5 gap-2 mb-3"><label>${lmV5ShiftT('الإدارة','Department')}<select class="hr-feature-input w-full" id="lm-v5-dept" onchange="lmV5ShiftRefresh()"></select></label><label>${lmV5ShiftT('ابحث بالكود أو الاسم','Code / name')}<input class="hr-feature-input w-full" id="lm-v5-search" oninput="lmV5ShiftRefresh()" placeholder="109"></label><label>${lmV5ShiftT('من','From')}<input class="hr-feature-input w-full" id="lm-v5-from" type="date" onchange="lmV5ShiftRefresh()"></label><label>${lmV5ShiftT('إلى','To')}<input class="hr-feature-input w-full" id="lm-v5-to" type="date" onchange="lmV5ShiftRefresh()"></label><label>${lmV5ShiftT('الوردية','Shift')}<select class="hr-feature-input w-full" id="lm-v5-type"><option>A</option><option>B</option><option>C</option><option>D</option></select></label></div><div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3"><label>${lmV5ShiftT('النمط','Pattern')}<select class="hr-feature-input w-full" id="lm-v5-pattern"><option value="short">09:00–16:00</option><option value="long">09:00–21:00</option><option value="night">21:00–09:00</option></select></label><label>${lmV5ShiftT('الإجراء','Action')}<select class="hr-feature-input w-full" id="lm-v5-action"><option value="WORK">${lmV5ShiftT('تعيين/تغيير وردية','Assign/change shift')}</option><option value="CANCEL">${lmV5ShiftT('إلغاء وردية','Cancel shift')}</option><option value="CANCEL_REST">${lmV5ShiftT('إلغاء راحة','Cancel rest')}</option></select></label><label class="md:col-span-2">${lmV5ShiftT('سبب التغيير أو الإلغاء','Reason')}<input class="hr-feature-input w-full" id="lm-v5-reason" maxlength="250" placeholder="${lmV5ShiftT('سبب إلزامي','Required reason')}"></label></div><div class="flex flex-wrap gap-2 mb-3"><button class="portal-action-btn px-4 py-2" onclick="lmV5ShiftApply()">${lmV5ShiftT('تطبيق على الموظفين المحددين','Apply to selected employees')}</button><button class="portal-ghost-btn px-4 py-2" onclick="lmPhase3ShiftPreview()">${lmV5ShiftT('معاينة حساب الورديات','Shift calculation preview')}</button><button class="portal-ghost-btn px-4 py-2" onclick="lmV5ShiftExport()">${lmV5ShiftT('تصدير تقرير CSV','Export CSV')}</button><button class="portal-ghost-btn px-4 py-2" onclick="lmV5ShiftLoad()">${lmV5ShiftT('تحديث البيانات','Refresh')}</button></div><div id="lm-v5-message" class="text-xs text-sky-300 mb-2"></div><div id="lm-v5-table" class="overflow-x-auto text-sm"></div></div>`;
  wrap.addEventListener('click',e=>{if(e.target===wrap)lmV5ShiftClose()});document.body.append(wrap);
  const de=document.getElementById('lm-v5-dept');de.innerHTML='<option value="">'+lmV5ShiftT('كل الإدارات','All departments')+'</option>'+Object.entries(LMV5_DEPT_LABELS).map(([k,v])=>'<option value="'+k+'">'+hrEscape(v[currentLang==='ar'?0:1])+'</option>').join('');
  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());document.getElementById('lm-v5-from').value=today;document.getElementById('lm-v5-to').value=today;lmV5ShiftLoad();
@@ -3406,6 +3406,26 @@ function lmPayEmployee(e){
  const code=getEmployeeCode(e),base={gross:lmPayNum(lmPayField(e,['الراتب الشامل','المرتب الشامل','gross salary','gross_salary','total salary','الشامل','الاجر الشامل','الأجر الشامل','comprehensiveSalary','grossSalary'])),insurance:lmPayNum(lmPayField(e,['أجر الاشتراك التأميني','insuranceContributionWage','insuranceWage','insuredWage'])),phone:0,transport:0,glasses:0,bonus:0,meal:0,overtime:0,other:0,penalty:0,loan:0,medical:0,included:1,insured:!!lmPayNum(lmPayField(e,['أجر الاشتراك التأميني','insuranceContributionWage','insuranceWage','insuredWage'])),secondary:false};
  return {...base,...(lmPayrollState.overrides[code]||{})};
 }
+/* Phase 4: manually verified shift inputs can be fed into payroll preview only. */
+function lmPayShiftBridgePreview(){
+ try{
+  const code=prompt(hrText('كود الموظف بالضبط','Exact employee code'));if(!code)return;
+  const employee=allEmployees.find(e=>String(getEmployeeCode(e))===String(code).trim());if(!employee){alert(hrText('الكود غير موجود','Employee code not found'));return;}
+  const raw=prompt(hrText('ألصق JSON بسجلات الوردية المعتمدة: shift, records, openingDebitHours','Paste approved shift JSON: shift, records, openingDebitHours'));
+  if(!raw)return;
+  const shiftInput=JSON.parse(raw);
+  const rateRaw=prompt(hrText('أجر الساعة الإضافية المعتمد (رقم)','Approved base overtime hourly rate (number)'));
+  if(rateRaw===null)return;
+  const approvedOvertimeRate=Number(rateRaw);
+  const nightRaw=prompt(hrText('عدد ساعات الإضافي الليلي المعتمدة','Approved night overtime hours'),'0');if(nightRaw===null)return;
+  const restRaw=prompt(hrText('عدد ساعات إضافي الراحة المعتمدة','Approved rest overtime hours'),'0');if(restRaw===null)return;
+  const base=lmPayEmployee(employee);
+  const result=LactoPayrollShiftBridge.calculate({shiftInput,monthlyPayrollInput:base,approvedOvertimeRate,approvedNightHours:Number(nightRaw),approvedRestHours:Number(restRaw)});
+  if(!result.ready){lmDialog('BLOCKED — '+JSON.stringify(result.reasons,null,2));return;}
+  const calc=lmPayCalc(result.payrollInput);
+  lmDialog(JSON.stringify({code,month:lmPayrollState.month,status:'PREVIEW_NOT_APPROVED',shift:result.shift,overtime:result.overtimeBreakdown,payroll:calc},null,2));
+ }catch(e){alert(hrText('خطأ في بيانات المعاينة: ','Preview input error: ')+e.message)}
+}
 function lmPayEdit(code,key,value){
  if(!lmPayrollState.overrides[code])lmPayrollState.overrides[code]={};
  lmPayrollState.overrides[code][key]=['insured','secondary'].includes(key)?value==='true':lmPayNum(value);
@@ -3460,7 +3480,8 @@ function lmPayExport(){
 }
 function lmAnnualRaisePreview(){
  const root=document.getElementById('hr-payroll-view');if(!root)return;
- root.innerHTML=`<h1 class="text-2xl font-bold mb-3">${hrText('المرتبات — ورشة الحساب والمراجعة','Payroll — Calculation workbench')}</h1><p class="text-amber-300 mb-4 text-sm">${hrText('محاكاة فقط: لا حفظ ولا صرف ولا ترحيل إلى Firebase. راجع ضريبة جهة العمل غير الأصلية وإعفاءات البدلات مع مستندات الشركة. قيم البدلات تدخل ضمن الشامل ولا تضاف إليه مرة ثانية. الإضافي النقدي يُضاف منفصلًا.','SIMULATION ONLY: no Firebase writes or posting. Confirm secondary employer withholding and allowance exemptions. Allowances are included in gross; overtime is added separately.')}</p><div class="glass-card rounded-xl p-3 mb-3 flex flex-wrap gap-3 items-end"><label>${hrText('بحث بالكود أو الاسم','Code/name')}<input id="lm-pay-search" class="hr-feature-input block" oninput="lmPayRenderRows()"></label><label>${hrText('الشهر','Month')}<input type="month" class="hr-feature-input block" value="${lmPayrollState.month}" onchange="lmPayrollState.month=this.value"></label><label class="portal-ghost-btn" style="cursor:pointer">${hrText('استيراد CSV','Import CSV')}<input type="file" accept=".csv,text/csv" style="display:none" onchange="lmPayImport(this.files[0]);this.value=''"></label><button class="portal-action-btn" onclick="lmPayExport()">${hrText('تصدير كشف الحساب CSV','Export payroll CSV')}</button><button class="portal-ghost-btn" onclick="lmPayRaisePage()">${hrText('معاينة العلاوة السنوية','Annual raise preview')}</button></div><p class="text-xs text-slate-300 mb-3">${hrText('تنبيه: إدخال قيم البدلات يدويًا لتوزيع مكونات الشامل ضريبيًا؛ لا تُضاف مرة أخرى. الحساب يفترض شريحة 2024 للدخل السنوي حتى 600 ألف؛ الحالات الأعلى تحتاج إعدادات شرائح خاصة. الأجور والبدلات غير المكتملة لا تصلح للصرف.','Manual allowance allocation is part of gross, not additional pay. 2024 tax bands for incomes up to 600k only; higher incomes need specific brackets. Incomplete inputs are not payroll-ready.')}</p><p id="lm-pay-import-status" class="text-sky-300 text-sm mb-2">CSV: Code, Gross, Insurance, Phone, Transport, Glasses, Bonus, Meal, Overtime, Other, Penalty, Loan, Medical — preview only.</p><div id="lm-pay-summary" class="text-sky-300 mb-2"></div><div class="overflow-x-auto glass-card rounded-xl" id="lm-payroll-table"></div><div id="lm-pay-raise" class="mt-4 hidden"></div>`;
+ root.innerHTML=`<h1 class="text-2xl font-bold mb-3">${hrText('المرتبات — ورشة الحساب والمراجعة','Payroll — Calculation workbench')}</h1><p class="text-amber-300 mb-4 text-sm">${hrText('محاكاة فقط: لا حفظ ولا صرف ولا ترحيل إلى Firebase. راجع ضريبة جهة العمل غير الأصلية وإعفاءات البدلات مع مستندات الشركة. قيم البدلات تدخل ضمن الشامل ولا تضاف إليه مرة ثانية. الإضافي النقدي يُضاف منفصلًا.','SIMULATION ONLY: no Firebase writes or posting. Confirm secondary employer withholding and allowance exemptions. Allowances are included in gross; overtime is added separately.')}</p><div class="glass-card rounded-xl p-3 mb-3 flex flex-wrap gap-3 items-end"><label>${hrText('بحث بالكود أو الاسم','Code/name')}<input id="lm-pay-search" class="hr-feature-input block" oninput="lmPayRenderRows()"></label><label>${hrText('الشهر','Month')}<input type="month" class="hr-feature-input block" value="${lmPayrollState.month}" onchange="lmPayrollState.month=this.value"></label><label class="portal-ghost-btn" style="cursor:pointer">${hrText('استيراد CSV','Import CSV')}<input type="file" accept=".csv,text/csv" style="display:none" onchange="lmPayImport(this.files[0]);this.value=''"></label><button class="portal-action-btn" onclick="lmPayExport()">${hrText('تصدير كشف الحساب CSV','Export payroll CSV')}</button><button class="portal-ghost-btn" onclick="lmPayShiftBridgePreview()">${hrText('معاينة ربط الوردية بالمرتب','Shift-to-payroll preview')}</button><button class="portal-ghost-btn" onclick="lmPayRaisePage()">${hrText('معاينة العلاوة السنوية','Annual raise preview')}</button></div><p class="text-xs text-slate-300 mb-3">${hrText('تنبيه: إدخال قيم البدلات يدويًا لتوزيع مكونات الشامل ضريبيًا؛ لا تُضاف مرة أخرى. الحساب يفترض شريحة 2024 للدخل السنوي حتى 600 ألف؛ الحالات الأعلى تحتاج إعدادات شرائح خاصة. الأجور والبدلات غير المكتملة لا تصلح للصرف.','Manual allowance allocation is part of gross, not additional pay. 2024 tax bands for incomes up to 600k only; higher incomes need specific brackets. Incomplete inputs are not payroll-ready.')}</p><p id="lm-pay-import-status" class="text-sky-300 text-sm mb-2">CSV: Code, Gross, Insurance, Phone, Transport, Glasses, Bonus, Meal, Overtime, Other, Penalty, Loan, Medical — preview only.</p><div id="lm-pay-summary" class="text-sky-300 mb-2"></div><div class="overflow-x-auto glass-card rounded-xl" id="lm-payroll-table"></div><div id="lm-pay-raise" class="mt-4 hidden"></div>`;
+ if(typeof lmP5Mount==='function')lmP5Mount();if(typeof lmP6Mount==='function')lmP6Mount();
  lmPayRenderRows();
 }
 const lmRaiseDraft={rate:7,year:2027,referenceVerified:false};
@@ -3479,4 +3500,73 @@ function lmRaiseSaveDraft(){
  if(!Number.isFinite(rate)||rate<0||rate>100||!Number.isInteger(year)||year<2020||year>2100){alert('Invalid rate or year / سنة أو نسبة غير صحيحة');return;}
  lmRaiseDraft.rate=rate;lmRaiseDraft.year=year;
  const status=document.getElementById('lm-raise-draft-status');if(status)status.textContent=hrText('تم حفظ نسبة المسودة في جلسة البورتال الحالية فقط؛ لم تتغير مرتبات الموظفين في Firebase.','Draft rate saved for this portal session only; no Firebase employee wages changed.');
+}
+
+
+// PHASE 2: Exception review is independent from raw/approved punches and payroll.
+// Pilot only: employee 2. All administrative decisions are written with audit metadata.
+(function(){
+ let caseRef=null,caseHandler=null;
+ const safe=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ function allowed(){return portalIsAdmin() && essAuth.currentUser?.uid===ESS_ADMIN_UID;}
+ function mount(){
+  if(hrActivePage!=='notifications'||!allowed())return;
+  const host=document.getElementById('hr-notifications-view');if(!host)return;
+  if(!document.getElementById('lm-attendance-exceptions')){
+   const section=document.createElement('section');section.id='lm-attendance-exceptions';section.className='glass-card rounded-2xl p-5 mt-5';
+   section.innerHTML=`<h2 class="font-bold text-sky-300 mb-3">${hrText('مراجعة استثناءات الحضور — اختبار الموظف 2','Attendance exceptions — employee 2 pilot')}</h2>
+    <p class="text-sm text-amber-300 mb-3">${hrText('تسجيل حالة للمراجعة لا يغيّر البصمات أو المرتب. لا تُعتمد ساعات مصححة إلا بعد التحقق من الأدلة.','Review cases do not modify punches or payroll. Corrected hours require verified evidence.')}</p>
+    <div class="flex flex-wrap gap-2 mb-3"><input id="lm-ex-day" type="date" class="hr-feature-input" aria-label="Operational day"><input id="lm-ex-first" type="time" class="hr-feature-input" aria-label="First punch"><input id="lm-ex-last" type="time" class="hr-feature-input" aria-label="Last punch"><input id="lm-ex-shift" type="text" maxlength="60" placeholder="${hrText('الوردية المقررة','Scheduled shift')}" class="hr-feature-input"><button type="button" id="lm-ex-create" class="portal-action-btn">${hrText('فتح حالة واستفسار الموظف','Open case & ask employee')}</button></div>
+    <div id="lm-ex-list" aria-live="polite" class="text-sm">${hrText('جاري تحميل الحالات...','Loading cases...')}</div>`;
+   host.appendChild(section);
+   section.querySelector('#lm-ex-create').onclick=create;
+  }
+  if(!caseRef){caseRef=essDb.ref('attendance_exceptions/2');caseHandler=snap=>render(snap.val()||{});caseRef.on('value',caseHandler,e=>{const n=document.getElementById('lm-ex-list');if(n)n.textContent=String(e.message||e)});}
+ }
+ async function create(){
+  if(!allowed())return;
+  const day=document.getElementById('lm-ex-day')?.value,first=document.getElementById('lm-ex-first')?.value,last=document.getElementById('lm-ex-last')?.value,shift=document.getElementById('lm-ex-shift')?.value.trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(day||'')||!first||!last||!shift){alert(hrText('أكمل التاريخ والبصمات والوردية','Complete day, punches and shift'));return;}
+  const key=essDb.ref('attendance_exceptions/2').push().key;
+  const record={code:'2',operationalDay:day,firstPunch: first,lastPunch:last,shiftLabel:shift,status:'AWAITING_EMPLOYEE',createdBy:ESS_ADMIN_UID,createdAt:firebase.database.ServerValue.TIMESTAMP,source:'MANUAL_REVIEW',payrollHold:true};
+  const notification={title:'مراجعة بصمات الحضور / Attendance clarification',body:'يرجى مراجعة بصمات يوم '+day+' ('+first+' - '+last+') والرد من شاشة مراجعة الحضور. / Please respond in Attendance Review.',exceptionId:key,createdAt:firebase.database.ServerValue.TIMESTAMP,senderUid:ESS_ADMIN_UID};
+  try{await essDb.ref().update({['attendance_exceptions/2/'+key]:record,['notifications/2/'+key]:notification});}catch(e){alert('Failed: '+(e.code||e.message));}
+ }
+ function render(cases){
+  const el=document.getElementById('lm-ex-list');if(!el)return;
+  const entries=Object.entries(cases).sort((a,b)=>(b[1].createdAt||0)-(a[1].createdAt||0));
+  if(!entries.length){el.textContent=hrText('لا توجد حالات مراجعة','No review cases');return;}
+  el.replaceChildren();
+  for(const [id,c] of entries){
+   const card=document.createElement('div');card.className='p-3 mb-2 rounded-xl border border-slate-600';
+   const details=document.createElement('p');details.textContent=`${c.operationalDay||''} | ${c.firstPunch||''} → ${c.lastPunch||''} | ${c.shiftLabel||''} | ${c.status||''}`;card.append(details);
+   const reply=document.createElement('p');reply.className='text-sky-300 my-2';reply.textContent=c.employeeResponse?('Employee: '+c.employeeResponse.answer+' — '+(c.employeeResponse.note||'')):'Awaiting employee response';card.append(reply);
+   if(c.status!=='CLOSED_VERIFIED'&&c.status!=='CLOSED_UNVERIFIED'){
+    const evidence=document.createElement('textarea');evidence.placeholder=hrText('وصف دليل التحقق (إلزامي)','Verification evidence (required)');evidence.maxLength=1000;evidence.className='hr-feature-input w-full';card.append(evidence);
+    for(const [status,label] of [['CLOSED_VERIFIED',hrText('اعتماد بعد التحقق','Verified close')],['CLOSED_UNVERIFIED',hrText('إغلاق دون إثبات','Close unverified')]]){
+     const btn=document.createElement('button');btn.type='button';btn.className='portal-action-btn mr-2 mt-2';btn.textContent=label;
+     btn.onclick=async()=>{if(!allowed()||!c.employeeResponse){alert(hrText('انتظر رد الموظف','Await employee response'));return;}const note=evidence.value.trim();if(note.length<10){alert(hrText('اكتب تفاصيل الدليل (10 أحرف على الأقل)','Enter evidence details (10+ characters)'));return;}try{await essDb.ref('attendance_exceptions/2/'+id).update({status,reviewEvidence:note,reviewedBy:ESS_ADMIN_UID,reviewedAt:firebase.database.ServerValue.TIMESTAMP,payrollHold:status!=='CLOSED_VERIFIED'});}catch(e){alert(e.message)}};
+     card.append(btn);
+    }
+   }
+   el.append(card);
+  }
+ }
+ document.addEventListener('click',()=>setTimeout(mount,100));
+ setInterval(()=>{if(hrActivePage==='notifications')mount();else if(caseRef){caseRef.off('value',caseHandler);caseRef=null;caseHandler=null;}},2500);
+})();
+
+/* Phase 3: isolated manual preview for verified shift rows. Never writes payroll/Firebase. */
+function lmPhase3ShiftPreview(){
+ const shift=document.getElementById('lm-v5-type')?.value||'A';
+ const sample='[{"id":"approved-1","date":"2026-11-01","status":"APPROVED","hours":7,"extraHours":0}]';
+ const raw=prompt(lmV5ShiftT('ألصق سجلات الحضور المعتمدة بصيغة JSON. لن يتم حفظ أو تعديل أي بيانات.','Paste approved attendance records as JSON. No data will be saved.'),sample);
+ if(raw===null)return;
+ try{
+  const records=JSON.parse(raw);
+  const result=window.LactoShiftEngine.calculate({shift,records});
+  const msg=document.getElementById('lm-v5-message');
+  if(msg)msg.textContent=JSON.stringify(result);
+  lmDialog((result.readyForPayroll?'Preview OK — ':'REVIEW REQUIRED — ')+JSON.stringify(result,null,2));
+ }catch(e){lmDialog(lmV5ShiftT('بيانات غير صالحة: ','Invalid input: ')+e.message);}
 }
