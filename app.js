@@ -2944,7 +2944,7 @@ function lmUnifiedAlertsDraw(){
 
 
 // Attendance workspace UI: real source records, no payroll/shift calculations.
-const lmAttWorkspace={rows:[],loading:false,mode:'today'};
+const lmAttWorkspace={rows:[],loading:false,mode:'today',shiftPlans:{},shiftPlansLoaded:false};
 function lmAttMode(mode){lmAttWorkspace.mode=mode==='report'?'report':'today';const filters=document.getElementById('lm-att-filters');if(filters)filters.style.display=lmAttWorkspace.mode==='today'?'none':'grid';const title=document.getElementById('lm-att-mode-title');if(title)title.textContent=lmAttWorkspace.mode==='today'?hrText('حركات اليوم','Today punches'):hrText('تقرير الحضور والانصراف','Attendance history report');lmAttFilter();}
 function lmAttSafe(v){return escapeHtml(String(v??''));}
 function lmAttDate(r){return String(r.date||r.clientDate||r.timestamp||'').slice(0,10);}
@@ -3082,24 +3082,55 @@ async function lmAttLoad(){
  const rows=[],errors=[];
  const add=(r)=>{if(r&&typeof r==='object')rows.push(r)};
  try{
-  const jobs=[['attendance_requests/2','ess'],['approved_attendance/2','approved'],['hr_imports/attendance','imports']];
+  const jobs=[['attendance_requests/2','ess'],['approved_attendance/2','approved'],['hr_imports/attendance','imports'],['shift_plans','plans']];
   const results=await Promise.allSettled(jobs.map(([path])=>db.ref(path).once('value')));
   results.forEach((res,i)=>{
    const [path,kind]=jobs[i];if(res.status!=='fulfilled'){errors.push(path);return;}
    const val=res.value.val()||{};
+   if(kind==='plans'){lmAttWorkspace.shiftPlans=val;lmAttWorkspace.shiftPlansLoaded=true;return;}
    if(kind==='ess')Object.entries(val).forEach(([id,r])=>add({id,code:'2',date:r.clientDate,time:r.clientTime,punch:r.punchType,status:r.verificationStatus||'PENDING_REVIEW',origin:'ess',createdAt:r.createdAt}));
    if(kind==='approved')Object.entries(val).forEach(([id,r])=>{if(!val||typeof r!=='object')return; /* Approved ledger is an approval of an ESS request, not a second punch. */});
    if(kind==='imports')Object.entries(val).forEach(([batchId,batch])=>Object.entries(batch?.records||{}).forEach(([i,r])=>{if(!r||typeof r!=='object')return;const source=String(r.source||'').toLowerCase();add({id:batchId+':'+i,code:r.code,date:String(r.timestamp||'').slice(0,10),timestamp:r.timestamp,punch:r.type,status:'IMPORTED',origin:/zkteco|device|finger|zk|[1-4]/.test(source)?'device':'unknown',device:/^[1-4]$/.test(source)?source:'',createdAt:Date.parse(String(r.timestamp||''))||0});}));
   });
  }catch(e){errors.push(e.message||'read failed')}
- lmAttWorkspace.rows=rows.sort((a,b)=>lmAttStamp(b)-lmAttStamp(a));lmAttWorkspace.loading=false;
+ lmAttWorkspace.rows=rows.sort((a,b)=>lmAttStamp(b)-lmAttStamp(a));lmAttWorkspace.loading=false;lmAttClassify();
  const warn=document.getElementById('lm-att-count');if(warn&&errors.length)warn.textContent=hrText('تعذر قراءة بعض المصادر: ','Some sources unavailable: ')+errors.join(', ');
  lmAttFilter();
 }
+// Display-only punch pairing. Never modifies imported records or Firebase.
+// Night-shift grouping is enabled only by an explicit saved shift plan.
+function lmAttClassify(){
+ const plans=lmAttWorkspace.shiftPlans||{},groups=new Map();
+ const dayBefore=d=>{const dt=new Date(d+'T12:00:00Z');if(!Number.isFinite(dt.getTime()))return '';dt.setUTCDate(dt.getUTCDate()-1);return dt.toISOString().slice(0,10);};
+ for(const r of lmAttWorkspace.rows){
+  r.reportPunch='';r.reportWorkday=lmAttDate(r);r.reportPairStatus='';
+  const code=String(r.code||'').trim(),date=lmAttDate(r),time=lmAttTime(r),stamp=Date.parse(date+'T'+time);
+  if(!code||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!/^\d{1,2}:\d{2}/.test(time)||!Number.isFinite(stamp)){r.reportPairStatus='INVALID_TIME';continue;}
+  let workday=date;
+  const previous=dayBefore(date),previousPlan=plans[lmV5ShiftKey(code,previous)];
+  const overnight=previousPlan?.kind==='WORK'&&!previousPlan?.cancelled&&previousPlan?.pattern==='night'&&['B','C','D'].includes(previousPlan?.shift);
+  if(overnight&&Number(time.slice(0,2))<12)workday=previous;
+  r.reportWorkday=workday;
+  const key=code+'|'+workday;
+  if(!groups.has(key))groups.set(key,[]);
+  groups.get(key).push({r,stamp});
+ }
+ for(const group of groups.values()){
+  group.sort((a,b)=>a.stamp-b.stamp);
+  const distinct=[];for(const x of group){if(!distinct.length||distinct[distinct.length-1].stamp!==x.stamp)distinct.push(x);}
+  if(distinct.length===1){for(const x of group)x.r.reportPairStatus='SINGLE_PUNCH';continue;}
+  const first=distinct[0].stamp,last=distinct[distinct.length-1].stamp;
+  // More than 20 hours between first and last indicates ambiguous grouping.
+  if(last-first>20*3600000){for(const x of group)x.r.reportPairStatus='REVIEW_REQUIRED';continue;}
+  for(const x of group){x.r.reportPairStatus='PAIRED';x.r.reportPunch=x.stamp===first?'IN':x.stamp===last?'OUT':'INTERMEDIATE';}
+ }
+}
+function lmAttPunchLabel(r){const v=r.reportPunch||'';return v==='IN'?hrText('حضور','Check-in'):v==='OUT'?hrText('انصراف','Check-out'):v==='INTERMEDIATE'?hrText('بصمة وسطية','Intermediate'):r.reportPairStatus==='SINGLE_PUNCH'?hrText('بصمة واحدة — مراجعة','Single punch — review'):r.reportPairStatus==='REVIEW_REQUIRED'?hrText('تحتاج مراجعة','Review required'):hrText('غير محدد','Unclassified');}
+function lmAttEmployeeName(r){return lmBilingualName(r.code,r.name||'');}
 function lmAttFiltered(){const code=document.getElementById('lm-att-code')?.value.trim()||'',from=document.getElementById('lm-att-from')?.value||'',to=document.getElementById('lm-att-to')?.value||'',src=document.getElementById('lm-att-source')?.value||'all',dept=document.getElementById('lm-att-dept')?.value||'';const selected=lmV5DeptGroups().find(d=>d.key===dept);return lmAttWorkspace.rows.filter(r=>{const date=lmAttDate(r);if(lmAttWorkspace.mode==='today'&&date!==new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()) )return false;return (!selected||selected.codes.has(String(r.code||'')))&&(!code||String(r.code||'').includes(code))&&(!from||(date&&date>=from))&&(!to||(date&&date<=to))&&(src==='all'||r.origin===src)});}
-function lmAttFilter(){const el=document.getElementById('lm-att-table');if(!el)return;const rows=lmAttFiltered(),kpi=document.getElementById('lm-att-kpis'),count=document.getElementById('lm-att-count');const cards=[[hrText('السجلات المعروضة','Records'),rows.length],[hrText('بصمات ESS','ESS punches'),rows.filter(r=>r.origin==='ess').length],[hrText('بصمات الأجهزة','Device punches'),rows.filter(r=>r.origin==='device').length],[hrText('بانتظار المراجعة','Pending review'),rows.filter(r=>r.status==='PENDING_REVIEW'||r.status==='HELD').length]];if(kpi)kpi.innerHTML=cards.map(([label,n])=>`<div class="rounded-xl border border-sky-500/20 bg-slate-900/40 p-3"><p class="text-xs text-slate-400">${label}</p><strong class="text-2xl text-sky-200">${n}</strong></div>`).join('');if(count)count.textContent=rows.length+' '+hrText('سجل مطابق للفلاتر','matching records');el.innerHTML=rows.length?`<table class="hr-feature-table w-full"><thead><tr>${[hrText('الكود','Code'),hrText('التاريخ','Date'),hrText('الوقت','Time'),hrText('الحركة','Punch'),hrText('المصدر','Source'),hrText('الحالة','Status')].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.slice(0,500).map(r=>`<tr><td>${lmAttSafe(r.code)}</td><td>${lmAttSafe(lmAttDate(r))}</td><td>${lmAttSafe(lmAttTime(r))}</td><td>${lmAttSafe(r.punch||'—')}</td><td>${lmAttSafe(lmAttSource(r))}</td><td>${lmAttSafe(r.status)}</td></tr>`).join('')}</tbody></table>${rows.length>500?'<p class="text-xs mt-2">'+hrText('يتم عرض أول 500 سجل، ويشمل التصدير جميع السجلات المطابقة.','Showing first 500 records; export includes all filtered records.')+'</p>':''}`:`<p class="text-slate-400 p-4">${hrText('لا توجد سجلات مطابقة','No matching records')}</p>`;}
+function lmAttFilter(){const el=document.getElementById('lm-att-table');if(!el)return;const rows=lmAttFiltered(),kpi=document.getElementById('lm-att-kpis'),count=document.getElementById('lm-att-count');const cards=[[hrText('السجلات المعروضة','Records'),rows.length],[hrText('بصمات ESS','ESS punches'),rows.filter(r=>r.origin==='ess').length],[hrText('بصمات الأجهزة','Device punches'),rows.filter(r=>r.origin==='device').length],[hrText('بانتظار المراجعة','Pending review'),rows.filter(r=>r.status==='PENDING_REVIEW'||r.status==='HELD').length]];if(kpi)kpi.innerHTML=cards.map(([label,n])=>`<div class="rounded-xl border border-sky-500/20 bg-slate-900/40 p-3"><p class="text-xs text-slate-400">${label}</p><strong class="text-2xl text-sky-200">${n}</strong></div>`).join('');if(count)count.textContent=rows.length+' '+hrText('سجل مطابق للفلاتر','matching records');el.innerHTML=rows.length?`<table class="hr-feature-table w-full"><thead><tr>${[hrText('الكود','Code'),hrText('اسم الموظف','Employee name'),hrText('التاريخ','Date'),hrText('الوقت','Time'),hrText('الحركة','Punch'),hrText('المصدر','Source'),hrText('الحالة','Status')].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.slice(0,500).map(r=>`<tr><td>${lmAttSafe(r.code)}</td><td>${lmAttSafe(lmAttEmployeeName(r))}</td><td>${lmAttSafe(lmAttDate(r))}</td><td>${lmAttSafe(lmAttTime(r))}</td><td>${lmAttSafe(lmAttPunchLabel(r))}</td><td>${lmAttSafe(lmAttSource(r))}</td><td>${lmAttSafe(r.status)}</td></tr>`).join('')}</tbody></table>${rows.length>500?'<p class="text-xs mt-2">'+hrText('يتم عرض أول 500 سجل، ويشمل التصدير جميع السجلات المطابقة.','Showing first 500 records; export includes all filtered records.')+'</p>':''}`:`<p class="text-slate-400 p-4">${hrText('لا توجد سجلات مطابقة','No matching records')}</p>`;}
 function lmAttTime(r){const direct=String(r.time??r.clientTime??'').trim();if(direct)return direct;const stamp=String(r.timestamp??'').trim();const match=stamp.match(/(?:T|\s)(\d{1,2}:\d{2}(?::\d{2})?)/);return match?match[1]:'';}
-function lmAttExport(){const rows=lmAttFiltered();if(!rows.length)return;const cols=['code','date','time','punch','origin','device','status','id'];const esc=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const csv='\uFEFF'+[cols.join(','),...rows.map(r=>cols.map(k=>esc(k==='date'?lmAttDate(r):k==='time'?lmAttTime(r):r[k])).join(','))].join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='attendance_filtered.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function lmAttExport(){const rows=lmAttFiltered();if(!rows.length)return;const cols=['code','employee_name','date','time','punch','pair_status','workday','origin','device','status','id'];const esc=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const csv='\uFEFF'+[cols.join(','),...rows.map(r=>cols.map(k=>esc(k==='date'?lmAttDate(r):k==='time'?lmAttTime(r):k==='employee_name'?lmAttEmployeeName(r):k==='punch'?lmAttPunchLabel(r):k==='pair_status'?r.reportPairStatus:k==='workday'?r.reportWorkday:r[k])).join(','))].join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='attendance_filtered.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 
 // V5.4: refresh dynamic attendance controls on a language switch, retaining entered filters.
 function lmV54RefreshAttendanceLanguage(){
