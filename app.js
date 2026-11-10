@@ -1285,7 +1285,7 @@ const ESS_ATTENDANCE_PILOT_CODES=new Set(['2']);
 const ESS_PILOT_TTL=86400000;
 let essPilotSweepRunning=false;
 function essPilotReady(){return portalIsAdmin() && essAuth.currentUser?.uid===ESS_ADMIN_UID;}
-function essCairoDay(ts){return LactoAttendanceDay.dayKey(ts);}
+function essCairoDay(ts){const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(ts));const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));return `${p.year}-${p.month}-${p.day}`;}
 // Idempotent repair: a previously approved request is still copied to the immutable ledger.
 async function essFinalizeApproved(code,id){
  if(!essPilotReady()||String(code)!=='2'||!/^[-\w]+$/.test(id))throw Error('UNAUTHORIZED');
@@ -3262,7 +3262,7 @@ function lmV5ShiftClose(){document.getElementById('lm-v5-shift-modal')?.remove()
 function lmV5ShiftOpen(){
  if(!portalIsAdmin()){lmDialog(lmV5ShiftT('تحتاج صلاحية إدارية موثقة. صلاحيات المديرين ستُفعّل بعد إنشاء حسابات Firebase Auth وربطها.','Verified admin required. Manager access requires Firebase Auth identity mapping.'));return;}
  lmV5ShiftClose();const wrap=document.createElement('div');wrap.id='lm-v5-shift-modal';wrap.style.cssText='position:fixed;inset:0;z-index:100001;background:rgba(1,8,20,.88);display:flex;align-items:center;justify-content:center;padding:14px';wrap.setAttribute('role','dialog');wrap.setAttribute('aria-modal','true');
- wrap.innerHTML=`<div dir="${currentLang==='ar'?'rtl':'ltr'}" style="background:#0e1b31;border:1px solid #2676a0;border-radius:18px;padding:20px;width:min(1180px,98vw);max-height:94vh;overflow:auto;color:#e2e8f0"><div class="flex justify-between items-center mb-3"><h2 class="font-bold text-sky-300 text-xl">${lmV5ShiftT('إدارة الورديات — V5','Shift management — V5')}</h2><button type="button" class="portal-ghost-btn" onclick="lmV5ShiftClose()">✕</button></div><p class="text-amber-300 text-xs mb-3">${lmV5ShiftT('وضع تجريبي: حسابات الساعات تقديرية ولا تُرحّل إلى المرتبات. التغييرات تحفظ في سجل منفصل بعد تأكيدك.','Pilot: hours are provisional, not payroll. Plans save separately after confirmation.')}</p><div class="grid grid-cols-1 md:grid-cols-5 gap-2 mb-3"><label>${lmV5ShiftT('الإدارة','Department')}<select class="hr-feature-input w-full" id="lm-v5-dept" onchange="lmV5ShiftRefresh()"></select></label><label>${lmV5ShiftT('ابحث بالكود أو الاسم','Code / name')}<input class="hr-feature-input w-full" id="lm-v5-search" oninput="lmV5ShiftRefresh()" placeholder="109"></label><label>${lmV5ShiftT('من','From')}<input class="hr-feature-input w-full" id="lm-v5-from" type="date" onchange="lmV5ShiftRefresh()"></label><label>${lmV5ShiftT('إلى','To')}<input class="hr-feature-input w-full" id="lm-v5-to" type="date" onchange="lmV5ShiftRefresh()"></label><label>${lmV5ShiftT('الوردية','Shift')}<select class="hr-feature-input w-full" id="lm-v5-type"><option>A</option><option>B</option><option>C</option><option>D</option></select></label></div><div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3"><label>${lmV5ShiftT('النمط','Pattern')}<select class="hr-feature-input w-full" id="lm-v5-pattern"><option value="short">09:00–16:00</option><option value="long">09:00–21:00</option><option value="night">21:00–09:00</option></select></label><label>${lmV5ShiftT('الإجراء','Action')}<select class="hr-feature-input w-full" id="lm-v5-action"><option value="WORK">${lmV5ShiftT('تعيين/تغيير وردية','Assign/change shift')}</option><option value="CANCEL">${lmV5ShiftT('إلغاء وردية','Cancel shift')}</option><option value="CANCEL_REST">${lmV5ShiftT('إلغاء راحة','Cancel rest')}</option></select></label><label class="md:col-span-2">${lmV5ShiftT('سبب التغيير أو الإلغاء','Reason')}<input class="hr-feature-input w-full" id="lm-v5-reason" maxlength="250" placeholder="${lmV5ShiftT('سبب إلزامي','Required reason')}"></label></div><div class="flex flex-wrap gap-2 mb-3"><button class="portal-action-btn px-4 py-2" onclick="lmV5ShiftApply()">${lmV5ShiftT('تطبيق على الموظفين المحددين','Apply to selected employees')}</button><button class="portal-ghost-btn px-4 py-2" onclick="lmPhase3ShiftPreview()">${lmV5ShiftT('معاينة حساب الورديات','Shift calculation preview')}</button><button class="portal-ghost-btn px-4 py-2" onclick="lmV5ShiftExport()">${lmV5ShiftT('تصدير تقرير CSV','Export CSV')}</button><button class="portal-ghost-btn px-4 py-2" onclick="lmV5ShiftLoad()">${lmV5ShiftT('تحديث البيانات','Refresh')}</button></div><div id="lm-v5-message" class="text-xs text-sky-300 mb-2"></div><div id="lm-v5-table" class="overflow-x-auto text-sm"></div></div>`;
+ wrap.innerHTML=`<div dir="${currentLang==='ar'?'rtl':'ltr'}" style="background:#0e1b31;border:1px solid #2676a0;border-radius:18px;padding:20px;width:min(1180px,98vw);max-height:94vh;overflow:auto;color:#e2e8f0"><div class="flex justify-between items-center mb-3"><h2 class="font-bold text-sky-300 text-xl">${lmV5ShiftT('إدارة الورديات — V5','Shift management — V5')}</h2><button type="button" class="portal-ghost-btn" onclick="lmV5ShiftClose()">✕</button></div><p class="text-amber-300 text-xs mb-3">${lmV5ShiftT('وضع تجريبي: حسابات الساعات تقديرية ولا تُرحّل إلى المرتبات. التغييرات تحفظ في سجل منفصل بعد تأكيدك.','Pilot: hours are provisional, not payroll. Plans save separately after confirmation.')}</p><div class="grid grid-cols-1 md:grid-cols-5 gap-2 mb-3"><label>${lmV5ShiftT('الإدارة','Department')}<select class="hr-feature-input w-full" id="lm-v5-dept" onchange="lmV5ShiftRefresh()"></select></label><label>${lmV5ShiftT('ابحث بالكود أو الاسم','Code / name')}<input class="hr-feature-input w-full" id="lm-v5-search" oninput="lmV5ShiftRefresh()" placeholder="109"></label><label>${lmV5ShiftT('من','From')}<input class="hr-feature-input w-full" id="lm-v5-from" type="date" onchange="lmV5ShiftRefresh()"></label><label>${lmV5ShiftT('إلى','To')}<input class="hr-feature-input w-full" id="lm-v5-to" type="date" onchange="lmV5ShiftRefresh()"></label><label>${lmV5ShiftT('الوردية','Shift')}<select class="hr-feature-input w-full" id="lm-v5-type"><option>A</option><option>B</option><option>C</option><option>D</option></select></label></div><div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3"><label>${lmV5ShiftT('النمط','Pattern')}<select class="hr-feature-input w-full" id="lm-v5-pattern"><option value="short">09:00–16:00</option><option value="long">09:00–21:00</option><option value="night">21:00–09:00</option></select></label><label>${lmV5ShiftT('الإجراء','Action')}<select class="hr-feature-input w-full" id="lm-v5-action"><option value="WORK">${lmV5ShiftT('تعيين/تغيير وردية','Assign/change shift')}</option><option value="CANCEL">${lmV5ShiftT('إلغاء وردية','Cancel shift')}</option><option value="CANCEL_REST">${lmV5ShiftT('إلغاء راحة','Cancel rest')}</option></select></label><label class="md:col-span-2">${lmV5ShiftT('سبب التغيير أو الإلغاء','Reason')}<input class="hr-feature-input w-full" id="lm-v5-reason" maxlength="250" placeholder="${lmV5ShiftT('سبب إلزامي','Required reason')}"></label></div><div class="flex flex-wrap gap-2 mb-3"><button class="portal-action-btn px-4 py-2" onclick="lmV5ShiftApply()">${lmV5ShiftT('تطبيق على الموظفين المحددين','Apply to selected employees')}</button><button class="portal-ghost-btn px-4 py-2" onclick="lmV5ShiftExport()">${lmV5ShiftT('تصدير تقرير CSV','Export CSV')}</button><button class="portal-ghost-btn px-4 py-2" onclick="lmV5ShiftLoad()">${lmV5ShiftT('تحديث البيانات','Refresh')}</button></div><div id="lm-v5-message" class="text-xs text-sky-300 mb-2"></div><div id="lm-v5-table" class="overflow-x-auto text-sm"></div></div>`;
  wrap.addEventListener('click',e=>{if(e.target===wrap)lmV5ShiftClose()});document.body.append(wrap);
  const de=document.getElementById('lm-v5-dept');de.innerHTML='<option value="">'+lmV5ShiftT('كل الإدارات','All departments')+'</option>'+Object.entries(LMV5_DEPT_LABELS).map(([k,v])=>'<option value="'+k+'">'+hrEscape(v[currentLang==='ar'?0:1])+'</option>').join('');
  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());document.getElementById('lm-v5-from').value=today;document.getElementById('lm-v5-to').value=today;lmV5ShiftLoad();
@@ -3406,26 +3406,6 @@ function lmPayEmployee(e){
  const code=getEmployeeCode(e),base={gross:lmPayNum(lmPayField(e,['الراتب الشامل','المرتب الشامل','gross salary','gross_salary','total salary','الشامل','الاجر الشامل','الأجر الشامل','comprehensiveSalary','grossSalary'])),insurance:lmPayNum(lmPayField(e,['أجر الاشتراك التأميني','insuranceContributionWage','insuranceWage','insuredWage'])),phone:0,transport:0,glasses:0,bonus:0,meal:0,overtime:0,other:0,penalty:0,loan:0,medical:0,included:1,insured:!!lmPayNum(lmPayField(e,['أجر الاشتراك التأميني','insuranceContributionWage','insuranceWage','insuredWage'])),secondary:false};
  return {...base,...(lmPayrollState.overrides[code]||{})};
 }
-/* Phase 4: manually verified shift inputs can be fed into payroll preview only. */
-function lmPayShiftBridgePreview(){
- try{
-  const code=prompt(hrText('كود الموظف بالضبط','Exact employee code'));if(!code)return;
-  const employee=allEmployees.find(e=>String(getEmployeeCode(e))===String(code).trim());if(!employee){alert(hrText('الكود غير موجود','Employee code not found'));return;}
-  const raw=prompt(hrText('ألصق JSON بسجلات الوردية المعتمدة: shift, records, openingDebitHours','Paste approved shift JSON: shift, records, openingDebitHours'));
-  if(!raw)return;
-  const shiftInput=JSON.parse(raw);
-  const rateRaw=prompt(hrText('أجر الساعة الإضافية المعتمد (رقم)','Approved base overtime hourly rate (number)'));
-  if(rateRaw===null)return;
-  const approvedOvertimeRate=Number(rateRaw);
-  const nightRaw=prompt(hrText('عدد ساعات الإضافي الليلي المعتمدة','Approved night overtime hours'),'0');if(nightRaw===null)return;
-  const restRaw=prompt(hrText('عدد ساعات إضافي الراحة المعتمدة','Approved rest overtime hours'),'0');if(restRaw===null)return;
-  const base=lmPayEmployee(employee);
-  const result=LactoPayrollShiftBridge.calculate({shiftInput,monthlyPayrollInput:base,approvedOvertimeRate,approvedNightHours:Number(nightRaw),approvedRestHours:Number(restRaw)});
-  if(!result.ready){lmDialog('BLOCKED — '+JSON.stringify(result.reasons,null,2));return;}
-  const calc=lmPayCalc(result.payrollInput);
-  lmDialog(JSON.stringify({code,month:lmPayrollState.month,status:'PREVIEW_NOT_APPROVED',shift:result.shift,overtime:result.overtimeBreakdown,payroll:calc},null,2));
- }catch(e){alert(hrText('خطأ في بيانات المعاينة: ','Preview input error: ')+e.message)}
-}
 function lmPayEdit(code,key,value){
  if(!lmPayrollState.overrides[code])lmPayrollState.overrides[code]={};
  lmPayrollState.overrides[code][key]=['insured','secondary'].includes(key)?value==='true':lmPayNum(value);
@@ -3480,9 +3460,9 @@ function lmPayExport(){
 }
 function lmAnnualRaisePreview(){
  const root=document.getElementById('hr-payroll-view');if(!root)return;
- root.innerHTML=`<h1 class="text-2xl font-bold mb-3">${hrText('المرتبات — ورشة الحساب والمراجعة','Payroll — Calculation workbench')}</h1><p class="text-amber-300 mb-4 text-sm">${hrText('محاكاة فقط: لا حفظ ولا صرف ولا ترحيل إلى Firebase. راجع ضريبة جهة العمل غير الأصلية وإعفاءات البدلات مع مستندات الشركة. قيم البدلات تدخل ضمن الشامل ولا تضاف إليه مرة ثانية. الإضافي النقدي يُضاف منفصلًا.','SIMULATION ONLY: no Firebase writes or posting. Confirm secondary employer withholding and allowance exemptions. Allowances are included in gross; overtime is added separately.')}</p><div class="glass-card rounded-xl p-3 mb-3 flex flex-wrap gap-3 items-end"><label>${hrText('بحث بالكود أو الاسم','Code/name')}<input id="lm-pay-search" class="hr-feature-input block" oninput="lmPayRenderRows()"></label><label>${hrText('الشهر','Month')}<input type="month" class="hr-feature-input block" value="${lmPayrollState.month}" onchange="lmPayrollState.month=this.value"></label><label class="portal-ghost-btn" style="cursor:pointer">${hrText('استيراد CSV','Import CSV')}<input type="file" accept=".csv,text/csv" style="display:none" onchange="lmPayImport(this.files[0]);this.value=''"></label><button class="portal-action-btn" onclick="lmPayExport()">${hrText('تصدير كشف الحساب CSV','Export payroll CSV')}</button><button class="portal-ghost-btn" onclick="lmPayShiftBridgePreview()">${hrText('معاينة ربط الوردية بالمرتب','Shift-to-payroll preview')}</button><button class="portal-ghost-btn" onclick="lmPayRaisePage()">${hrText('معاينة العلاوة السنوية','Annual raise preview')}</button></div><p class="text-xs text-slate-300 mb-3">${hrText('تنبيه: إدخال قيم البدلات يدويًا لتوزيع مكونات الشامل ضريبيًا؛ لا تُضاف مرة أخرى. الحساب يفترض شريحة 2024 للدخل السنوي حتى 600 ألف؛ الحالات الأعلى تحتاج إعدادات شرائح خاصة. الأجور والبدلات غير المكتملة لا تصلح للصرف.','Manual allowance allocation is part of gross, not additional pay. 2024 tax bands for incomes up to 600k only; higher incomes need specific brackets. Incomplete inputs are not payroll-ready.')}</p><p id="lm-pay-import-status" class="text-sky-300 text-sm mb-2">CSV: Code, Gross, Insurance, Phone, Transport, Glasses, Bonus, Meal, Overtime, Other, Penalty, Loan, Medical — preview only.</p><div id="lm-pay-summary" class="text-sky-300 mb-2"></div><div class="overflow-x-auto glass-card rounded-xl" id="lm-payroll-table"></div><div id="lm-pay-raise" class="mt-4 hidden"></div>`;
- if(typeof lmP5Mount==='function')lmP5Mount();if(typeof lmP6Mount==='function')lmP6Mount();
+ root.innerHTML=`<h1 class="text-2xl font-bold mb-3">${hrText('المرتبات — ورشة الحساب والمراجعة','Payroll — Calculation workbench')}</h1><p class="text-amber-300 mb-4 text-sm">${hrText('محاكاة فقط: لا حفظ ولا صرف ولا ترحيل إلى Firebase. راجع ضريبة جهة العمل غير الأصلية وإعفاءات البدلات مع مستندات الشركة. قيم البدلات تدخل ضمن الشامل ولا تضاف إليه مرة ثانية. الإضافي النقدي يُضاف منفصلًا.','SIMULATION ONLY: no Firebase writes or posting. Confirm secondary employer withholding and allowance exemptions. Allowances are included in gross; overtime is added separately.')}</p><div class="glass-card rounded-xl p-3 mb-3 flex flex-wrap gap-3 items-end"><label>${hrText('بحث بالكود أو الاسم','Code/name')}<input id="lm-pay-search" class="hr-feature-input block" oninput="lmPayRenderRows()"></label><label>${hrText('الشهر','Month')}<input type="month" class="hr-feature-input block" value="${lmPayrollState.month}" onchange="lmPayrollState.month=this.value"></label><label class="portal-ghost-btn" style="cursor:pointer">${hrText('استيراد CSV','Import CSV')}<input type="file" accept=".csv,text/csv" style="display:none" onchange="lmPayImport(this.files[0]);this.value=''"></label><button class="portal-action-btn" onclick="lmPayExport()">${hrText('تصدير كشف الحساب CSV','Export payroll CSV')}</button><button class="portal-ghost-btn" onclick="lmPayRaisePage()">${hrText('معاينة العلاوة السنوية','Annual raise preview')}</button></div><p class="text-xs text-slate-300 mb-3">${hrText('تنبيه: إدخال قيم البدلات يدويًا لتوزيع مكونات الشامل ضريبيًا؛ لا تُضاف مرة أخرى. الحساب يفترض شريحة 2024 للدخل السنوي حتى 600 ألف؛ الحالات الأعلى تحتاج إعدادات شرائح خاصة. الأجور والبدلات غير المكتملة لا تصلح للصرف.','Manual allowance allocation is part of gross, not additional pay. 2024 tax bands for incomes up to 600k only; higher incomes need specific brackets. Incomplete inputs are not payroll-ready.')}</p><p id="lm-pay-import-status" class="text-sky-300 text-sm mb-2">CSV: Code, Gross, Insurance, Phone, Transport, Glasses, Bonus, Meal, Overtime, Other, Penalty, Loan, Medical — preview only.</p><div id="lm-pay-summary" class="text-sky-300 mb-2"></div><div class="overflow-x-auto glass-card rounded-xl" id="lm-payroll-table"></div><div id="lm-pay-raise" class="mt-4 hidden"></div><div id="lm-pay-pilot-tools" class="mt-4"></div>`;
  lmPayRenderRows();
+ lmSafePilotMount();
 }
 const lmRaiseDraft={rate:7,year:2027,referenceVerified:false};
 function lmPayRaisePage(){
@@ -3502,71 +3482,149 @@ function lmRaiseSaveDraft(){
  const status=document.getElementById('lm-raise-draft-status');if(status)status.textContent=hrText('تم حفظ نسبة المسودة في جلسة البورتال الحالية فقط؛ لم تتغير مرتبات الموظفين في Firebase.','Draft rate saved for this portal session only; no Firebase employee wages changed.');
 }
 
+/* Lacto Misr attendance operational-day helpers. Pilot: no payroll authorization. */
+(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;root.LactoAttendanceDay=api;})(typeof globalThis!=='undefined'?globalThis:this,function(){
+ 'use strict';
+ function dayKey(timestamp){const d=new Date(Number(timestamp));if(!Number.isFinite(d.getTime()))throw Error('INVALID_TIMESTAMP');const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).formatToParts(d).map(p=>[p.type,p.value]));let key=`${parts.year}-${parts.month}-${parts.day}`;if(Number(parts.hour)<9){const prev=new Date(Date.parse(key+'T00:00:00Z')-86400000);key=prev.toISOString().slice(0,10);}return key;}
+ function timestamp(row){const n=Number(row?.createdAt??row?.punchTimestamp??row?.attemptStartedAt);return Number.isFinite(n)&&n>0?n:NaN;}
+ function events(rows,key){return Object.values(rows||{}).filter(r=>r&&Number.isFinite(timestamp(r))&&dayKey(timestamp(r))===key&&['IN','OUT'].includes(r.punchType)&&String(r.verificationStatus||'').toUpperCase()!=='REJECTED').sort((a,b)=>timestamp(a)-timestamp(b));}
+ function summary(rows,key){const all=events(rows,key);const first=all.find(r=>r.punchType==='IN')||null;const last=first?all.filter(r=>r.punchType==='OUT'&&timestamp(r)>timestamp(first)).at(-1)||null:null;const lastMovement=first?all.filter(r=>timestamp(r)>=timestamp(first)).at(-1):null;const provisionalOut=!last&&first&&all.length>1?all.at(-1):null;return {key,events:all,firstIn:first,lastOut:last,provisionalOut,lastMovement,elapsedMinutes:last?Math.floor((timestamp(last)-timestamp(first))/60000):null,provisionalMinutes:provisionalOut?Math.floor((timestamp(provisionalOut)-timestamp(first))/60000):null,needsReview:!!first&&(!last||lastMovement?.punchType==='IN'),status:!first?'NO_CHECK_IN':!last?'MISSING_CHECK_OUT':lastMovement?.punchType==='IN'?'UNRESOLVED_LAST_IN':'PENDING_SHIFT_REVIEW'};}
+ function canSubmit(rows,key,punchType){if(!['IN','OUT'].includes(punchType))return false;if(punchType==='IN')return true;const all=events(rows,key);const first=all.find(r=>r.punchType==='IN');return !!first;}
+ return Object.freeze({dayKey,timestamp,events,summary,canSubmit});
+});
 
-// PHASE 2: Exception review is independent from raw/approved punches and payroll.
-// Pilot only: employee 2. All administrative decisions are written with audit metadata.
-(function(){
- let caseRef=null,caseHandler=null;
- const safe=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- function allowed(){return portalIsAdmin() && essAuth.currentUser?.uid===ESS_ADMIN_UID;}
- function mount(){
-  if(hrActivePage!=='notifications'||!allowed())return;
-  const host=document.getElementById('hr-notifications-view');if(!host)return;
-  if(!document.getElementById('lm-attendance-exceptions')){
-   const section=document.createElement('section');section.id='lm-attendance-exceptions';section.className='glass-card rounded-2xl p-5 mt-5';
-   section.innerHTML=`<h2 class="font-bold text-sky-300 mb-3">${hrText('مراجعة استثناءات الحضور — اختبار الموظف 2','Attendance exceptions — employee 2 pilot')}</h2>
-    <p class="text-sm text-amber-300 mb-3">${hrText('تسجيل حالة للمراجعة لا يغيّر البصمات أو المرتب. لا تُعتمد ساعات مصححة إلا بعد التحقق من الأدلة.','Review cases do not modify punches or payroll. Corrected hours require verified evidence.')}</p>
-    <div class="flex flex-wrap gap-2 mb-3"><input id="lm-ex-day" type="date" class="hr-feature-input" aria-label="Operational day"><input id="lm-ex-first" type="time" class="hr-feature-input" aria-label="First punch"><input id="lm-ex-last" type="time" class="hr-feature-input" aria-label="Last punch"><input id="lm-ex-shift" type="text" maxlength="60" placeholder="${hrText('الوردية المقررة','Scheduled shift')}" class="hr-feature-input"><button type="button" id="lm-ex-create" class="portal-action-btn">${hrText('فتح حالة واستفسار الموظف','Open case & ask employee')}</button></div>
-    <div id="lm-ex-list" aria-live="polite" class="text-sm">${hrText('جاري تحميل الحالات...','Loading cases...')}</div>`;
-   host.appendChild(section);
-   section.querySelector('#lm-ex-create').onclick=create;
+/* Lacto Misr phase 3: read-only shift calculation. No Firebase or payroll writes. */
+(function(root){'use strict';
+ const r=n=>Math.round((n+Number.EPSILON)*100)/100;
+ const finite=n=>typeof n==='number'&&Number.isFinite(n)&&n>=0;
+ function calculate(input){
+  const shift=String(input?.shift||'').toUpperCase(), records=input?.records;
+  if(!['A','B','C','D'].includes(shift)||!Array.isArray(records))throw Error('Invalid shift or records');
+  const seen=new Set(), rows=[], flags=[];
+  for(const item of records){
+   const id=String(item?.id||'');
+   if(!id||seen.has(id)){flags.push({id,reason:'MISSING_OR_DUPLICATE_ID'});continue;}seen.add(id);
+   const date=String(item.date||'');
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){flags.push({id,reason:'INVALID_DATE'});continue;}
+   const status=String(item.status||'');
+   if(!['APPROVED','REST','LEAVE','SICK','CANCEL_SHIFT','PENDING_REVIEW'].includes(status)){flags.push({id,reason:'INVALID_STATUS'});continue;}
+   if(status==='PENDING_REVIEW'||item.payrollHold===true){flags.push({id,reason:'UNRESOLVED_ATTENDANCE'});continue;}
+   if(status==='APPROVED'&&!finite(item.hours)){flags.push({id,reason:'MISSING_VERIFIED_HOURS'});continue;}
+   if(item.extraHours!==undefined&&!finite(item.extraHours)){flags.push({id,reason:'INVALID_EXTRA_HOURS'});continue;}
+   rows.push({...item,id,date,status});
   }
-  if(!caseRef){caseRef=essDb.ref('attendance_exceptions/2');caseHandler=snap=>render(snap.val()||{});caseRef.on('value',caseHandler,e=>{const n=document.getElementById('lm-ex-list');if(n)n.textContent=String(e.message||e)});}
- }
- async function create(){
-  if(!allowed())return;
-  const day=document.getElementById('lm-ex-day')?.value,first=document.getElementById('lm-ex-first')?.value,last=document.getElementById('lm-ex-last')?.value,shift=document.getElementById('lm-ex-shift')?.value.trim();
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(day||'')||!first||!last||!shift){alert(hrText('أكمل التاريخ والبصمات والوردية','Complete day, punches and shift'));return;}
-  const key=essDb.ref('attendance_exceptions/2').push().key;
-  const record={code:'2',operationalDay:day,firstPunch: first,lastPunch:last,shiftLabel:shift,status:'AWAITING_EMPLOYEE',createdBy:ESS_ADMIN_UID,createdAt:firebase.database.ServerValue.TIMESTAMP,source:'MANUAL_REVIEW',payrollHold:true};
-  const notification={title:'مراجعة بصمات الحضور / Attendance clarification',body:'يرجى مراجعة بصمات يوم '+day+' ('+first+' - '+last+') والرد من شاشة مراجعة الحضور. / Please respond in Attendance Review.',exceptionId:key,createdAt:firebase.database.ServerValue.TIMESTAMP,senderUid:ESS_ADMIN_UID};
-  try{await essDb.ref().update({['attendance_exceptions/2/'+key]:record,['notifications/2/'+key]:notification});}catch(e){alert('Failed: '+(e.code||e.message));}
- }
- function render(cases){
-  const el=document.getElementById('lm-ex-list');if(!el)return;
-  const entries=Object.entries(cases).sort((a,b)=>(b[1].createdAt||0)-(a[1].createdAt||0));
-  if(!entries.length){el.textContent=hrText('لا توجد حالات مراجعة','No review cases');return;}
-  el.replaceChildren();
-  for(const [id,c] of entries){
-   const card=document.createElement('div');card.className='p-3 mb-2 rounded-xl border border-slate-600';
-   const details=document.createElement('p');details.textContent=`${c.operationalDay||''} | ${c.firstPunch||''} → ${c.lastPunch||''} | ${c.shiftLabel||''} | ${c.status||''}`;card.append(details);
-   const reply=document.createElement('p');reply.className='text-sky-300 my-2';reply.textContent=c.employeeResponse?('Employee: '+c.employeeResponse.answer+' — '+(c.employeeResponse.note||'')):'Awaiting employee response';card.append(reply);
-   if(c.status!=='CLOSED_VERIFIED'&&c.status!=='CLOSED_UNVERIFIED'){
-    const evidence=document.createElement('textarea');evidence.placeholder=hrText('وصف دليل التحقق (إلزامي)','Verification evidence (required)');evidence.maxLength=1000;evidence.className='hr-feature-input w-full';card.append(evidence);
-    for(const [status,label] of [['CLOSED_VERIFIED',hrText('اعتماد بعد التحقق','Verified close')],['CLOSED_UNVERIFIED',hrText('إغلاق دون إثبات','Close unverified')]]){
-     const btn=document.createElement('button');btn.type='button';btn.className='portal-action-btn mr-2 mt-2';btn.textContent=label;
-     btn.onclick=async()=>{if(!allowed()||!c.employeeResponse){alert(hrText('انتظر رد الموظف','Await employee response'));return;}const note=evidence.value.trim();if(note.length<10){alert(hrText('اكتب تفاصيل الدليل (10 أحرف على الأقل)','Enter evidence details (10+ characters)'));return;}try{await essDb.ref('attendance_exceptions/2/'+id).update({status,reviewEvidence:note,reviewedBy:ESS_ADMIN_UID,reviewedAt:firebase.database.ServerValue.TIMESTAMP,payrollHold:status!=='CLOSED_VERIFIED'});}catch(e){alert(e.message)}};
-     card.append(btn);
-    }
+  rows.sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id));
+  const worked=r(rows.filter(x=>x.status==='APPROVED').reduce((s,x)=>s+x.hours,0));
+  const cancelled=rows.filter(x=>x.status==='CANCEL_SHIFT').length;
+  const recalled=rows.filter(x=>x.status==='APPROVED'&&x.restRecall===true).reduce((s,x)=>s+x.hours,0);
+  let earned=0,target=null,creditedDays=null;
+  if(shift==='A'){
+   for(const x of rows.filter(x=>x.status==='APPROVED')){
+    if(x.extraHours===undefined){flags.push({id:x.id,reason:'MISSING_APPROVED_SHIFT_A_OT'});continue;}
+    earned+=x.extraHours;
    }
-   el.append(card);
+  }else if(shift==='B'||shift==='C'){
+   target=shift==='B'?154:132;
+   // Recalled rest hours are overtime in their own right, not counted twice against target.
+   earned=Math.max(0,worked-recalled-target)+recalled;
+  }else{
+   creditedDays=new Set(rows.filter(x=>['APPROVED','REST','LEAVE','SICK','CANCEL_SHIFT'].includes(x.status)).map(x=>x.date)).size;
+   // Shift D's overtime cannot be inferred from 19-day credit alone.
   }
+  const events=[];
+  if(shift!=='D'){
+   // Monthly target overtime is only known at month end: book on final day after cancellations.
+   rows.filter(x=>x.status==='CANCEL_SHIFT').forEach(x=>events.push({id:x.id,date:x.date,type:'CANCEL',hours:7}));
+   if(earned>0)events.push({id:'MONTHLY_EARN',date:'9999-12-31',type:'EARN',hours:r(earned)});
+  }
+  let debt=r(Math.max(0,Number(input.openingDebitHours)||0)),payable=0;
+  for(const e of events.sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id))){
+   if(e.type==='CANCEL'){const offset=Math.min(payable,7);payable=r(payable-offset);debt=r(debt+7-offset);}
+   else{const offset=Math.min(debt,e.hours);debt=r(debt-offset);payable=r(payable+e.hours-offset);}
+  }
+  const ready=flags.length===0&&rows.length>0&&shift!=='D';
+  return {shift,workedHours:worked,targetHours:target,creditedDays,requiredDays:shift==='D'?19:null,
+   overtimeEarnedHours:shift==='D'?null:r(earned),payableOvertimeHours:shift==='D'?null:payable,
+   carriedDebitHours:shift==='D'?null:debt,cancelledShifts:cancelled,restRecallHours:r(recalled),
+   readyForPayroll:ready,reviewRequired:!ready,flags,sourceRecords:rows.length,
+   note:shift==='D'?'D requires approved day-credit and separate overtime policy':ready?'Calculation preview; payroll approval is separate':'Blocked pending evidence or shift policy'};
  }
- document.addEventListener('click',()=>setTimeout(mount,100));
- setInterval(()=>{if(hrActivePage==='notifications')mount();else if(caseRef){caseRef.off('value',caseHandler);caseRef=null;caseHandler=null;}},2500);
-})();
+ root.LactoShiftEngine=Object.freeze({calculate});
+ if(typeof module!=='undefined'&&module.exports)module.exports={calculate};
+})(typeof window!=='undefined'?window:globalThis);
 
-/* Phase 3: isolated manual preview for verified shift rows. Never writes payroll/Firebase. */
-function lmPhase3ShiftPreview(){
- const shift=document.getElementById('lm-v5-type')?.value||'A';
- const sample='[{"id":"approved-1","date":"2026-11-01","status":"APPROVED","hours":7,"extraHours":0}]';
- const raw=prompt(lmV5ShiftT('ألصق سجلات الحضور المعتمدة بصيغة JSON. لن يتم حفظ أو تعديل أي بيانات.','Paste approved attendance records as JSON. No data will be saved.'),sample);
- if(raw===null)return;
- try{
-  const records=JSON.parse(raw);
-  const result=window.LactoShiftEngine.calculate({shift,records});
-  const msg=document.getElementById('lm-v5-message');
-  if(msg)msg.textContent=JSON.stringify(result);
-  lmDialog((result.readyForPayroll?'Preview OK — ':'REVIEW REQUIRED — ')+JSON.stringify(result,null,2));
- }catch(e){lmDialog(lmV5ShiftT('بيانات غير صالحة: ','Invalid input: ')+e.message);}
+/* Phase 4: auditable, read-only shift-to-payroll preview; no database writes. */
+(function(root){'use strict';
+ const round=n=>Math.round((n+Number.EPSILON)*100)/100;
+ function calculate({shiftInput,monthlyPayrollInput,approvedOvertimeRate,approvedNightHours=0,approvedRestHours=0,approvedDayHours,rateDayMultiplier=1.35,rateNightMultiplier=1.70,rateRestMultiplier=2}){
+  const reasons=[];
+  if(!root.LactoShiftEngine?.calculate)throw Error('Shift engine unavailable');
+  const shift=root.LactoShiftEngine.calculate(shiftInput);
+  if(!shift.readyForPayroll)reasons.push('SHIFT_REVIEW_REQUIRED',...shift.flags.map(x=>x.reason));
+  if(!monthlyPayrollInput||typeof monthlyPayrollInput!=='object')reasons.push('MISSING_PAYROLL_INPUT');
+  const total=shift.payableOvertimeHours;
+  const values=[approvedOvertimeRate,approvedNightHours,approvedRestHours,rateDayMultiplier,rateNightMultiplier,rateRestMultiplier];
+  if(values.some(x=>typeof x!=='number'||!Number.isFinite(x)||x<0))reasons.push('INVALID_APPROVED_RATES');
+  const day=approvedDayHours===undefined&&typeof total==='number'?total-approvedNightHours-approvedRestHours:approvedDayHours;
+  if(typeof day!=='number'||!Number.isFinite(day)||day<0)reasons.push('INVALID_DAY_HOURS');
+  if(typeof total!=='number'||!Number.isFinite(total)||Math.abs(day+approvedNightHours+approvedRestHours-total)>0.011)reasons.push('OVERTIME_HOURS_MISMATCH');
+  if(monthlyPayrollInput && (typeof monthlyPayrollInput.gross!=='number'||!Number.isFinite(monthlyPayrollInput.gross)||monthlyPayrollInput.gross<0))reasons.push('MISSING_VALID_GROSS');
+  if(monthlyPayrollInput?.insured===true && !(typeof monthlyPayrollInput.insurance==='number'&&Number.isFinite(monthlyPayrollInput.insurance)&&monthlyPayrollInput.insurance>0))reasons.push('MISSING_INSURANCE_WAGE');
+  if(monthlyPayrollInput?.secondary===undefined)reasons.push('SECONDARY_TAX_STATUS_UNCONFIRMED');
+  if(monthlyPayrollInput?.included!==1)reasons.push('GROSS_ALLOWANCE_DOUBLE_COUNT_RISK');
+  if(reasons.length)return {ready:false,reasons:[...new Set(reasons)],shift,payroll:null,approved:false};
+  const overtime=round(approvedOvertimeRate*(day*rateDayMultiplier+approvedNightHours*rateNightMultiplier+approvedRestHours*rateRestMultiplier));
+  return {ready:true,reasons:[],shift,approved:false,payrollInput:{...monthlyPayrollInput,overtime},overtimeBreakdown:{dayHours:day,nightHours:approvedNightHours,restHours:approvedRestHours,rate:approvedOvertimeRate,overtime},note:'PREVIEW_ONLY_NOT_APPROVED; requires payroll calculation, evidence and authorized monthly approval'};
+ }
+ root.LactoPayrollShiftBridge=Object.freeze({calculate});
+ if(typeof module!=='undefined'&&module.exports)module.exports={calculate};
+})(typeof window!=='undefined'?window:globalThis);
+
+/* Phase 6 pilot: independent payroll cycle and parallel reconciliation. No automatic payment. */
+(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;if(root)root.LactoPayrollCycle=api;})(typeof window!=='undefined'?window:null,function(){
+'use strict';
+const DAY_MS=86400000;
+function iso(d){return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0')}
+function date(y,m,day){return new Date(Date.UTC(y,m-1,Math.min(day,new Date(Date.UTC(y,m,0)).getUTCDate())))}
+function addDays(d,n){return new Date(d.getTime()+n*DAY_MS)}
+function cycle(month,startDay=25){if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw Error('Invalid month');const d=Number(startDay);if(!Number.isInteger(d)||d<1||d>31)throw Error('Invalid start day');const [y,m]=month.split('-').map(Number);const start=date(y,m,d);const next=date(y,m+1,d);if(next<=start)throw Error('Invalid cycle dates');return {id:month,start:iso(start),endExclusive:iso(next),lastAttendanceDate:iso(addDays(next,-1)),calendarDays:Math.round((next-start)/DAY_MS),salaryDivisor:30};}
+function config(v){const x={startDay:Number(v.startDay),salaryDivisor:30,hrReviewLeadDays:Number(v.hrReviewLeadDays),financeReviewLeadDays:Number(v.financeReviewLeadDays),deadlineDay:Number(v.deadlineDay)};if(!Number.isInteger(x.startDay)||x.startDay<1||x.startDay>28)throw Error('Start day must be 1–28 to avoid month-end ambiguity');if(!Number.isInteger(x.hrReviewLeadDays)||x.hrReviewLeadDays<1||x.hrReviewLeadDays>10)throw Error('HR review lead must be 1–10 days');if(!Number.isInteger(x.financeReviewLeadDays)||x.financeReviewLeadDays<0||x.financeReviewLeadDays>=x.hrReviewLeadDays)throw Error('Finance lead must precede HR review');if(!Number.isInteger(x.deadlineDay)||x.deadlineDay<1||x.deadlineDay>31)throw Error('Invalid deadline day');return x;}
+function schedule(month,settings){const c=config(settings),period=cycle(month,c.startDay),end=new Date(period.endExclusive+'T00:00:00Z');return {...period,hrReviewDate:iso(addDays(end,-c.hrReviewLeadDays)),financeReviewDate:iso(addDays(end,-c.financeReviewLeadDays)),nominalDeadlineDay:c.deadlineDay};}
+function money(v){const n=Number(v);if(!Number.isFinite(n)||n<0)throw Error('Invalid amount');return Math.round((n+Number.EPSILON)*100)/100}
+function reconcile(newRows,oldRows){if(!Array.isArray(newRows)||!Array.isArray(oldRows))throw Error('Invalid rows');const make=(rows,side)=>{const m=new Map();for(const r of rows){const code=String(r.code??'').trim();if(!/^[\w-]{1,40}$/.test(code))throw Error('Invalid employee code in '+side);if(m.has(code))throw Error('Duplicate code '+code+' in '+side);m.set(code,money(r.net));}return m};const a=make(newRows,'new'),b=make(oldRows,'existing');return [...new Set([...a.keys(),...b.keys()])].sort((x,y)=>x.localeCompare(y,undefined,{numeric:true})).map(code=>({code,existing:b.get(code)??null,newSystem:a.get(code)??null,difference:a.has(code)&&b.has(code)?Math.round((a.get(code)-b.get(code))*100)/100:null,status:!a.has(code)?'MISSING_NEW':!b.has(code)?'MISSING_EXISTING':Math.abs(a.get(code)-b.get(code))<.005?'MATCH':'DIFFERENCE'}));}
+return {cycle,config,schedule,reconcile};
+});
+
+
+/* Integrated, non-posting payroll tools. Baseline UI and employee/leave workflows unchanged. */
+const lmSafeCycleSettingsKey='lm-payroll-cycle-review-v2';
+function lmSafeCycleSettings(){
+ const defaults={startDay:25,hrReviewLeadDays:2,financeReviewLeadDays:0,deadlineDay:30};
+ try{return LactoPayrollCycle.config({...defaults,...JSON.parse(localStorage.getItem(lmSafeCycleSettingsKey)||'{}')});}catch(_){return defaults;}
 }
+function lmSafePilotMount(){
+ const host=document.getElementById('lm-pay-pilot-tools');if(!host)return;
+ const s=lmSafeCycleSettings();
+ host.innerHTML=`<section class="glass-card rounded-xl p-4" dir="${currentLang==='ar'?'rtl':'ltr'}"><h2 class="font-bold text-sky-300 mb-2">${hrText('إعداد دورة المرتبات والمطابقة — تجربة بدون ترحيل','Payroll cycle and reconciliation — no posting')}</h2>
+ <p class="text-sm text-amber-300 mb-3">${hrText('حساب الأجر على 30 يومًا. دورة الحضور الفعلية منفصلة. لا نشر لقسائم ولا تغيير في Firebase.','30-day salary divisor; attendance dates are separate. No payslip publication or Firebase writes.')}</p>
+ <div class="flex flex-wrap gap-3 items-end"><label>${hrText('يوم بداية الدورة','Cycle start day')}<input id="lm-safe-start" type="number" min="1" max="28" class="hr-feature-input block" value="${s.startDay}"></label>
+ <label>${hrText('مراجعة HR قبل النهاية بأيام','HR review lead days')}<input id="lm-safe-hr" type="number" min="1" max="10" class="hr-feature-input block" value="${s.hrReviewLeadDays}"></label>
+ <label>${hrText('مراجعة المالية قبل النهاية بأيام','Finance review lead days')}<input id="lm-safe-fin" type="number" min="0" max="9" class="hr-feature-input block" value="${s.financeReviewLeadDays}"></label>
+ <label>${hrText('موعد الإرسال المستهدف','Target day')}<input id="lm-safe-deadline" type="number" min="1" max="31" class="hr-feature-input block" value="${s.deadlineDay}"></label>
+ <button type="button" class="portal-action-btn" onclick="lmSafeCycleSave()">${hrText('حفظ إعداد التجربة','Save test settings')}</button></div>
+ <p id="lm-safe-period" class="text-sm mt-3 text-sky-300" aria-live="polite"></p>
+ <hr class="my-4 border-slate-600"><h3 class="font-bold">${hrText('مطابقة صافي المرتبات مع النظام الحالي','Compare net salaries with existing system')}</h3>
+ <p class="text-xs my-2">CSV: Code,Net — ${hrText('قراءة محلية فقط، ولا يعني تطابق الصافي صحة كل مكونات الحساب','Local-only comparison; net match does not validate every component')}</p>
+ <input id="lm-safe-csv" type="file" accept=".csv,text/csv" class="hr-feature-input" onchange="lmSafeCompare(this.files[0]);this.value=''"><div id="lm-safe-comparison" class="overflow-x-auto mt-3"></div>
+ <hr class="my-4 border-slate-600"><h3 class="font-bold">${hrText('معاينة الورديات المعتمدة','Approved shift preview')}</h3>
+ <p class="text-xs my-2">${hrText('أدخل ساعات معتمدة يدويًا للاختبار؛ لا يتم استيرادها تلقائيًا من البصمة','Manual verified hours for testing; not auto-imported from punches')}</p>
+ <div class="flex flex-wrap gap-2 items-end"><label>${hrText('الوردية','Shift')}<select id="lm-safe-shift" class="hr-feature-input block"><option>A</option><option>B</option><option>C</option><option>D</option></select></label>
+ <label>${hrText('التاريخ','Date')}<input id="lm-safe-date" type="date" class="hr-feature-input block"></label><label>${hrText('ساعات العمل','Hours worked')}<input id="lm-safe-hours" type="number" min="0" max="24" step="0.25" class="hr-feature-input block" value="7"></label>
+ <label>${hrText('ساعات إضافية معتمدة (A)','Approved overtime (A)')}<input id="lm-safe-extra" type="number" min="0" max="24" step="0.25" class="hr-feature-input block" value="0"></label>
+ <button type="button" class="portal-ghost-btn" onclick="lmSafeShiftPreview()">${hrText('معاينة فقط','Preview only')}</button></div><p id="lm-safe-shift-result" class="text-sm mt-2" aria-live="polite"></p></section>`;
+ lmSafeCycleShow();
+}
+function lmSafeCycleShow(){const el=document.getElementById('lm-safe-period');if(!el)return;try{const s=LactoPayrollCycle.schedule(lmPayrollState.month,lmSafeCycleSettings());el.textContent=`${s.start} → ${s.lastAttendanceDate} | ${s.calendarDays} calendar days | salary ÷ 30 | HR: ${s.hrReviewDate} | Finance: ${s.financeReviewDate}`;}catch(e){el.textContent=e.message}}
+function lmSafeCycleSave(){const val=id=>Number(document.getElementById(id).value);const box=document.getElementById('lm-safe-period');try{const c=LactoPayrollCycle.config({startDay:val('lm-safe-start'),hrReviewLeadDays:val('lm-safe-hr'),financeReviewLeadDays:val('lm-safe-fin'),deadlineDay:val('lm-safe-deadline')});localStorage.setItem(lmSafeCycleSettingsKey,JSON.stringify(c));lmSafeCycleShow();}catch(e){box.textContent=e.message}}
+async function lmSafeCompare(file){if(!file)return;const box=document.getElementById('lm-safe-comparison');try{const text=await file.text();const lines=lmPayParseCSV(text.replace(/^\ufeff/,''));const h=lines.shift().map(v=>v.trim().toLowerCase()),ci=h.findIndex(x=>['code','employee code','الكود'].includes(x)),ni=h.findIndex(x=>['net','net salary','الصافي'].includes(x));if(ci<0||ni<0)throw Error('CSV requires Code and Net');const old=lines.filter(x=>x.some(y=>y.trim())).map(x=>({code:x[ci],net:x[ni]}));const current=lmPayrollState.results.map(x=>({code:String(x.code),net:x.calc.net}));const rows=LactoPayrollCycle.reconcile(current,old);box.replaceChildren();const p=document.createElement('p');p.textContent=`${rows.length} employees | ${rows.filter(x=>x.status==='MATCH').length} matched | ${rows.filter(x=>x.status!=='MATCH').length} require review`;box.append(p);const table=document.createElement('table');table.className='hr-feature-table w-full text-xs';const tr=document.createElement('tr');for(const h of ['Code','Existing','New','Difference','Status']){const th=document.createElement('th');th.textContent=h;tr.append(th)}table.append(tr);for(const r of rows){const tr=document.createElement('tr');for(const value of [r.code,r.existing,r.newSystem,r.difference,r.status]){const td=document.createElement('td');td.textContent=value===null?'—':String(value);tr.append(td)}table.append(tr)}box.append(table);}catch(e){box.textContent='Comparison error: '+e.message}}
+function lmSafeShiftPreview(){const box=document.getElementById('lm-safe-shift-result');try{const shift=document.getElementById('lm-safe-shift').value,date=document.getElementById('lm-safe-date').value,hours=Number(document.getElementById('lm-safe-hours').value),extraHours=Number(document.getElementById('lm-safe-extra').value);if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||![hours,extraHours].every(n=>Number.isFinite(n)&&n>=0&&n<=24))throw Error('Enter valid date and hours');const result=LactoShiftEngine.calculate({shift,records:[{id:'manual-preview',date,status:'APPROVED',hours,extraHours}]});box.textContent=JSON.stringify({workedHours:result.workedHours,overtimeHours:result.payableOvertimeHours,reviewRequired:result.reviewRequired,flags:result.flags})+' — Preview only; not a full monthly calculation.';}catch(e){box.textContent=e.message}}
