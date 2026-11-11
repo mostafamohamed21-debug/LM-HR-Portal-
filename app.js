@@ -3827,7 +3827,7 @@ function lmRaiseSaveDraft(){
 /* Phase 4: auditable, read-only shift-to-payroll preview; no database writes. */
 (function(root){'use strict';
  const round=n=>Math.round((n+Number.EPSILON)*100)/100;
- function calculate({shiftInput,monthlyPayrollInput,approvedOvertimeRate,approvedNightHours=0,approvedRestHours=0,approvedDayHours,rateDayMultiplier=1.35,rateNightMultiplier=1.70,rateRestMultiplier=2}){
+ function calculate({shiftInput,monthlyPayrollInput,approvedOvertimeRate,approvedNightHours=0,approvedRestHours=0,approvedDayHours,rateDayMultiplier=1.35,rateNightMultiplier=1.75,rateRestMultiplier=2}){
   const reasons=[];
   if(!root.LactoShiftEngine?.calculate)throw Error('Shift engine unavailable');
   const shift=root.LactoShiftEngine.calculate(shiftInput);
