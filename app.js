@@ -265,7 +265,7 @@ function setLanguage(lang) {
     lmPopulateEmployeeFilters();
     filterEmployees();
     if (typeof renderHRWorkspace === 'function') renderHRWorkspace();
-    if (activeEmployeeCode !== null) viewEmployee(activeEmployeeCode);
+    if (activeEmployeeCode !== null && hrActivePage === 'employees') viewEmployee(activeEmployeeCode);
     document.querySelectorAll("[data-ar][data-en]:not(.hr-nav [data-ar])").forEach(el=>{el.textContent=el.getAttribute("data-"+currentLang);});
     if (document.getElementById('add-employee-modal') && !document.getElementById('add-employee-modal').classList.contains('hidden')) buildAddEmployeeForm();
     if(typeof lmUpdateHeaderIdentity==='function') lmUpdateHeaderIdentity();
@@ -1727,13 +1727,13 @@ function fahdRenderCompleteFields(emp,fields){
 function lmInsuranceExtraUI(emp){
  const v=emp.hr_extra_insurance||{},enabled=v.enabled===true;
  const t=(ar,en)=>fahdLang(ar,en);
- return `<section class="fahd-field" style="grid-column:1/-1;padding:15px;border:1px solid rgba(56,189,248,.35);border-radius:14px" data-field-language="common">
- <label style="display:flex;align-items:center;gap:9px"><input type="checkbox" id="lm-extra-insurance-enabled" ${enabled?'checked':''} onchange="lmInsuranceExtraToggle()">${t('مدة تأمينية إضافية','Additional insured service')}</label>
- <div id="lm-extra-insurance-fields" ${enabled?'':'hidden'} style="display:flex;flex-wrap:wrap;gap:12px;margin-top:12px">
- <label>${t('عدد السنوات الإضافية','Additional years')} <input id="lm-extra-insurance-years" type="number" min="0" max="80" step="1" value="${Number.isInteger(Number(v.years))?Number(v.years):0}" class="hr-feature-input" style="width:100px"></label>
+ return `<section class="fahd-field lm-insurance-card" data-field-language="common">
+ <label class="lm-insurance-heading"><input type="checkbox" id="lm-extra-insurance-enabled" ${enabled?'checked':''} onchange="lmInsuranceExtraToggle()">${t('مدة تأمينية إضافية','Additional insured service')}</label>
+ <div id="lm-extra-insurance-fields" ${enabled?'':'hidden'} class="lm-insurance-grid">
+ <label>${t('عدد السنوات الإضافية','Additional years')} <input id="lm-extra-insurance-years" type="number" min="0" max="80" step="1" value="${Number.isInteger(Number(v.years))?Number(v.years):0}" class="hr-feature-input"></label>
  <label>${t('تاريخ تقديم البرنت للموارد البشرية','Date submitted to HR')} <input id="lm-extra-insurance-date" type="date" value="${/^\d{4}-\d{2}-\d{2}$/.test(v.submittedAt||'')?v.submittedAt:''}" class="hr-feature-input"></label>
  <label>${t('سبب الإضافة / ملاحظة التحقق','Reason / verification note')} <input id="lm-extra-insurance-reason" type="text" maxlength="300" value="" placeholder="${t('برنت تأمينات معتمد','Verified insurance printout')}" class="hr-feature-input"></label>
- </div><div style="margin-top:10px"><button type="button" class="portal-action-btn" id="lm-extra-insurance-save" onclick="lmInsuranceExtraSave()">${t('حفظ واعتماد المدة مع سجل التحقق','Save and audit insurance service')}</button></div>
+ </div><div class="lm-insurance-actions"><button type="button" class="portal-action-btn" id="lm-extra-insurance-save" onclick="lmInsuranceExtraSave()">${t('حفظ واعتماد المدة مع سجل التحقق','Save and audit insurance service')}</button></div>
  <small>${t('لا يتم رفع البرنت. يسري الأثر من تاريخ تقديمه، ولا تُعدل أرصدة الإجازات المعتمدة تلقائيًا.','No printout upload. Effective from submission date; approved leave balances are not overwritten.')}</small>
  </section>`;
 }
