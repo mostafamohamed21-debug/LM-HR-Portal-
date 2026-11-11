@@ -3645,11 +3645,11 @@ function lmPayCalc(input){
  // Phone: 20% taxable; transport: exempt. The other exclusions are user-editable
  // preview assumptions, not a statutory claim about their tax treatment.
  const excluded=lmPayRound(phone*(1-lmPayrollState.taxPhone)+transport*(1-lmPayrollState.taxTransport)+glasses*(1-lmPayrollState.taxGlasses));
- // Personal allowance (EGP 20,000/year) is separate from the 40,000 zero-rate band.
- // Martyrs Fund contribution is a separate deduction, not an income-tax exemption.
- const taxableMonth=Math.max(0,lmPayRound(earning-excluded-insuranceEmployee-penalty-absence-lateness-medical));
- // Law 7/2024: round annual net taxable income DOWN to the nearest EGP 10.
- const annualTaxable=Math.floor(Math.max(0,taxableMonth*12-20000)/10)*10;
+ const taxableMonth=Math.max(0,lmPayRound(earning-excluded-insuranceEmployee-penalty-absence-lateness-medical-martyrs));
+ // Word document explicitly applies the annual tax formula directly to the
+ // annualized taxable base (first 40,000 is zero-rated). Do not subtract an
+ // additional 20,000: that would double-apply a personal allowance.
+ const annualTaxable=lmPayRound(taxableMonth*12);
  const tax=input.secondary===true?lmPayRound(earning*.10):lmPayRound(lmPayTax(annualTaxable)/12);
  const deductions=lmPayRound(insuranceEmployee+tax+martyrs+penalty+loan+medical+absence+lateness);
  return {earning,insuredWage,insuranceEmployee,employerInsurance,excluded,taxableMonth,annualTaxable,tax,martyrs,deductions,net:lmPayRound(earning-deductions),penalty,loan,medical,absence,lateness};
@@ -3827,7 +3827,7 @@ function lmRaiseSaveDraft(){
 /* Phase 4: auditable, read-only shift-to-payroll preview; no database writes. */
 (function(root){'use strict';
  const round=n=>Math.round((n+Number.EPSILON)*100)/100;
- function calculate({shiftInput,monthlyPayrollInput,approvedOvertimeRate,approvedNightHours=0,approvedRestHours=0,approvedDayHours,rateDayMultiplier=1.35,rateNightMultiplier=1.75,rateRestMultiplier=2}){
+ function calculate({shiftInput,monthlyPayrollInput,approvedOvertimeRate,approvedNightHours=0,approvedRestHours=0,approvedDayHours,rateDayMultiplier=1.35,rateNightMultiplier=1.70,rateRestMultiplier=2}){
   const reasons=[];
   if(!root.LactoShiftEngine?.calculate)throw Error('Shift engine unavailable');
   const shift=root.LactoShiftEngine.calculate(shiftInput);
@@ -3887,18 +3887,13 @@ function lmSafePilotMount(){
  <hr class="my-4 border-slate-600"><h3 class="font-bold">${hrText('مطابقة صافي المرتبات مع النظام الحالي','Compare net salaries with existing system')}</h3>
  <p class="text-xs my-2">CSV: Code,Net — ${hrText('قراءة محلية فقط، ولا يعني تطابق الصافي صحة كل مكونات الحساب','Local-only comparison; net match does not validate every component')}</p>
  <input id="lm-safe-csv" type="file" accept=".csv,text/csv" class="hr-feature-input" onchange="lmSafeCompare(this.files[0]);this.value=''"><div id="lm-safe-comparison" class="overflow-x-auto mt-3"></div>
- <hr class="my-4 border-slate-600"><h3 class="font-bold">${hrText('معاينة الورديات المعتمدة','Approved shift preview')}</h3>
- <p class="text-xs my-2">${hrText('أدخل ساعات معتمدة يدويًا للاختبار؛ لا يتم استيرادها تلقائيًا من البصمة','Manual verified hours for testing; not auto-imported from punches')}</p>
- <div class="flex flex-wrap gap-2 items-end"><label>${hrText('الوردية','Shift')}<select id="lm-safe-shift" class="hr-feature-input block"><option>A</option><option>B</option><option>C</option><option>D</option></select></label>
- <label>${hrText('التاريخ','Date')}<input id="lm-safe-date" type="date" class="hr-feature-input block"></label><label>${hrText('ساعات العمل','Hours worked')}<input id="lm-safe-hours" type="number" min="0" max="24" step="0.25" class="hr-feature-input block" value="7"></label>
- <label>${hrText('ساعات إضافية معتمدة (A)','Approved overtime (A)')}<input id="lm-safe-extra" type="number" min="0" max="24" step="0.25" class="hr-feature-input block" value="0"></label>
- <button type="button" class="portal-ghost-btn" onclick="lmSafeShiftPreview()">${hrText('معاينة فقط','Preview only')}</button></div><p id="lm-safe-shift-result" class="text-sm mt-2" aria-live="polite"></p></section>`;
+</section>`;
  lmSafeCycleShow();
 }
 function lmSafeCycleShow(){const el=document.getElementById('lm-safe-period');if(!el)return;try{const s=LactoPayrollCycle.schedule(lmPayrollState.month,lmSafeCycleSettings());el.textContent=`${s.start} → ${s.lastAttendanceDate} | ${s.calendarDays} calendar days | salary ÷ 30 | HR: ${s.hrReviewDate} | Finance: ${s.financeReviewDate}`;}catch(e){el.textContent=e.message}}
 function lmSafeCycleSave(){const val=id=>Number(document.getElementById(id).value);const box=document.getElementById('lm-safe-period');try{const c=LactoPayrollCycle.config({startDay:val('lm-safe-start'),hrReviewLeadDays:val('lm-safe-hr'),financeReviewLeadDays:val('lm-safe-fin'),deadlineDay:val('lm-safe-deadline')});localStorage.setItem(lmSafeCycleSettingsKey,JSON.stringify(c));lmSafeCycleShow();}catch(e){box.textContent=e.message}}
 async function lmSafeCompare(file){if(!file)return;const box=document.getElementById('lm-safe-comparison');try{const text=await file.text();const lines=lmPayParseCSV(text.replace(/^\ufeff/,''));const h=lines.shift().map(v=>v.trim().toLowerCase()),ci=h.findIndex(x=>['code','employee code','الكود'].includes(x)),ni=h.findIndex(x=>['net','net salary','الصافي'].includes(x));if(ci<0||ni<0)throw Error('CSV requires Code and Net');const old=lines.filter(x=>x.some(y=>y.trim())).map(x=>({code:x[ci],net:x[ni]}));const current=lmPayrollState.results.map(x=>({code:String(x.code),net:x.calc.net}));const rows=LactoPayrollCycle.reconcile(current,old);box.replaceChildren();const p=document.createElement('p');p.textContent=`${rows.length} employees | ${rows.filter(x=>x.status==='MATCH').length} matched | ${rows.filter(x=>x.status!=='MATCH').length} require review`;box.append(p);const table=document.createElement('table');table.className='hr-feature-table w-full text-xs';const tr=document.createElement('tr');for(const h of ['Code','Existing','New','Difference','Status']){const th=document.createElement('th');th.textContent=h;tr.append(th)}table.append(tr);for(const r of rows){const tr=document.createElement('tr');for(const value of [r.code,r.existing,r.newSystem,r.difference,r.status]){const td=document.createElement('td');td.textContent=value===null?'—':String(value);tr.append(td)}table.append(tr)}box.append(table);}catch(e){box.textContent='Comparison error: '+e.message}}
-function lmSafeShiftPreview(){const box=document.getElementById('lm-safe-shift-result');try{const shift=document.getElementById('lm-safe-shift').value,date=document.getElementById('lm-safe-date').value,hours=Number(document.getElementById('lm-safe-hours').value),extraHours=Number(document.getElementById('lm-safe-extra').value);if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||![hours,extraHours].every(n=>Number.isFinite(n)&&n>=0&&n<=24))throw Error('Enter valid date and hours');const result=LactoShiftEngine.calculate({shift,records:[{id:'manual-preview',date,status:'APPROVED',hours,extraHours}]});box.textContent=JSON.stringify({workedHours:result.workedHours,overtimeHours:result.payableOvertimeHours,reviewRequired:result.reviewRequired,flags:result.flags})+' — Preview only; not a full monthly calculation.';}catch(e){box.textContent=e.message}}
+
 
 
 /* 2026-11-11 UI consolidation only: preserve original leave calculation and Firebase reads/writes. */
