@@ -2605,7 +2605,7 @@ const LM13=Object.freeze({
   if(insurance!==null&&insurance>=10){
    if(!approval)return {days:null,verified:false,reason:'insurance approval date missing'};
    if(approval.slice(0,4)<String(year))return {days:30,verified:true,reason:'insured'};
-   if(approval.slice(0,4)===String(year))return {days:null,verified:false,reason:'midyear insurance approval: monthly split required'};
+   if(approval.slice(0,4)===String(year))return {days:21,verified:true,reason:'insured-approval-transition',splitMonth:Number(approval.slice(5,7))};
   }
   return {days:year===Number(hire.slice(0,4))?15:21,verified:true,reason:'standard'};
  },
@@ -2650,6 +2650,33 @@ const LM13=Object.freeze({
   return {ok:true,rows,entitlement,benchmark,base,exception,exceptionVerified:verified,cap:base+exception};
  }
 });
+/* Leave report: separate earned-to-date from end-of-cycle forecast.
+   The report is read-only; no balances, ledger or Firebase values are changed.
+   A started calendar month counts as a full accrual month (agreed leave rule).
+   The selected settlement year is the cycle's END boundary, exclusive. */
+function lm24AccruedInCycle(e,settlementYear,cutoffDate){
+ const hire=LM13.date(lm3Hire(e)),y=Number(settlementYear);
+ if(!hire||!lm19SettlementYear(e,y))return {ok:false,reason:'Settlement cycle requires review'};
+ const from=lm19PreviousBoundary(e,y),today=LM13.date(cutoffDate);
+ if(from===null||!today)return {ok:false,reason:'Invalid cycle or cutoff date'};
+ const exclusiveEnd=`${y}-01-01`,end=today<exclusiveEnd?today:exclusiveEnd;
+ let earned=0,benchmark=0,cap=0;
+ for(let yr=from;yr<y;yr++){
+  const firstMonth=yr===Number(hire.slice(0,4))?Number(hire.slice(5,7)):1;
+  if(yr<Number(hire.slice(0,4))||yr>Number(end.slice(0,4)))continue;
+  const lastMonth=yr<Number(end.slice(0,4))?12:(end===exclusiveEnd?0:Number(end.slice(5,7)));
+  if(lastMonth<firstMonth)continue;
+  const a=LM13.annual(e,hire,yr);
+  if(!a.verified)return {ok:false,reason:a.reason};
+  for(let month=firstMonth;month<=lastMonth;month++){
+   const rate=a.splitMonth?(month<a.splitMonth?21:30):a.days;
+   earned+=rate/12;
+   benchmark+=15/12;
+   cap+=Math.max(0,rate-15)/12;
+  }
+ }
+ return {ok:true,earned:Math.round(earned*10000)/10000,benchmark:Math.round(benchmark*10000)/10000,cap:Math.round(cap*10000)/10000};
+}
 /* Archive recovery: retirement/end-service must be based on verified actual
    dates/status, not on a selected future report year. Read-only classification. */
 let lm12ReportMode='ordinary';
@@ -2686,36 +2713,38 @@ function lm12OpenReport(){
   const full=retirement||ended;
   const baseRule=full?{ok:true,entitlement:null,benchmark:0,base:null,exception:0,exceptionVerified:true,cap:null}:LM13.cap(r.e,year);
   const rule={...baseRule,retirement,ended,cutoff:ended?r.e.hr_service_lifecycle.endDate:retirement?lm23SixtyDate(r.e):null};
+  const toDate=full?null:lm24AccruedInCycle(r.e,year,lmArchiveToday());
   const archivedSnapshot=ended?r.e.hr_leave_end_service_snapshot:null;
   const retirementSnapshot=retirement?r.e.hr_leave_retirement_snapshot:null;
   const effectiveBalance=ended&&archivedSnapshot&&archivedSnapshot.remainingDays!=null?Number(archivedSnapshot.remainingDays):
    retirement&&retirementSnapshot&&retirementSnapshot.remainingDays!=null?Number(retirementSnapshot.remainingDays):balance;
-  const days=rule.ok&&effectiveBalance!==null?(full?effectiveBalance:Math.min(effectiveBalance,rule.cap)):null;
+  const currentCap=toDate?.ok?Math.min(rule.cap??Infinity,toDate.cap+(rule.exception||0)):null;
+  const days=rule.ok&&effectiveBalance!==null?(full?effectiveBalance:(currentCap!==null?Math.min(effectiveBalance,currentCap):null)):null;
   const hasCutoffProof=!full||(ended&&archivedSnapshot&&Number.isFinite(Number(archivedSnapshot.remainingDays)))||
     (retirement&&r.e.hr_leave_retirement_snapshot&&Number.isFinite(Number(r.e.hr_leave_retirement_snapshot.remainingDays)));
-  const valid=rule.ok&&rule.exceptionVerified&&salary!==null&&salary>=0&&effectiveBalance!==null&&effectiveBalance>=0&&hasCutoffProof;
+  const valid=rule.ok&&(full||toDate?.ok)&&rule.exceptionVerified&&salary!==null&&salary>=0&&effectiveBalance!==null&&effectiveBalance>=0&&hasCutoffProof;
   // Retirement/end-service full balances are only estimates until a dated leave ledger is approved.
-  return {...r,year,rule,salary,balance:effectiveBalance,days,hasCutoffProof,daily:salary===null?null:salary/30,total:valid?(salary/30)*days:null,valid};
+  return {...r,year,rule,toDate,salary,balance:effectiveBalance,days,hasCutoffProof,daily:salary===null?null:salary/30,total:valid?(salary/30)*days:null,valid};
  });
  const valid=lm12ReportRows.filter(r=>r.valid),sumDays=valid.reduce((n,r)=>n+r.days,0),sumMoney=valid.reduce((n,r)=>n+r.total,0);
  document.getElementById('lm12-settlement-report')?.remove();
  const overlay=document.createElement('div');overlay.id='lm12-settlement-report';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');
- const cols=[t('الكود','Code'),t('الموظف','Employee'),t('الإدارة','Department'),t('سنة التسوية','Settlement year'),t('الرصيد المسجل','Recorded balance'),t('استحقاق الدورة','Cycle entitlement'),t('استهلاك مرجعي','Use benchmark'),t('الحد الأساسي','Base cap'),t('استثناء حاجة العمل','Business exception'),t('الأيام القابلة للتسوية','Settlement days'),t('الراتب الشامل','Gross salary'),t('الأجر اليومي','Daily wage'),t('القيمة المالية','Amount'),t('الحالة','Status')];
+ const cols=[t('الكود','Code'),t('الموظف','Employee'),t('الإدارة','Department'),t('سنة التسوية','Settlement year'),t('الرصيد المسجل','Recorded balance'),t('الاستحقاق حتى تاريخه','Accrued to date'),t('الاستحقاق في نهاية الدورة (متوقع)','Forecast at cycle end'),t('استحقاق الدورة','Cycle entitlement'),t('استهلاك مرجعي','Use benchmark'),t('الحد الأساسي','Base cap'),t('استثناء حاجة العمل','Business exception'),t('الأيام القابلة للتسوية','Settlement days'),t('الراتب الشامل','Gross salary'),t('الأجر اليومي','Daily wage'),t('القيمة المالية','Amount'),t('الحالة','Status')];
  const status=r=>!r.valid&&(r.rule.retirement||r.rule.ended)&&!r.hasCutoffProof?t('يلزم رصيد موثق بتاريخ القطع','Verified cutoff balance required'):r.valid?(r.rule.ended?t('إنهاء خدمة — حساب تجريبي تلقائي دون اعتماد','End of service — automatic test calculation, no approval'):t('حساب مبدئي — يحتاج اعتماد','Provisional — approval required')):t('يحتاج مراجعة: ','Review: ')+(r.rule.ok?(r.rule.exceptionVerified?t('الراتب أو الرصيد ناقص','Missing salary/balance'):t('سجل رفض غير معتمد','Unverified refusal')):r.rule.reason);
  overlay.innerHTML=`<div class="lm12-sheet"><header class="lm12-head"><div><h2>${lm12ReportMode==='special'?t('تسويات المعاش وإنهاء الخدمة','Retirement and end-of-service settlements'):t('التسويات العادية','Ordinary leave settlements')}</h2><p>${t('دورة ثلاثية قبل الستين وسنوية من يناير التالي لبلوغ الستين، مع حد التسوية والاستثناء الموثق.','Three-year cycles before age 60, annual January settlements thereafter, with caps and verified exceptions.')}</p></div><div class="lm12-actions"><button type="button" onclick="lm12OpenOrdinaryReport()">${t('التسويات العادية','Ordinary settlements')}</button><button type="button" onclick="lm12OpenSpecialReport()">${t('المعاش وإنهاء الخدمة','Retirement & end of service')}</button><button type="button" onclick="lm12Export()">${t('تصدير Excel','Export Excel')}</button><button type="button" onclick="lm12Print()">${t('طباعة','Print')}</button><button type="button" onclick="lm12Close()">${t('العودة للأرصدة','Back to balances')} ×</button></div></header>
  <div class="lm12-summary"><div>${t('الموظفون','Employees')}<strong>${lm12ReportRows.length}</strong></div><div>${t('أيام التسوية المبدئية','Provisional days')}<strong>${sumDays.toLocaleString()}</strong></div><div>${t('القيمة المبدئية','Provisional amount')}<strong>${lm3Money(sumMoney)}</strong></div><div>${t('تحتاج مراجعة','Needs review')}<strong>${lm12ReportRows.length-valid.length}</strong></div></div>
- <p class="lm12-note">${t('تنبيه: الأرصدة الحالية تعكس البيانات المسجلة ولا تمثل بالضرورة رصيد يناير التاريخي. لا يتم الصرف أو تصفير الأرصدة قبل التحقق من حركة الإجازات والاعتماد. الموافقات والرفض من ESS لم يتم ربطها بعد.','Important: current recorded balances are not necessarily historical January balances. No payout or reset without a verified leave ledger and approval. ESS approvals/refusals are not yet connected.')}</p>
- <div class="lm12-scroll"><table><thead><tr>${cols.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${lm12ReportRows.map(r=>`<tr><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.dept)}</td><td>${r.year||'—'}</td><td>${r.balance??'—'}</td><td>${r.rule.retirement||r.rule.ended?t('تسوية كاملة','Full balance'):r.rule.ok?(r.rule.entitlement??'—'):'—'}</td><td>${r.rule.ok?(r.rule.benchmark??'—'):'—'}</td><td>${r.rule.retirement||r.rule.ended?t('غير مطبق','Not applicable'):r.rule.ok?(r.rule.base??'—'):'—'}</td><td>${r.rule.ok?r.rule.exception:'—'}</td><td>${r.days??'—'}</td><td>${lm3Money(r.salary)}</td><td>${lm3Money(r.daily)}</td><td>${lm3Money(r.total)}</td><td>${esc(status(r))}</td></tr>`).join('')||`<tr><td colspan="14">${t('لا توجد نتائج','No results')}</td></tr>`}</tbody><tfoot><tr><td colspan="9">${t('إجمالي السجلات القابلة للحساب','Total calculable records')}</td><td>${sumDays}</td><td colspan="2"></td><td>${lm3Money(sumMoney)}</td><td>${valid.length}/${lm12ReportRows.length}</td></tr></tfoot></table></div></div>`;
+ <p class="lm12-note">${t('تنبيه: الأرصدة الحالية تعكس البيانات المسجلة ولا تمثل بالضرورة رصيد يناير التاريخي. الاستحقاق في نهاية الدورة توقع وليس رصيدًا مكتسبًا اليوم؛ أيام التسوية المبدئية مقيدة بالحد المستحق حتى تاريخه. لا يتم الصرف أو تصفير الأرصدة قبل التحقق من حركة الإجازات والاعتماد. الموافقات والرفض من ESS لم يتم ربطها بعد.','Important: current recorded balances are not necessarily historical January balances. End-of-cycle entitlement is a forecast, not earned leave today; provisional settlement days are limited to the cap accrued to date. No payout or reset without a verified leave ledger and approval. ESS approvals/refusals are not yet connected.')}</p>
+ <div class="lm12-scroll"><table><thead><tr>${cols.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${lm12ReportRows.map(r=>`<tr><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.dept)}</td><td>${r.year||'—'}</td><td>${r.balance??'—'}</td><td>${r.toDate?.ok?r.toDate.earned:'—'}</td><td>${r.rule.ok&&!r.rule.retirement&&!r.rule.ended?r.rule.entitlement:'—'}</td><td>${r.rule.retirement||r.rule.ended?t('تسوية كاملة','Full balance'):r.rule.ok?(r.rule.entitlement??'—'):'—'}</td><td>${r.rule.ok?(r.rule.benchmark??'—'):'—'}</td><td>${r.rule.retirement||r.rule.ended?t('غير مطبق','Not applicable'):r.rule.ok?(r.rule.base??'—'):'—'}</td><td>${r.rule.ok?r.rule.exception:'—'}</td><td>${r.days??'—'}</td><td>${lm3Money(r.salary)}</td><td>${lm3Money(r.daily)}</td><td>${lm3Money(r.total)}</td><td>${esc(status(r))}</td></tr>`).join('')||`<tr><td colspan="16">${t('لا توجد نتائج','No results')}</td></tr>`}</tbody><tfoot><tr><td colspan="11">${t('إجمالي السجلات القابلة للحساب','Total calculable records')}</td><td>${sumDays}</td><td colspan="2"></td><td>${lm3Money(sumMoney)}</td><td>${valid.length}/${lm12ReportRows.length}</td></tr></tfoot></table></div></div>`;
  document.body.appendChild(overlay);document.body.classList.add('lm12-open');
 }
 function lm12Close(){document.getElementById('lm12-settlement-report')?.remove();document.body.classList.remove('lm12-open');}
 function lm12Export(){
  if(!window.XLSX){showToast(lm3T('مكتبة Excel غير متاحة','Excel library unavailable'),true);return;}
  const t=lm3T;
- const headings=[t('الكود','Code'),t('الموظف','Employee'),t('الإدارة','Department'),t('سنة التسوية','Settlement year'),t('الرصيد المسجل','Recorded balance'),t('استحقاق الدورة','Cycle entitlement'),t('الاستهلاك المرجعي','Use benchmark'),t('الحد الأساسي','Base cap'),t('الاستثناء','Exception'),t('أيام التسوية','Settlement days'),t('الراتب الشامل','Gross salary'),t('الأجر اليومي','Daily wage'),t('القيمة المالية','Amount'),t('الحالة','Status')];
- const data=[headings,...lm12ReportRows.map(r=>[r.code,r.name,r.dept,r.year||'',r.balance??'',r.rule.ok?r.rule.entitlement:'',r.rule.ok?r.rule.benchmark:'',r.rule.ok?r.rule.base:'',r.rule.ok?r.rule.exception:'',r.days??'',r.salary??'',r.daily??'',r.total??'',r.valid?t('مبدئي','Provisional'):t('مراجعة','Review')])];
+ const headings=[t('الكود','Code'),t('الموظف','Employee'),t('الإدارة','Department'),t('سنة التسوية','Settlement year'),t('الرصيد المسجل','Recorded balance'),t('الاستحقاق حتى تاريخه','Accrued to date'),t('الاستحقاق في نهاية الدورة (متوقع)','Forecast at cycle end'),t('استحقاق الدورة','Cycle entitlement'),t('الاستهلاك المرجعي','Use benchmark'),t('الحد الأساسي','Base cap'),t('الاستثناء','Exception'),t('أيام التسوية','Settlement days'),t('الراتب الشامل','Gross salary'),t('الأجر اليومي','Daily wage'),t('القيمة المالية','Amount'),t('الحالة','Status')];
+ const data=[headings,...lm12ReportRows.map(r=>[r.code,r.name,r.dept,r.year||'',r.balance??'',r.toDate?.ok?r.toDate.earned:'',r.rule.ok&&!r.rule.retirement&&!r.rule.ended?r.rule.entitlement:'',r.rule.ok?r.rule.entitlement:'',r.rule.ok?r.rule.benchmark:'',r.rule.ok?r.rule.base:'',r.rule.ok?r.rule.exception:'',r.days??'',r.salary??'',r.daily??'',r.total??'',r.valid?t('مبدئي','Provisional'):t('مراجعة','Review')])];
  const valid=lm12ReportRows.filter(r=>r.valid);
- data.push([t('الإجمالي','Total'),'','','','','','','','',valid.reduce((n,r)=>n+r.days,0),'','',valid.reduce((n,r)=>n+r.total,0),'']);
+ data.push([t('الإجمالي','Total'),'','','','','','','','','','',valid.reduce((n,r)=>n+r.days,0),'','',valid.reduce((n,r)=>n+r.total,0),'']);
  const ws=XLSX.utils.aoa_to_sheet(data);ws['!cols']=headings.map((_,i)=>({wch:i===1?35:i===2?30:21}));
  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Leave Settlement');
  XLSX.writeFile(wb,'LactoMisr_Leave_Settlement_'+new Date().toISOString().slice(0,10)+'.xlsx');
