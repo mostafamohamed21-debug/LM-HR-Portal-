@@ -2702,7 +2702,7 @@ function lm12OpenReport(){
  const overlay=document.createElement('div');overlay.id='lm12-settlement-report';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');
  const cols=[t('الكود','Code'),t('الموظف','Employee'),t('الإدارة','Department'),t('سنة التسوية','Settlement year'),t('الرصيد المسجل','Recorded balance'),t('استحقاق الدورة','Cycle entitlement'),t('استهلاك مرجعي','Use benchmark'),t('الحد الأساسي','Base cap'),t('استثناء حاجة العمل','Business exception'),t('الأيام القابلة للتسوية','Settlement days'),t('الراتب الشامل','Gross salary'),t('الأجر اليومي','Daily wage'),t('القيمة المالية','Amount'),t('الحالة','Status')];
  const status=r=>!r.valid&&(r.rule.retirement||r.rule.ended)&&!r.hasCutoffProof?t('يلزم رصيد موثق بتاريخ القطع','Verified cutoff balance required'):r.valid?(r.rule.ended?t('إنهاء خدمة — حساب تجريبي تلقائي دون اعتماد','End of service — automatic test calculation, no approval'):t('حساب مبدئي — يحتاج اعتماد','Provisional — approval required')):t('يحتاج مراجعة: ','Review: ')+(r.rule.ok?(r.rule.exceptionVerified?t('الراتب أو الرصيد ناقص','Missing salary/balance'):t('سجل رفض غير معتمد','Unverified refusal')):r.rule.reason);
- overlay.innerHTML=`<div class="lm12-sheet"><header class="lm12-head"><div><h2>${lm12ReportMode==='special'?t('تسويات المعاش وإنهاء الخدمة','Retirement and end-of-service settlements'):t('التسويات العادية','Ordinary leave settlements')}</h2><p>${t('دورة ثلاثية قبل الستين وسنوية من يناير التالي لبلوغ الستين، مع حد التسوية والاستثناء الموثق.','Three-year cycles before age 60, annual January settlements thereafter, with caps and verified exceptions.')}</p></div><div class="lm12-actions"><button type="button" onclick="lm12Export()">${t('تصدير Excel','Export Excel')}</button><button type="button" onclick="lm12Print()">${t('طباعة','Print')}</button><button type="button" onclick="lm12Close()">${t('العودة للأرصدة','Back to balances')} ×</button></div></header>
+ overlay.innerHTML=`<div class="lm12-sheet"><header class="lm12-head"><div><h2>${lm12ReportMode==='special'?t('تسويات المعاش وإنهاء الخدمة','Retirement and end-of-service settlements'):t('التسويات العادية','Ordinary leave settlements')}</h2><p>${t('دورة ثلاثية قبل الستين وسنوية من يناير التالي لبلوغ الستين، مع حد التسوية والاستثناء الموثق.','Three-year cycles before age 60, annual January settlements thereafter, with caps and verified exceptions.')}</p></div><div class="lm12-actions"><button type="button" onclick="lm12OpenOrdinaryReport()">${t('التسويات العادية','Ordinary settlements')}</button><button type="button" onclick="lm12OpenSpecialReport()">${t('المعاش وإنهاء الخدمة','Retirement & end of service')}</button><button type="button" onclick="lm12Export()">${t('تصدير Excel','Export Excel')}</button><button type="button" onclick="lm12Print()">${t('طباعة','Print')}</button><button type="button" onclick="lm12Close()">${t('العودة للأرصدة','Back to balances')} ×</button></div></header>
  <div class="lm12-summary"><div>${t('الموظفون','Employees')}<strong>${lm12ReportRows.length}</strong></div><div>${t('أيام التسوية المبدئية','Provisional days')}<strong>${sumDays.toLocaleString()}</strong></div><div>${t('القيمة المبدئية','Provisional amount')}<strong>${lm3Money(sumMoney)}</strong></div><div>${t('تحتاج مراجعة','Needs review')}<strong>${lm12ReportRows.length-valid.length}</strong></div></div>
  <p class="lm12-note">${t('تنبيه: الأرصدة الحالية تعكس البيانات المسجلة ولا تمثل بالضرورة رصيد يناير التاريخي. لا يتم الصرف أو تصفير الأرصدة قبل التحقق من حركة الإجازات والاعتماد. الموافقات والرفض من ESS لم يتم ربطها بعد.','Important: current recorded balances are not necessarily historical January balances. No payout or reset without a verified leave ledger and approval. ESS approvals/refusals are not yet connected.')}</p>
  <div class="lm12-scroll"><table><thead><tr>${cols.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${lm12ReportRows.map(r=>`<tr><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.dept)}</td><td>${r.year||'—'}</td><td>${r.balance??'—'}</td><td>${r.rule.retirement||r.rule.ended?t('تسوية كاملة','Full balance'):r.rule.ok?(r.rule.entitlement??'—'):'—'}</td><td>${r.rule.ok?(r.rule.benchmark??'—'):'—'}</td><td>${r.rule.retirement||r.rule.ended?t('غير مطبق','Not applicable'):r.rule.ok?(r.rule.base??'—'):'—'}</td><td>${r.rule.ok?r.rule.exception:'—'}</td><td>${r.days??'—'}</td><td>${lm3Money(r.salary)}</td><td>${lm3Money(r.daily)}</td><td>${lm3Money(r.total)}</td><td>${esc(status(r))}</td></tr>`).join('')||`<tr><td colspan="14">${t('لا توجد نتائج','No results')}</td></tr>`}</tbody><tfoot><tr><td colspan="9">${t('إجمالي السجلات القابلة للحساب','Total calculable records')}</td><td>${sumDays}</td><td colspan="2"></td><td>${lm3Money(sumMoney)}</td><td>${valid.length}/${lm12ReportRows.length}</td></tr></tfoot></table></div></div>`;
@@ -3823,7 +3823,7 @@ function lmSafeShiftPreview(){const box=document.getElementById('lm-safe-shift-r
   const actions=document.createElement('div');
   actions.id='lm-leave-top-actions';
   actions.className='flex flex-wrap items-center justify-end gap-2 mb-4';
-  actions.innerHTML='<button type="button" class="portal-ghost-btn px-4 py-2" onclick="lmLeaveOpenFullReport()">'+hrText('التقارير','Reports')+'</button><button type="button" class="portal-action-btn px-4 py-2" onclick="lm12OpenReport()">'+hrText('التسوية ودورات التسوية','Settlement & cycles')+'</button>';
+  actions.innerHTML='<button type="button" class="portal-ghost-btn px-4 py-2" onclick="lmLeaveOpenFullReport()">'+hrText('التقارير','Reports')+'</button><button type="button" class="portal-action-btn px-4 py-2" onclick="lm12OpenOrdinaryReport()">'+hrText('التسوية ودورات التسوية','Settlement & cycles')+'</button>';
   if(heading)heading.after(actions);else root.prepend(actions);
   // Pending leave requests appear below the import and current balance controls.
   // No new card or artificial figures are introduced.
@@ -3831,12 +3831,22 @@ function lmSafeShiftPreview(){const box=document.getElementById('lm-safe-shift-r
  };
 })();
 function lmLeaveOpenFullReport(){
- const root=document.getElementById('hr-leave-balances-view'),report=root?.querySelector('#lm3-report');
- if(!root||!report)return;
+ const root=document.getElementById('hr-leave-balances-view');
+ if(!root){if(typeof showToast==='function')showToast(hrText('صفحة الإجازات غير متاحة','Leave page unavailable'),true);return;}
+ let report=root.querySelector('#lm3-report');
+ // Recover the report UI if another page renderer omitted it. This is read-only.
+ if(!report&&typeof lm3UI==='function'){
+   const mount=document.createElement('div');mount.id='lm-leave-report-mount';
+   mount.innerHTML=lm3UI();root.appendChild(mount);
+   report=mount.querySelector('#lm3-report');
+ }
+ if(!report){if(typeof showToast==='function')showToast(hrText('تعذر فتح تقارير الإجازات','Unable to open leave reports'),true);return;}
  if(root.dataset.reportOpen==='1')return;
  root.dataset.reportOpen='1';
- const elements=[...root.children].filter(x=>x!==report);
+ const reportHost=report.parentElement===root?report:report.closest('#lm-leave-report-mount')||report;
+ const elements=[...root.children].filter(x=>x!==reportHost);
  root._lmLeaveHiddenElements=elements.map(x=>[x,x.style.display]);
+ if(reportHost!==report)reportHost.style.display='block';
  elements.forEach(x=>x.style.display='none');
  report.style.display='block';
  const back=document.createElement('button');
@@ -3850,9 +3860,10 @@ function lmLeaveOpenFullReport(){
 }
 function lmLeaveCloseFullReport(){
  const root=document.getElementById('hr-leave-balances-view'),report=root?.querySelector('#lm3-report');
- if(!root||!report)return;
+ if(!root)return;
  (root._lmLeaveHiddenElements||[]).forEach(([el,display])=>{if(el.isConnected)el.style.display=display});
- report.style.display='none';
+ if(report)report.style.display='none';
+ root.querySelector('#lm-leave-report-mount')?.remove();
  document.getElementById('lm-leave-report-back')?.remove();
  delete root.dataset.reportOpen;
  root._lmLeaveHiddenElements=null;
