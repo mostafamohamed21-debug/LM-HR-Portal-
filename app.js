@@ -3645,11 +3645,11 @@ function lmPayCalc(input){
  // Phone: 20% taxable; transport: exempt. The other exclusions are user-editable
  // preview assumptions, not a statutory claim about their tax treatment.
  const excluded=lmPayRound(phone*(1-lmPayrollState.taxPhone)+transport*(1-lmPayrollState.taxTransport)+glasses*(1-lmPayrollState.taxGlasses));
- const taxableMonth=Math.max(0,lmPayRound(earning-excluded-insuranceEmployee-penalty-absence-lateness-medical-martyrs));
- // Word document explicitly applies the annual tax formula directly to the
- // annualized taxable base (first 40,000 is zero-rated). Do not subtract an
- // additional 20,000: that would double-apply a personal allowance.
- const annualTaxable=lmPayRound(taxableMonth*12);
+ // Personal allowance (EGP 20,000/year) is separate from the 40,000 zero-rate band.
+ // Martyrs Fund contribution is a separate deduction, not an income-tax exemption.
+ const taxableMonth=Math.max(0,lmPayRound(earning-excluded-insuranceEmployee-penalty-absence-lateness-medical));
+ // Law 7/2024: round annual net taxable income DOWN to the nearest EGP 10.
+ const annualTaxable=Math.floor(Math.max(0,taxableMonth*12-20000)/10)*10;
  const tax=input.secondary===true?lmPayRound(earning*.10):lmPayRound(lmPayTax(annualTaxable)/12);
  const deductions=lmPayRound(insuranceEmployee+tax+martyrs+penalty+loan+medical+absence+lateness);
  return {earning,insuredWage,insuranceEmployee,employerInsurance,excluded,taxableMonth,annualTaxable,tax,martyrs,deductions,net:lmPayRound(earning-deductions),penalty,loan,medical,absence,lateness};
