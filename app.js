@@ -2354,7 +2354,7 @@ function lm3UI(){
  const departments=[...new Set(lm3Rows().map(r=>r.dept).filter(x=>x&&x!=='--'))].sort((a,b)=>a.localeCompare(b));
  const defaultYear=new Date().getFullYear()+1;
  return `<section class="hr-panel mt-5" id="lm3-report">
- <div class="lm3-head"><div><h2 class="text-xl font-bold text-sky-300">${lm3T('تقارير أرصدة الإجازات','Leave Balance Reports')}</h2><p class="text-sm text-amber-200">${lm3T('الأرصدة الأساسية بتاريخ 01/10/2026، ولا تشمل حركات لاحقة لم تُسجل بعد.','Opening balances as of 01 Oct 2026; later unrecorded transactions are not included.')}</p></div><div class="lm3-actions"><button type="button" class="portal-ghost-btn" onclick="lm15OpenLegacy()">${lm3T('دورات الموظفين القدام','Legacy cycles')}</button><button type="button" class="portal-ghost-btn" onclick="lm3Export()">${lm3T('تصدير Excel','Export Excel')}</button><button type="button" class="portal-action-btn" onclick="lm3Open()">${lm3T('تقرير التسوية المالية','Financial Settlement Report')}</button></div></div>
+ <div class="lm3-head"><div><h2 class="text-xl font-bold text-sky-300">${lm3T('تقارير أرصدة الإجازات','Leave Balance Reports')}</h2><p class="text-sm text-amber-200">${lm3T('الأرصدة الأساسية بتاريخ 01/10/2026، ولا تشمل حركات لاحقة لم تُسجل بعد.','Opening balances as of 01 Oct 2026; later unrecorded transactions are not included.')}</p></div><div class="lm3-actions"><button type="button" class="portal-ghost-btn" onclick="lm15OpenLegacy()">${lm3T('دورات الموظفين القدام','Legacy cycles')}</button><button type="button" class="portal-ghost-btn" onclick="lm3Export()">${lm3T('تصدير Excel','Export Excel')}</button><button type="button" class="portal-action-btn" onclick="lm12OpenOrdinaryReport()">${lm3T('التسويات العادية','Ordinary settlements')}</button><button type="button" class="portal-ghost-btn" onclick="lm12OpenSpecialReport()">${lm3T('المعاش وإنهاء الخدمة','Retirement & end of service')}</button></div></div>
  <div class="lm3-filters"><label class="lm3-filter"><span>${lm3T('بحث بالكود أو الاسم','Code or name')}</span><input id="lm3-search" type="search" oninput="lm3Apply()" placeholder="${lm3T('بحث...','Search...')}"></label>
  ${lm3Select('lm3-dept',lm3T('الإدارة','Department'),departments.map(d=>[d,d]))}
  ${lm3Select('lm3-category',lm3T('التصنيف','Category'),categories)}
@@ -2406,7 +2406,7 @@ function lm3Export(){if(!window.XLSX){showToast(lm3T('مكتبة Excel غير م
  const headings=currentLang==='ar'?['الكود','اسم الموظف','الإدارة','الرصيد المتاح','الرصيد عن السنة','المستحق حتى اليوم','التصنيف','تاريخ التسوية القادمة']:['Code','Employee','Department','Available balance','Annual entitlement','Accrued to date','Category','Next settlement'];
  const grid=[headings,...lm3State.filtered.map(r=>[r.code,r.name,r.dept,lm10Balance(r,lm8LeaveProjection(r.e)).display,lm8LeaveProjection(r.e).ok?lm8LeaveProjection(r.e).annual:'',lm8LeaveProjection(r.e).ok?lm8LeaveProjection(r.e).accrued:'',names[r.category],r.displaySettlement||''])];
  const sheet=XLSX.utils.aoa_to_sheet(grid);sheet['!cols']=[{wch:14},{wch:36},{wch:28},{wch:25},{wch:20},{wch:22},{wch:23},{wch:24}];const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,sheet,currentLang==='ar'?'أرصدة الإجازات':'Leave balances');XLSX.writeFile(book,'LactoMisr_Leave_Report_'+new Date().toISOString().slice(0,10)+'.xlsx');}
-function lm3Open(){lm12OpenReport();}
+function lm3Open(){lm12OpenOrdinaryReport();}
 function lm3Close(){document.getElementById('lm3-modal')?.classList.add('hidden');}
 function lm3Calculate(){const code=String(document.getElementById('lm3-code')?.value||'').trim(),target=document.getElementById('lm3-result');if(!target)return;if(!code){target.textContent=lm3T('أدخل كود الموظف لعرض بياناته.','Enter an employee code.');return;}const emp=(allEmployees||[]).find(e=>getEmployeeCode(e)===code);if(!emp){target.textContent=lm3T('كود الموظف غير موجود.','Employee code not found.');return;}
  const balance=lm3Balance(emp),salary=lm3Salary(emp),date=lm15Next(emp),day=salary===null?null:salary/30,total=salary===null||balance===null?null:day*balance;
@@ -2650,33 +2650,62 @@ const LM13=Object.freeze({
   return {ok:true,rows,entitlement,benchmark,base,exception,exceptionVerified:verified,cap:base+exception};
  }
 });
+/* Archive recovery: retirement/end-service must be based on verified actual
+   dates/status, not on a selected future report year. Read-only classification. */
+let lm12ReportMode='ordinary';
+function lmArchiveToday(){
+ const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+ const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));return `${p.year}-${p.month}-${p.day}`;
+}
+function lmArchiveSpecial(e){
+ const birthday=lm23SixtyDate(e),today=lmArchiveToday();
+ const sixty=!!(birthday&&birthday<=today);
+ const lifecycle=e?.hr_service_lifecycle||{};
+ const ended=lm23IsArchived(e)&&!!lm8Date(lifecycle.endDate)&&lm8Date(lifecycle.endDate)<=today;
+ return {sixty,ended,special:sixty||ended};
+}
+function lm12OpenSpecialReport(){lm12ReportMode='special';lm12OpenReport();}
+function lm12OpenOrdinaryReport(){lm12ReportMode='ordinary';lm12OpenReport();}
 let lm12ReportRows=[];
 function lm12OpenReport(){
  const t=lm3T,esc=lm3Escape,allYears=!!document.getElementById('lm5-all-years')?.checked;
  const requestedYear=Number(document.getElementById('lm3-settlement')?.value||0);
- lm12ReportRows=(lm3State.filtered||[]).map(r=>{
+ // Special cases are kept out of the ordinary financial report. Use the
+ // same active filters but do not hide special cases because their cycle is annual.
+ const reportSource=(lm12ReportMode==='special'?lm3Rows().filter(r=>{
+   const q=String(document.getElementById('lm3-search')?.value||'').trim().toLowerCase();
+   const dept=document.getElementById('lm3-dept')?.value||'';
+   const cat=document.getElementById('lm3-category')?.value||'';
+   return (!q||String(r.code)===q||String(r.name).toLowerCase().includes(q))&&(!dept||r.dept===dept)&&(!cat||r.category===cat);
+ }):(lm3State.filtered||[])).filter(r=>lmArchiveSpecial(r.e).special===(lm12ReportMode==='special'));
+ lm12ReportRows=reportSource.map(r=>{
   const salary=lm3Salary(r.e),balance=lm3Balance(r.e),year=allYears?Number((r.settlement||'').slice(0,4)):requestedYear;
-  const retirement=lm19FirstAnnual(r.e)!==null&&year>=lm19FirstAnnual(r.e);
-  const ended=lm23IsArchived(r.e)&&r.e.hr_service_lifecycle?.endDate&&year>=Number(r.e.hr_service_lifecycle.endDate.slice(0,4));
+  const specialState=lmArchiveSpecial(r.e);
+  const retirement=specialState.sixty&&lm19SixtyYear(r.e)!==null&&year>=lm19SixtyYear(r.e);
+  const ended=specialState.ended;
   const full=retirement||ended;
   const baseRule=full?{ok:true,entitlement:null,benchmark:0,base:null,exception:0,exceptionVerified:true,cap:null}:LM13.cap(r.e,year);
   const rule={...baseRule,retirement,ended,cutoff:ended?r.e.hr_service_lifecycle.endDate:retirement?lm23SixtyDate(r.e):null};
   const archivedSnapshot=ended?r.e.hr_leave_end_service_snapshot:null;
-  const effectiveBalance=ended&&archivedSnapshot&&archivedSnapshot.remainingDays!==null?Number(archivedSnapshot.remainingDays):balance;
+  const retirementSnapshot=retirement?r.e.hr_leave_retirement_snapshot:null;
+  const effectiveBalance=ended&&archivedSnapshot&&archivedSnapshot.remainingDays!=null?Number(archivedSnapshot.remainingDays):
+   retirement&&retirementSnapshot&&retirementSnapshot.remainingDays!=null?Number(retirementSnapshot.remainingDays):balance;
   const days=rule.ok&&effectiveBalance!==null?(full?effectiveBalance:Math.min(effectiveBalance,rule.cap)):null;
-  const valid=rule.ok&&rule.exceptionVerified&&salary!==null&&salary>=0&&balance!==null&&balance>=0;
+  const hasCutoffProof=!full||(ended&&archivedSnapshot&&Number.isFinite(Number(archivedSnapshot.remainingDays)))||
+    (retirement&&r.e.hr_leave_retirement_snapshot&&Number.isFinite(Number(r.e.hr_leave_retirement_snapshot.remainingDays)));
+  const valid=rule.ok&&rule.exceptionVerified&&salary!==null&&salary>=0&&effectiveBalance!==null&&effectiveBalance>=0&&hasCutoffProof;
   // Retirement/end-service full balances are only estimates until a dated leave ledger is approved.
-  return {...r,year,rule,salary,balance:effectiveBalance,days,daily:salary===null?null:salary/30,total:valid?(salary/30)*days:null,valid};
+  return {...r,year,rule,salary,balance:effectiveBalance,days,hasCutoffProof,daily:salary===null?null:salary/30,total:valid?(salary/30)*days:null,valid};
  });
  const valid=lm12ReportRows.filter(r=>r.valid),sumDays=valid.reduce((n,r)=>n+r.days,0),sumMoney=valid.reduce((n,r)=>n+r.total,0);
  document.getElementById('lm12-settlement-report')?.remove();
  const overlay=document.createElement('div');overlay.id='lm12-settlement-report';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');
  const cols=[t('الكود','Code'),t('الموظف','Employee'),t('الإدارة','Department'),t('سنة التسوية','Settlement year'),t('الرصيد المسجل','Recorded balance'),t('استحقاق الدورة','Cycle entitlement'),t('استهلاك مرجعي','Use benchmark'),t('الحد الأساسي','Base cap'),t('استثناء حاجة العمل','Business exception'),t('الأيام القابلة للتسوية','Settlement days'),t('الراتب الشامل','Gross salary'),t('الأجر اليومي','Daily wage'),t('القيمة المالية','Amount'),t('الحالة','Status')];
- const status=r=>r.valid?(r.rule.ended?t('إنهاء خدمة — حساب تجريبي تلقائي دون اعتماد','End of service — automatic test calculation, no approval'):t('حساب مبدئي — يحتاج اعتماد','Provisional — approval required')):t('يحتاج مراجعة: ','Review: ')+(r.rule.ok?(r.rule.exceptionVerified?t('الراتب أو الرصيد ناقص','Missing salary/balance'):t('سجل رفض غير معتمد','Unverified refusal')):r.rule.reason);
- overlay.innerHTML=`<div class="lm12-sheet"><header class="lm12-head"><div><h2>${t('تقرير التسوية المالية للإجازات','Leave Financial Settlement Report')}</h2><p>${t('دورة ثلاثية قبل الستين وسنوية من يناير التالي لبلوغ الستين، مع حد التسوية والاستثناء الموثق.','Three-year cycles before age 60, annual January settlements thereafter, with caps and verified exceptions.')}</p></div><div class="lm12-actions"><button type="button" onclick="lm12Export()">${t('تصدير Excel','Export Excel')}</button><button type="button" onclick="lm12Print()">${t('طباعة','Print')}</button><button type="button" onclick="lm12Close()">${t('العودة للأرصدة','Back to balances')} ×</button></div></header>
+ const status=r=>!r.valid&&(r.rule.retirement||r.rule.ended)&&!r.hasCutoffProof?t('يلزم رصيد موثق بتاريخ القطع','Verified cutoff balance required'):r.valid?(r.rule.ended?t('إنهاء خدمة — حساب تجريبي تلقائي دون اعتماد','End of service — automatic test calculation, no approval'):t('حساب مبدئي — يحتاج اعتماد','Provisional — approval required')):t('يحتاج مراجعة: ','Review: ')+(r.rule.ok?(r.rule.exceptionVerified?t('الراتب أو الرصيد ناقص','Missing salary/balance'):t('سجل رفض غير معتمد','Unverified refusal')):r.rule.reason);
+ overlay.innerHTML=`<div class="lm12-sheet"><header class="lm12-head"><div><h2>${lm12ReportMode==='special'?t('تسويات المعاش وإنهاء الخدمة','Retirement and end-of-service settlements'):t('التسويات العادية','Ordinary leave settlements')}</h2><p>${t('دورة ثلاثية قبل الستين وسنوية من يناير التالي لبلوغ الستين، مع حد التسوية والاستثناء الموثق.','Three-year cycles before age 60, annual January settlements thereafter, with caps and verified exceptions.')}</p></div><div class="lm12-actions"><button type="button" onclick="lm12Export()">${t('تصدير Excel','Export Excel')}</button><button type="button" onclick="lm12Print()">${t('طباعة','Print')}</button><button type="button" onclick="lm12Close()">${t('العودة للأرصدة','Back to balances')} ×</button></div></header>
  <div class="lm12-summary"><div>${t('الموظفون','Employees')}<strong>${lm12ReportRows.length}</strong></div><div>${t('أيام التسوية المبدئية','Provisional days')}<strong>${sumDays.toLocaleString()}</strong></div><div>${t('القيمة المبدئية','Provisional amount')}<strong>${lm3Money(sumMoney)}</strong></div><div>${t('تحتاج مراجعة','Needs review')}<strong>${lm12ReportRows.length-valid.length}</strong></div></div>
  <p class="lm12-note">${t('تنبيه: الأرصدة الحالية تعكس البيانات المسجلة ولا تمثل بالضرورة رصيد يناير التاريخي. لا يتم الصرف أو تصفير الأرصدة قبل التحقق من حركة الإجازات والاعتماد. الموافقات والرفض من ESS لم يتم ربطها بعد.','Important: current recorded balances are not necessarily historical January balances. No payout or reset without a verified leave ledger and approval. ESS approvals/refusals are not yet connected.')}</p>
- <div class="lm12-scroll"><table><thead><tr>${cols.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${lm12ReportRows.map(r=>`<tr><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.dept)}</td><td>${r.year||'—'}</td><td>${r.balance??'—'}</td><td>${r.rule.ok?(r.rule.entitlement??'—'):'—'}</td><td>${r.rule.ok?(r.rule.benchmark??'—'):'—'}</td><td>${r.rule.ok?(r.rule.base??'—'):'—'}</td><td>${r.rule.ok?r.rule.exception:'—'}</td><td>${r.days??'—'}</td><td>${lm3Money(r.salary)}</td><td>${lm3Money(r.daily)}</td><td>${lm3Money(r.total)}</td><td>${esc(status(r))}</td></tr>`).join('')||`<tr><td colspan="14">${t('لا توجد نتائج','No results')}</td></tr>`}</tbody><tfoot><tr><td colspan="9">${t('إجمالي السجلات القابلة للحساب','Total calculable records')}</td><td>${sumDays}</td><td colspan="2"></td><td>${lm3Money(sumMoney)}</td><td>${valid.length}/${lm12ReportRows.length}</td></tr></tfoot></table></div></div>`;
+ <div class="lm12-scroll"><table><thead><tr>${cols.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${lm12ReportRows.map(r=>`<tr><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.dept)}</td><td>${r.year||'—'}</td><td>${r.balance??'—'}</td><td>${r.rule.retirement||r.rule.ended?t('تسوية كاملة','Full balance'):r.rule.ok?(r.rule.entitlement??'—'):'—'}</td><td>${r.rule.ok?(r.rule.benchmark??'—'):'—'}</td><td>${r.rule.retirement||r.rule.ended?t('غير مطبق','Not applicable'):r.rule.ok?(r.rule.base??'—'):'—'}</td><td>${r.rule.ok?r.rule.exception:'—'}</td><td>${r.days??'—'}</td><td>${lm3Money(r.salary)}</td><td>${lm3Money(r.daily)}</td><td>${lm3Money(r.total)}</td><td>${esc(status(r))}</td></tr>`).join('')||`<tr><td colspan="14">${t('لا توجد نتائج','No results')}</td></tr>`}</tbody><tfoot><tr><td colspan="9">${t('إجمالي السجلات القابلة للحساب','Total calculable records')}</td><td>${sumDays}</td><td colspan="2"></td><td>${lm3Money(sumMoney)}</td><td>${valid.length}/${lm12ReportRows.length}</td></tr></tfoot></table></div></div>`;
  document.body.appendChild(overlay);document.body.classList.add('lm12-open');
 }
 function lm12Close(){document.getElementById('lm12-settlement-report')?.remove();document.body.classList.remove('lm12-open');}
