@@ -2903,7 +2903,7 @@ essRenderRequestPanel=function(){
  const panel=document.getElementById('ess-request-panel');if(!panel)return;
  essStopListeners();
  if(!portalIsAdmin()){panel.textContent=hrText('هذه الصفحة متاحة لمسؤول Portal فقط','Portal admin only');return;}
- panel.innerHTML=`<p class="mb-4 text-sm text-slate-300">${hrText('الطلبات مرتبة من الأقدم للأحدث حسب وقت تقديمها الأصلي. الاعتمادات من نفس السجل، دون نسخ الطلبات.','Requests are ordered oldest first by original submission time. Approvals use the original records.')}</p><div class="flex flex-wrap gap-3 mb-4"><label class="text-sm">${hrText('نوع الطلب','Request type')}<select id="lm-alert-kind" class="hr-feature-input mt-1" onchange="lmUnifiedAlertsDraw()"><option value="">${hrText('جميع الأنواع','All types')}</option>${essPaths.filter(([path])=>path!=='attendance_requests').map(([path,ar,en])=>`<option value="${path}">${hrText(ar,en)}</option>`).join('')}</select></label><label class="text-sm">${hrText('بحث بالكود','Search by code')}<input id="lm-alert-code" class="hr-feature-input mt-1" oninput="lmUnifiedAlertsDraw()" placeholder="2"></label></div><div id="ess-requests-content" aria-live="polite"></div>`;
+ panel.innerHTML=`<p class="mb-4 text-sm text-slate-300">${hrText('الطلبات مرتبة من الأقدم للأحدث حسب وقت تقديمها الأصلي. الاعتمادات من نفس السجل، دون نسخ الطلبات.','Requests are ordered oldest first by original submission time. Approvals use the original records.')}</p><div class="flex flex-wrap gap-3 mb-4"><label class="text-sm">${hrText('نوع الطلب','Request type')}<select id="lm-alert-kind" class="hr-feature-input mt-1" onchange="lmUnifiedAlertsDraw()"><option value="">${hrText('جميع الأنواع','All types')}</option>${essPaths.map(([path,ar,en])=>`<option value="${path}">${hrText(ar,en)}</option>`).join('')}</select></label><label class="text-sm">${hrText('الحالة','Status')}<select id="lm-alert-status" class="hr-feature-input mt-1" onchange="lmUnifiedAlertsDraw()"><option value="pending">${hrText('المعلقة','Pending')}</option><option value="all">${hrText('كل الحالات','All statuses')}</option><option value="closed">${hrText('المنتهية','Resolved')}</option></select></label><label class="text-sm">${hrText('بحث بالكود','Search by code')}<input id="lm-alert-code" class="hr-feature-input mt-1" oninput="lmUnifiedAlertsDraw()" placeholder="2"></label></div><div id="ess-requests-content" aria-live="polite"></div>`;
  essRequestState={};essRequestErrors={};
  for(const [path] of essPaths){
   const ref=db.ref(path);const cb=s=>{essRequestState[path]=s.val()||{};delete essRequestErrors[path];lmUnifiedAlertsDraw();};
@@ -2916,14 +2916,18 @@ function lmUnifiedAlertsDraw(){
  const el=document.getElementById('ess-requests-content');if(!el)return;
  const kind=document.getElementById('lm-alert-kind')?.value||'';
  const codeFilter=(document.getElementById('lm-alert-code')?.value||'').trim();
+ const statusFilter=document.getElementById('lm-alert-status')?.value||'pending';
  const alerts=[];
  for(const [path,ar,en] of essPaths){
   if(kind&&kind!==path)continue;
   for(const [code,byId] of Object.entries(essRequestState[path]||{})){
    if(codeFilter&&!String(code).includes(codeFilter))continue;
    for(const [id,r] of Object.entries(byId||{})){
-    if(!r||typeof r!=='object'||!lmPendingStatus(path,r))continue;
-    alerts.push({path,code,id,r,label:hrText(ar,en),time:Number(r.createdAt||r.timestamp||0)});
+    if(!r||typeof r!=='object')continue;
+    const pending=lmPendingStatus(path,r);
+    if(statusFilter==='pending'&&!pending||statusFilter==='closed'&&pending)continue;
+    const status=String(r.verificationStatus||r.status||'—');
+    alerts.push({path,code,id,r,pending,status,label:hrText(ar,en),time:Number(r.createdAt||r.timestamp||0)});
    }
   }
  }
@@ -2935,10 +2939,10 @@ function lmUnifiedAlertsDraw(){
  const rows=alerts.slice(0,100).map((a,i)=>{
   const date=a.time>0?dateFormat.format(new Date(a.time)):hrText('وقت غير مسجل','No timestamp');
   const destination=pageFor[a.path]||'notifications';
-  const action=a.path==='attendance_requests'?`<button type="button" class="portal-action-btn px-3 py-1" onclick="lmOpenGpsApproval('${escapeHtml(a.id)}')">${hrText('مراجعة واعتماد','Review & approve')}</button>`:`<button type="button" class="portal-ghost-btn px-3 py-1" onclick="showHRPage('${destination}')">${hrText('فتح التاب المختص','Open module')}</button>`;
-  return `<tr class="border-b border-slate-700/40"><td class="p-3">${i+1}</td><td class="p-3">${escapeHtml(a.label)}</td><td class="p-3">${escapeHtml(a.code)}</td><td class="p-3" dir="auto">${escapeHtml(date)}</td><td class="p-3">${action}</td></tr>`;
+  const action=a.path==='attendance_requests'?`<button type="button" class="portal-action-btn px-3 py-1" onclick="lmOpenGpsApproval('${escapeHtml(a.id)}')">${a.pending?hrText('مراجعة واعتماد','Review & approve'):hrText('فتح سجل البصمة','Open punch record')}</button>`:`<button type="button" class="portal-ghost-btn px-3 py-1" onclick="showHRPage('${destination}')">${hrText('فتح التاب المختص','Open module')}</button>`;
+  return `<tr class="border-b border-slate-700/40"><td class="p-3">${i+1}</td><td class="p-3">${escapeHtml(a.label)}</td><td class="p-3">${escapeHtml(a.code)}</td><td class="p-3" dir="auto">${escapeHtml(date)}</td><td class="p-3">${escapeHtml(a.status)}</td><td class="p-3">${action}</td></tr>`;
  }).join('');
- el.innerHTML=warning+`<p class="text-sm mb-3">${hrText('طلبات معلقة','Pending requests')}: <strong>${alerts.length}</strong>${alerts.length>100?' — '+hrText('عرض أول 100','Showing first 100'):''}</p>`+(alerts.length?`<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr>${[hrText('الترتيب','Order'),hrText('النوع','Type'),hrText('الموظف','Employee'),hrText('وقت التقديم','Submitted at'),hrText('الإجراء','Action')].map(x=>`<th class="p-3 text-start border-b border-slate-600">${x}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`:`<p class="text-slate-400">${hrText('لا توجد طلبات معلقة مطابقة','No matching pending requests')}</p>`);
+ el.innerHTML=warning+`<p class="text-sm mb-3">${statusFilter==='pending'?hrText('طلبات معلقة','Pending requests'):hrText('السجلات المطابقة','Matching records')}: <strong>${alerts.length}</strong>${alerts.length>100?' — '+hrText('عرض أول 100','Showing first 100'):''}</p>`+(alerts.length?`<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr>${[hrText('الترتيب','Order'),hrText('النوع','Type'),hrText('الموظف','Employee'),hrText('وقت التقديم','Submitted at'),hrText('الحالة','Status'),hrText('الإجراء','Action')].map(x=>`<th class="p-3 text-start border-b border-slate-600">${x}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`:`<p class="text-slate-400">${hrText('لا توجد سجلات مطابقة','No matching records')}</p>`);
 }
 
 
