@@ -1723,6 +1723,51 @@ function fahdRenderCompleteFields(emp,fields){
   card.append(label,input);fields.append(card);fahdEditing.original[key]=input.value;
  }
 }
+// Approved prior insurance service: no document upload; recorded as a separate audited event.
+function lmInsuranceExtraUI(emp){
+ const v=emp.hr_extra_insurance||{},enabled=v.enabled===true;
+ const t=(ar,en)=>fahdLang(ar,en);
+ return `<section class="fahd-field" style="grid-column:1/-1;padding:15px;border:1px solid rgba(56,189,248,.35);border-radius:14px" data-field-language="common">
+ <label style="display:flex;align-items:center;gap:9px"><input type="checkbox" id="lm-extra-insurance-enabled" ${enabled?'checked':''} onchange="lmInsuranceExtraToggle()">${t('مدة تأمينية إضافية','Additional insured service')}</label>
+ <div id="lm-extra-insurance-fields" ${enabled?'':'hidden'} style="display:flex;flex-wrap:wrap;gap:12px;margin-top:12px">
+ <label>${t('عدد السنوات الإضافية','Additional years')} <input id="lm-extra-insurance-years" type="number" min="0" max="80" step="1" value="${Number.isInteger(Number(v.years))?Number(v.years):0}" class="hr-feature-input" style="width:100px"></label>
+ <label>${t('تاريخ تقديم البرنت للموارد البشرية','Date submitted to HR')} <input id="lm-extra-insurance-date" type="date" value="${/^\d{4}-\d{2}-\d{2}$/.test(v.submittedAt||'')?v.submittedAt:''}" class="hr-feature-input"></label>
+ <label>${t('سبب الإضافة / ملاحظة التحقق','Reason / verification note')} <input id="lm-extra-insurance-reason" type="text" maxlength="300" value="" placeholder="${t('برنت تأمينات معتمد','Verified insurance printout')}" class="hr-feature-input"></label>
+ </div><div style="margin-top:10px"><button type="button" class="portal-action-btn" id="lm-extra-insurance-save" onclick="lmInsuranceExtraSave()">${t('حفظ واعتماد المدة مع سجل التحقق','Save and audit insurance service')}</button></div>
+ <small>${t('لا يتم رفع البرنت. يسري الأثر من تاريخ تقديمه، ولا تُعدل أرصدة الإجازات المعتمدة تلقائيًا.','No printout upload. Effective from submission date; approved leave balances are not overwritten.')}</small>
+ </section>`;
+}
+function lmInsuranceExtraToggle(){const c=document.getElementById('lm-extra-insurance-enabled'),r=document.getElementById('lm-extra-insurance-fields');if(r)r.hidden=!c?.checked;}
+async function lmInsuranceExtraSave(){
+ const status=document.getElementById('fahd-status'),emp=allEmployees.find(e=>String(getEmployeeCode(e))===String(fahdEditing?.code));
+ if(!portalIsAdmin()||String(currentUserData?.code)!==PORTAL_ADMIN_CODE){if(status)status.textContent=fahdLang('غير مصرح','Not authorized');return;}
+ if(!emp||!fahdEditing?.path||!fahdEditing.path.startsWith('employees_v2/'))return;
+ if(fahdHasUnsavedChanges()){if(status)status.textContent=fahdLang('احفظ تعديلات الملف الأخرى أولًا','Save other profile changes first');return;}
+ const enabled=!!document.getElementById('lm-extra-insurance-enabled')?.checked;
+ const years=Number(document.getElementById('lm-extra-insurance-years')?.value);
+ const submittedAt=document.getElementById('lm-extra-insurance-date')?.value||'';
+ const reason=(document.getElementById('lm-extra-insurance-reason')?.value||'').trim();
+ const today=new Date().toISOString().slice(0,10);
+ if(enabled&&(!Number.isInteger(years)||years<1||years>80||!/^\d{4}-\d{2}-\d{2}$/.test(submittedAt)||submittedAt>today||!reason)){
+  if(status)status.textContent=fahdLang('أدخل عدد سنوات صحيح وتاريخ تقديم غير مستقبلي وسبب التحقق','Enter valid years, a non-future submission date, and a reason');return;
+ }
+ const old=emp.hr_extra_insurance||null;
+ const next={enabled,years:enabled?years:0,submittedAt:enabled?submittedAt:null,verified:true,verifiedBy:portalAuth.currentUser.uid,verifiedAt:firebase.database.ServerValue.TIMESTAMP};
+ if(JSON.stringify({enabled:old?.enabled===true,years:old?.years||0,submittedAt:old?.submittedAt||null})===JSON.stringify({enabled:next.enabled,years:next.years,submittedAt:next.submittedAt})){
+  if(status)status.textContent=fahdLang('لا يوجد تغيير في المدة التأمينية','No insurance change');return;
+ }
+ if(!await fahdDialog(fahdLang('اعتماد مدة تأمينية إضافية','Approve additional insured service'),fahdLang('سيتم حفظ التغيير وسجل التحقق معًا. هل تؤكد؟','Save the change and audit record together?')))return;
+ const btn=document.getElementById('lm-extra-insurance-save');if(btn)btn.disabled=true;
+ try{
+  const auditRef=db.ref('hr_insurance_verification_audit').push();
+  const changes={};changes[fahdEditing.path+'/hr_extra_insurance']=next;
+  changes['hr_insurance_verification_audit/'+auditRef.key]={employeeCode:String(fahdEditing.code),employeePath:fahdEditing.path,previous:old||false,next:{enabled:next.enabled,years:next.years,submittedAt:next.submittedAt},reason,actorCode:String(currentUserData.code),actorUid:portalAuth.currentUser.uid,createdAt:firebase.database.ServerValue.TIMESTAMP};
+  await db.ref().update(changes);
+  emp.hr_extra_insurance={...next,verifiedAt:Date.now()};fahdRender(emp);
+  const st=document.getElementById('fahd-status');if(st)st.textContent=fahdLang('تم الاعتماد وتسجيل التحقق','Saved with audit');
+ }catch(err){if(status)status.textContent=fahdLang('فشل الحفظ: ','Save failed: ')+(err?.message||'Permission denied');}
+ finally{if(btn)btn.disabled=false;}
+}
 function fahdRender(emp){
  const root=document.getElementById('fahd1-native');if(!root||!emp)return;
  const code=getEmployeeCode(emp);fahdEditing={code,path:emp._firebasePath,keys:{},original:{}};
@@ -1737,6 +1782,8 @@ function fahdRender(emp){
  const fields=document.getElementById('fahd-fields');fields.replaceChildren();
  fahdRenderCompleteFields(emp,fields);
  fields.insertAdjacentHTML('beforeend',lmFiveUI(true,emp.hr_five_percent));
+ fields.insertAdjacentHTML('beforeend',lmInsuranceExtraUI(emp));
+ if(!portalIsAdmin()){for(const el of fields.querySelectorAll('#lm-extra-insurance-enabled,#lm-extra-insurance-years,#lm-extra-insurance-date,#lm-extra-insurance-reason,#lm-extra-insurance-save'))el.disabled=true;}
  lmRenderGlobalCustomFields(emp,fields);
  fahdRefreshFieldVisibility();fahdEnableDropdowns();
  const fin=document.getElementById('fahd-financial');fin.replaceChildren();const financial=emp.financial;
@@ -2599,6 +2646,19 @@ const LM13=Object.freeze({
    return {days:30,verified:true,reason:'company-tenure'};
   if(year===anniversaryYear)
    return {days:21,verified:true,reason:'company-tenure-transition',splitMonth:anniversaryMonth};
+  // Additional verified prior service is effective no earlier than HR submission.
+  // It does not alter company hire date or service years shown on the profile.
+  const extra=e.hr_extra_insurance;
+  if(extra?.enabled===true&&extra?.verified===true&&Number.isInteger(Number(extra.years))&&Number(extra.years)>0){
+   const submitted=this.date(extra.submittedAt);
+   if(!submitted)return {days:null,verified:false,reason:'insurance submission date missing'};
+   const required=Math.max(0,10-Number(extra.years));
+   const hireThreshold=new Date(Date.UTC(Number(hire.slice(0,4))+Math.ceil(required),Number(hire.slice(5,7))-1,Number(hire.slice(8,10)))).toISOString().slice(0,10);
+   const effective=required===0?submitted:(hireThreshold>submitted?hireThreshold:submitted);
+   const effectYear=Number(effective.slice(0,4)),effectMonth=Number(effective.slice(5,7));
+   if(year>effectYear)return {days:30,verified:true,reason:'additional-insurance'};
+   if(year===effectYear)return {days:21,verified:true,reason:'additional-insurance-transition',splitMonth:effectMonth};
+  }
   const insurance=this.number(lmBField(e,['insuredYears','insuranceYears','سنوات التأمين','مدة الاشتراك التأميني']));
   const approval=this.date(lmBField(e,['insuranceApprovalDate','insuredTenureApprovalDate','تاريخ اعتماد المدة التأمينية']));
   // Approval date is mandatory for a historical entitlement increase.
@@ -2718,33 +2778,36 @@ function lm12OpenReport(){
   const retirementSnapshot=retirement?r.e.hr_leave_retirement_snapshot:null;
   const effectiveBalance=ended&&archivedSnapshot&&archivedSnapshot.remainingDays!=null?Number(archivedSnapshot.remainingDays):
    retirement&&retirementSnapshot&&retirementSnapshot.remainingDays!=null?Number(retirementSnapshot.remainingDays):balance;
-  const currentCap=toDate?.ok?Math.min(rule.cap??Infinity,toDate.cap+(rule.exception||0)):null;
-  const days=rule.ok&&effectiveBalance!==null?(full?effectiveBalance:(currentCap!==null?Math.min(effectiveBalance,currentCap):null)):null;
+  // A settlement is assessed against the FULL cap at the selected cycle end,
+  // not the proportional cap accrued as of the report date. Accrued-to-date
+  // remains informational only. Verified business-need days increase the cap.
+  const days=rule.ok&&effectiveBalance!==null?(full?effectiveBalance:Math.min(effectiveBalance,rule.cap)):null;
+  const nonSettleable=rule.ok&&effectiveBalance!==null&&!full?Math.max(0,effectiveBalance-rule.cap):null;
   const hasCutoffProof=!full||(ended&&archivedSnapshot&&Number.isFinite(Number(archivedSnapshot.remainingDays)))||
     (retirement&&r.e.hr_leave_retirement_snapshot&&Number.isFinite(Number(r.e.hr_leave_retirement_snapshot.remainingDays)));
   const valid=rule.ok&&(full||toDate?.ok)&&rule.exceptionVerified&&salary!==null&&salary>=0&&effectiveBalance!==null&&effectiveBalance>=0&&hasCutoffProof;
   // Retirement/end-service full balances are only estimates until a dated leave ledger is approved.
-  return {...r,year,rule,toDate,salary,balance:effectiveBalance,days,hasCutoffProof,daily:salary===null?null:salary/30,total:valid?(salary/30)*days:null,valid};
+  return {...r,year,rule,toDate,salary,balance:effectiveBalance,days,nonSettleable,hasCutoffProof,daily:salary===null?null:salary/30,total:valid?(salary/30)*days:null,valid};
  });
  const valid=lm12ReportRows.filter(r=>r.valid),sumDays=valid.reduce((n,r)=>n+r.days,0),sumMoney=valid.reduce((n,r)=>n+r.total,0);
  document.getElementById('lm12-settlement-report')?.remove();
  const overlay=document.createElement('div');overlay.id='lm12-settlement-report';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');
- const cols=[t('الكود','Code'),t('الموظف','Employee'),t('الإدارة','Department'),t('سنة التسوية','Settlement year'),t('الرصيد المسجل','Recorded balance'),t('الاستحقاق حتى تاريخه','Accrued to date'),t('الاستحقاق في نهاية الدورة (متوقع)','Forecast at cycle end'),t('استحقاق الدورة','Cycle entitlement'),t('استهلاك مرجعي','Use benchmark'),t('الحد الأساسي','Base cap'),t('استثناء حاجة العمل','Business exception'),t('الأيام القابلة للتسوية','Settlement days'),t('الراتب الشامل','Gross salary'),t('الأجر اليومي','Daily wage'),t('القيمة المالية','Amount'),t('الحالة','Status')];
+ const cols=[t('الكود','Code'),t('اسم الموظف','Employee'),t('الإدارة','Department'),t('الرصيد الحالي','Current balance'),t('سنة التسوية','Settlement year'),t('سقف المستحق عند التسوية نهاية الدورة','Cycle-end settlement cap'),t('الرصيد المستحق حتى تاريخه','Accrued to date'),t('الاستحقاق في نهاية الدورة','Cycle-end entitlement'),t('أيام مرفوضة لحاجة العمل','Verified business-need days'),t('رصيد التسوية النهائي','Final settlement days'),t('أيام غير قابلة للتسوية','Non-settleable days'),t('الأجر اليومي','Daily wage'),t('القيمة المالية','Amount'),t('الحالة','Status')];
  const status=r=>!r.valid&&(r.rule.retirement||r.rule.ended)&&!r.hasCutoffProof?t('يلزم رصيد موثق بتاريخ القطع','Verified cutoff balance required'):r.valid?(r.rule.ended?t('إنهاء خدمة — حساب تجريبي تلقائي دون اعتماد','End of service — automatic test calculation, no approval'):t('حساب مبدئي — يحتاج اعتماد','Provisional — approval required')):t('يحتاج مراجعة: ','Review: ')+(r.rule.ok?(r.rule.exceptionVerified?t('الراتب أو الرصيد ناقص','Missing salary/balance'):t('سجل رفض غير معتمد','Unverified refusal')):r.rule.reason);
  overlay.innerHTML=`<div class="lm12-sheet"><header class="lm12-head"><div><h2>${lm12ReportMode==='special'?t('تسويات المعاش وإنهاء الخدمة','Retirement and end-of-service settlements'):t('التسويات العادية','Ordinary leave settlements')}</h2><p>${t('دورة ثلاثية قبل الستين وسنوية من يناير التالي لبلوغ الستين، مع حد التسوية والاستثناء الموثق.','Three-year cycles before age 60, annual January settlements thereafter, with caps and verified exceptions.')}</p></div><div class="lm12-actions"><button type="button" onclick="lm12OpenOrdinaryReport()">${t('التسويات العادية','Ordinary settlements')}</button><button type="button" onclick="lm12OpenSpecialReport()">${t('المعاش وإنهاء الخدمة','Retirement & end of service')}</button><button type="button" onclick="lm12Export()">${t('تصدير Excel','Export Excel')}</button><button type="button" onclick="lm12Print()">${t('طباعة','Print')}</button><button type="button" onclick="lm12Close()">${t('العودة للأرصدة','Back to balances')} ×</button></div></header>
  <div class="lm12-summary"><div>${t('الموظفون','Employees')}<strong>${lm12ReportRows.length}</strong></div><div>${t('أيام التسوية المبدئية','Provisional days')}<strong>${sumDays.toLocaleString()}</strong></div><div>${t('القيمة المبدئية','Provisional amount')}<strong>${lm3Money(sumMoney)}</strong></div><div>${t('تحتاج مراجعة','Needs review')}<strong>${lm12ReportRows.length-valid.length}</strong></div></div>
- <p class="lm12-note">${t('تنبيه: الأرصدة الحالية تعكس البيانات المسجلة ولا تمثل بالضرورة رصيد يناير التاريخي. الاستحقاق في نهاية الدورة توقع وليس رصيدًا مكتسبًا اليوم؛ أيام التسوية المبدئية مقيدة بالحد المستحق حتى تاريخه. لا يتم الصرف أو تصفير الأرصدة قبل التحقق من حركة الإجازات والاعتماد. الموافقات والرفض من ESS لم يتم ربطها بعد.','Important: current recorded balances are not necessarily historical January balances. End-of-cycle entitlement is a forecast, not earned leave today; provisional settlement days are limited to the cap accrued to date. No payout or reset without a verified leave ledger and approval. ESS approvals/refusals are not yet connected.')}</p>
- <div class="lm12-scroll"><table><thead><tr>${cols.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${lm12ReportRows.map(r=>`<tr><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.dept)}</td><td>${r.year||'—'}</td><td>${r.balance??'—'}</td><td>${r.toDate?.ok?r.toDate.earned:'—'}</td><td>${r.rule.ok&&!r.rule.retirement&&!r.rule.ended?r.rule.entitlement:'—'}</td><td>${r.rule.retirement||r.rule.ended?t('تسوية كاملة','Full balance'):r.rule.ok?(r.rule.entitlement??'—'):'—'}</td><td>${r.rule.ok?(r.rule.benchmark??'—'):'—'}</td><td>${r.rule.retirement||r.rule.ended?t('غير مطبق','Not applicable'):r.rule.ok?(r.rule.base??'—'):'—'}</td><td>${r.rule.ok?r.rule.exception:'—'}</td><td>${r.days??'—'}</td><td>${lm3Money(r.salary)}</td><td>${lm3Money(r.daily)}</td><td>${lm3Money(r.total)}</td><td>${esc(status(r))}</td></tr>`).join('')||`<tr><td colspan="16">${t('لا توجد نتائج','No results')}</td></tr>`}</tbody><tfoot><tr><td colspan="11">${t('إجمالي السجلات القابلة للحساب','Total calculable records')}</td><td>${sumDays}</td><td colspan="2"></td><td>${lm3Money(sumMoney)}</td><td>${valid.length}/${lm12ReportRows.length}</td></tr></tfoot></table></div></div>`;
+ <p class="lm12-note">${t('تنبيه: الأرصدة الحالية تعكس البيانات المسجلة ولا تمثل بالضرورة رصيد يناير التاريخي. الاستحقاق في نهاية الدورة توقع وليس رصيدًا مكتسبًا اليوم؛ رصيد التسوية محسوب بسقف نهاية الدورة؛ الاستحقاق حتى تاريخه معلوماتي فقط. والأيام غير القابلة للتسوية للإشعار السنوي في نوفمبر فقط، ولا تخصم من الرصيد. لا يتم الصرف أو تصفير الأرصدة قبل التحقق من حركة الإجازات والاعتماد. الموافقات والرفض من ESS لم يتم ربطها بعد.','Important: current recorded balances are not necessarily historical January balances. End-of-cycle entitlement is a forecast, not earned leave today; settlement days use the cycle-end cap; accrued-to-date is informational only. Non-settleable days are for the November notice only and are not deducted. No payout or reset without a verified leave ledger and approval. ESS approvals/refusals are not yet connected.')}</p>
+ <div class="lm12-scroll"><table><thead><tr>${cols.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${lm12ReportRows.map(r=>`<tr><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.dept)}</td><td>${r.balance??'—'}</td><td>${r.year||'—'}</td><td>${r.rule.retirement||r.rule.ended?t('تسوية كاملة','Full balance'):r.rule.ok?r.rule.cap:'—'}</td><td>${r.toDate?.ok?r.toDate.earned:'—'}</td><td>${r.rule.ok&&!r.rule.retirement&&!r.rule.ended?r.rule.entitlement:'—'}</td><td>${r.rule.ok?r.rule.exception:'—'}</td><td>${r.days??'—'}</td><td>${r.nonSettleable??'—'}</td><td>${lm3Money(r.daily)}</td><td>${lm3Money(r.total)}</td><td>${esc(status(r))}</td></tr>`).join('')||`<tr><td colspan="14">${t('لا توجد نتائج','No results')}</td></tr>`}</tbody><tfoot><tr><td colspan="9">${t('إجمالي السجلات القابلة للحساب','Total calculable records')}</td><td>${sumDays}</td><td>${valid.reduce((n,r)=>n+(r.nonSettleable||0),0)}</td><td></td><td>${lm3Money(sumMoney)}</td><td>${valid.length}/${lm12ReportRows.length}</td></tr></tfoot></table></div></div>`;
  document.body.appendChild(overlay);document.body.classList.add('lm12-open');
 }
 function lm12Close(){document.getElementById('lm12-settlement-report')?.remove();document.body.classList.remove('lm12-open');}
 function lm12Export(){
  if(!window.XLSX){showToast(lm3T('مكتبة Excel غير متاحة','Excel library unavailable'),true);return;}
  const t=lm3T;
- const headings=[t('الكود','Code'),t('الموظف','Employee'),t('الإدارة','Department'),t('سنة التسوية','Settlement year'),t('الرصيد المسجل','Recorded balance'),t('الاستحقاق حتى تاريخه','Accrued to date'),t('الاستحقاق في نهاية الدورة (متوقع)','Forecast at cycle end'),t('استحقاق الدورة','Cycle entitlement'),t('الاستهلاك المرجعي','Use benchmark'),t('الحد الأساسي','Base cap'),t('الاستثناء','Exception'),t('أيام التسوية','Settlement days'),t('الراتب الشامل','Gross salary'),t('الأجر اليومي','Daily wage'),t('القيمة المالية','Amount'),t('الحالة','Status')];
- const data=[headings,...lm12ReportRows.map(r=>[r.code,r.name,r.dept,r.year||'',r.balance??'',r.toDate?.ok?r.toDate.earned:'',r.rule.ok&&!r.rule.retirement&&!r.rule.ended?r.rule.entitlement:'',r.rule.ok?r.rule.entitlement:'',r.rule.ok?r.rule.benchmark:'',r.rule.ok?r.rule.base:'',r.rule.ok?r.rule.exception:'',r.days??'',r.salary??'',r.daily??'',r.total??'',r.valid?t('مبدئي','Provisional'):t('مراجعة','Review')])];
+ const headings=[t('الكود','Code'),t('اسم الموظف','Employee'),t('الإدارة','Department'),t('الرصيد الحالي','Current balance'),t('سنة التسوية','Settlement year'),t('سقف المستحق عند التسوية نهاية الدورة','Cycle-end settlement cap'),t('الرصيد المستحق حتى تاريخه','Accrued to date'),t('الاستحقاق في نهاية الدورة','Cycle-end entitlement'),t('أيام مرفوضة لحاجة العمل','Verified business-need days'),t('رصيد التسوية النهائي','Final settlement days'),t('أيام غير قابلة للتسوية','Non-settleable days'),t('الأجر اليومي','Daily wage'),t('القيمة المالية','Amount'),t('الحالة','Status')];
+ const data=[headings,...lm12ReportRows.map(r=>[r.code,r.name,r.dept,r.balance??'',r.year||'',r.rule.ok?r.rule.cap:'',r.toDate?.ok?r.toDate.earned:'',r.rule.ok?r.rule.entitlement:'',r.rule.ok?r.rule.exception:'',r.days??'',r.nonSettleable??'',r.daily??'',r.total??'',r.valid?t('مبدئي','Provisional'):t('مراجعة','Review')])];
  const valid=lm12ReportRows.filter(r=>r.valid);
- data.push([t('الإجمالي','Total'),'','','','','','','','','','',valid.reduce((n,r)=>n+r.days,0),'','',valid.reduce((n,r)=>n+r.total,0),'']);
+ data.push([t('الإجمالي','Total'),'','','','','','','','',valid.reduce((n,r)=>n+r.days,0),valid.reduce((n,r)=>n+(r.nonSettleable||0),0),'',valid.reduce((n,r)=>n+r.total,0),'']);
  const ws=XLSX.utils.aoa_to_sheet(data);ws['!cols']=headings.map((_,i)=>({wch:i===1?35:i===2?30:21}));
  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Leave Settlement');
  XLSX.writeFile(wb,'LactoMisr_Leave_Settlement_'+new Date().toISOString().slice(0,10)+'.xlsx');
