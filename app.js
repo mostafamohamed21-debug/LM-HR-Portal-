@@ -2618,10 +2618,23 @@ const LM13=Object.freeze({
    const months=this.yearMonths(hire,yr),a=this.annual(e,hire,yr);
    if(!a.verified)return {ok:false,reason:a.reason};
    const earned=Math.round((a.splitMonth ? (21*(a.splitMonth-1)+30*(13-a.splitMonth))/12 : a.days*months/12)*10000)/10000;
-   const minimum=Math.min(earned,Math.round(15*months/12*10000)/10000);
-   rows.push({year:yr,months,annual:a.days,earned,minimum});entitlement+=earned;benchmark+=minimum;
+   // Settlement ceiling is based on the FULL annual rate for each calendar year
+   // in the cycle, even when the employee joined midyear. Accrual remains prorated.
+   // Original agreed examples: 15/21/21 => 12 days; 30/30/30 => 45 days.
+   // The annual 15-day use benchmark is a ceiling rule, NOT a deduction from
+   // the employee's actual recorded balance or a proration of that ceiling.
+   const annualForCap=a.splitMonth
+    ? (21*(a.splitMonth-1)+30*(13-a.splitMonth))/12
+    : a.days;
+   const yearlyCap=Math.max(0,annualForCap-15);
+   const minimum=15;
+   rows.push({year:yr,months,annual:a.days,earned,minimum,yearlyCap});
+   entitlement+=earned;benchmark+=minimum;
   }
-  const base=Math.max(0,Math.round((entitlement-benchmark)*10000)/10000);
+  let base=Math.round(rows.reduce((sum,row)=>sum+row.yearlyCap,0)*10000)/10000;
+  // Explicit agreed exception: actively working employees in the 5% category
+  // have a 45-day maximum for a three-calendar-year settlement cycle.
+  if(e.hr_five_percent?.enabled&&e.hr_five_percent.workStatus==='working')base=Math.min(base,45);
   // Only verified business-need refusals in a dedicated record may increase the cap.
   const ledger=e.hr_leave_business_refusals;
   let exception=0,verified=true;
@@ -2663,7 +2676,7 @@ function lm12OpenReport(){
  overlay.innerHTML=`<div class="lm12-sheet"><header class="lm12-head"><div><h2>${t('تقرير التسوية المالية للإجازات','Leave Financial Settlement Report')}</h2><p>${t('دورة ثلاثية قبل الستين وسنوية من يناير التالي لبلوغ الستين، مع حد التسوية والاستثناء الموثق.','Three-year cycles before age 60, annual January settlements thereafter, with caps and verified exceptions.')}</p></div><div class="lm12-actions"><button type="button" onclick="lm12Export()">${t('تصدير Excel','Export Excel')}</button><button type="button" onclick="lm12Print()">${t('طباعة','Print')}</button><button type="button" onclick="lm12Close()">${t('العودة للأرصدة','Back to balances')} ×</button></div></header>
  <div class="lm12-summary"><div>${t('الموظفون','Employees')}<strong>${lm12ReportRows.length}</strong></div><div>${t('أيام التسوية المبدئية','Provisional days')}<strong>${sumDays.toLocaleString()}</strong></div><div>${t('القيمة المبدئية','Provisional amount')}<strong>${lm3Money(sumMoney)}</strong></div><div>${t('تحتاج مراجعة','Needs review')}<strong>${lm12ReportRows.length-valid.length}</strong></div></div>
  <p class="lm12-note">${t('تنبيه: الأرصدة الحالية تعكس البيانات المسجلة ولا تمثل بالضرورة رصيد يناير التاريخي. لا يتم الصرف أو تصفير الأرصدة قبل التحقق من حركة الإجازات والاعتماد. الموافقات والرفض من ESS لم يتم ربطها بعد.','Important: current recorded balances are not necessarily historical January balances. No payout or reset without a verified leave ledger and approval. ESS approvals/refusals are not yet connected.')}</p>
- <div class="lm12-scroll"><table><thead><tr>${cols.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${lm12ReportRows.map(r=>`<tr><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.dept)}</td><td>${r.year||'—'}</td><td>${r.balance??'—'}</td><td>${r.rule.ok?r.rule.entitlement:'—'}</td><td>${r.rule.ok?r.rule.benchmark:'—'}</td><td>${r.rule.ok?r.rule.base:'—'}</td><td>${r.rule.ok?r.rule.exception:'—'}</td><td>${r.days??'—'}</td><td>${lm3Money(r.salary)}</td><td>${lm3Money(r.daily)}</td><td>${lm3Money(r.total)}</td><td>${esc(status(r))}</td></tr>`).join('')||`<tr><td colspan="14">${t('لا توجد نتائج','No results')}</td></tr>`}</tbody><tfoot><tr><td colspan="9">${t('إجمالي السجلات القابلة للحساب','Total calculable records')}</td><td>${sumDays}</td><td colspan="2"></td><td>${lm3Money(sumMoney)}</td><td>${valid.length}/${lm12ReportRows.length}</td></tr></tfoot></table></div></div>`;
+ <div class="lm12-scroll"><table><thead><tr>${cols.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${lm12ReportRows.map(r=>`<tr><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.dept)}</td><td>${r.year||'—'}</td><td>${r.balance??'—'}</td><td>${r.rule.ok?(r.rule.entitlement??'—'):'—'}</td><td>${r.rule.ok?(r.rule.benchmark??'—'):'—'}</td><td>${r.rule.ok?(r.rule.base??'—'):'—'}</td><td>${r.rule.ok?r.rule.exception:'—'}</td><td>${r.days??'—'}</td><td>${lm3Money(r.salary)}</td><td>${lm3Money(r.daily)}</td><td>${lm3Money(r.total)}</td><td>${esc(status(r))}</td></tr>`).join('')||`<tr><td colspan="14">${t('لا توجد نتائج','No results')}</td></tr>`}</tbody><tfoot><tr><td colspan="9">${t('إجمالي السجلات القابلة للحساب','Total calculable records')}</td><td>${sumDays}</td><td colspan="2"></td><td>${lm3Money(sumMoney)}</td><td>${valid.length}/${lm12ReportRows.length}</td></tr></tfoot></table></div></div>`;
  document.body.appendChild(overlay);document.body.classList.add('lm12-open');
 }
 function lm12Close(){document.getElementById('lm12-settlement-report')?.remove();document.body.classList.remove('lm12-open');}
