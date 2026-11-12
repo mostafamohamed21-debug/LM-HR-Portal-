@@ -3652,10 +3652,11 @@ function lmPayCalc(input){
  // preview assumptions, not a statutory claim about their tax treatment.
  const excluded=lmPayRound(phone*(1-lmPayrollState.taxPhone)+transport*(1-lmPayrollState.taxTransport)+glasses*(1-lmPayrollState.taxGlasses));
  const taxableMonth=Math.max(0,lmPayRound(earning-excluded-insuranceEmployee-penalty-absence-lateness-medical-martyrs));
- // Word document explicitly applies the annual tax formula directly to the
- // annualized taxable base (first 40,000 is zero-rated). Do not subtract an
- // additional 20,000: that would double-apply a personal allowance.
- const annualTaxable=lmPayRound(taxableMonth*12);
+ // FINAL PILOT TAX RULE (2026-11-12): annual personal allowance EGP 20,000
+ // is deducted ONCE from the annualized taxable monthly income, BEFORE the
+ // income-tax bands are applied. The EGP 40,000 zero-rate band is separate.
+ // Regression fixtures: gross 9,500 / insured 7,400 => net 8,132.50.
+ const annualTaxable=Math.max(0,lmPayRound(taxableMonth*12-20000));
  const tax=input.secondary===true?lmPayRound(earning*.10):lmPayRound(lmPayTax(annualTaxable)/12);
  const deductions=lmPayRound(insuranceEmployee+tax+martyrs+penalty+loan+medical+absence+lateness);
  return {earning,insuredWage,insuranceEmployee,employerInsurance,excluded,taxableMonth,annualTaxable,tax,martyrs,deductions,net:lmPayRound(earning-deductions),penalty,loan,medical,absence,lateness};
