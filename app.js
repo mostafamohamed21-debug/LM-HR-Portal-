@@ -3643,7 +3643,7 @@ function lmRaiseExport(){
 
 
 /* V5.5.6 integrated payroll calculation workbench — simulation only, no DB writes. */
-const lmPayrollState={overrides:{},results:[],month:new Date().toISOString().slice(0,7),taxPhone:0.2,taxTransport:0,taxGlasses:0,insuranceMin:2700,insuranceMax:16700};
+const lmPayrollState={overrides:{},results:[],page:1,pageSize:25,month:new Date().toISOString().slice(0,7),taxPhone:0.2,taxTransport:0,taxGlasses:0,insuranceMin:2700,insuranceMax:16700};
 function lmPayMoney(n){return Number.isFinite(n)?n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';}
 function lmPayNum(v,defaultValue=0){const n=lmRaiseNum(v);return Number.isFinite(n)?n:defaultValue;}
 function lmPayField(e,keys){return lmRaiseField(e,keys);}
@@ -3694,16 +3694,35 @@ function lmPayEmployee(e){
 function lmPayEdit(code,key,value){
  if(!lmPayrollState.overrides[code])lmPayrollState.overrides[code]={};
  lmPayrollState.overrides[code][key]=['insured','secondary'].includes(key)?value==='true':lmPayNum(value);
- lmPayRenderRows();
+ // Refresh only the edited employee row, not the entire table.
+ const r=lmPayrollState.results.find(x=>String(x.code)===String(code));
+ if(r){r.input=lmPayEmployee(r.e);r.calc=lmPayCalc(r.input);const tr=Array.from(document.querySelectorAll('#lm-payroll-table tbody tr')).find(el=>el.dataset.payCode===String(code));if(tr)tr.outerHTML=lmPayRowHtml(r);lmPayUpdateSummary();}
 }
-function lmPayRenderRows(){
+function lmPayUpdateSummary(){
+ const count=document.getElementById('lm-pay-summary');if(!count)return;
+ const total=lmPayrollState.results.reduce((a,r)=>a+r.calc.net,0);
+ count.textContent=`${lmPayrollState.results.length} employees / موظف — Net total / إجمالي الصافي: ${lmPayMoney(total)} EGP`;
+}
+function lmPayChangePage(delta){lmPayrollState.page+=delta;lmPayRenderRows(true);}
+function lmPaySearch(){lmPayrollState.page=1;lmPayRenderRows();}
+function lmPayRowHtml(r){
+ const columns=['gross','insurance','phone','transport','glasses','bonus','meal','overtime','other','penalty','loan','medical','absence','lateness'];
+ const code=String(r.code),safe=escapeHtml(code),encoded=encodeURIComponent(code);
+ return `<tr data-pay-code="${safe}"><td>${safe}</td><td>${escapeHtml(getEmployeeName(r.e))}</td>${columns.map(key=>`<td><input aria-label="${key} ${safe}" class="hr-feature-input" style="width:95px" type="text" inputmode="decimal" value="${lmPayMoney(lmPayNum(r.input[key])).replace(/,/g,'')}" onchange="lmPayEdit(decodeURIComponent('${encoded}'),'${key}',this.value)"></td>`).join('')}<td><select class="hr-feature-input" onchange="lmPayEdit(decodeURIComponent('${encoded}'),'insured',this.value)"><option value="true" ${r.input.insured?'selected':''}>Yes</option><option value="false" ${!r.input.insured?'selected':''}>No</option></select></td><td><select class="hr-feature-input" onchange="lmPayEdit(decodeURIComponent('${encoded}'),'secondary',this.value)"><option value="false" ${!r.input.secondary?'selected':''}>No</option><option value="true" ${r.input.secondary?'selected':''}>10% withholding</option></select></td><td>${lmPayMoney(r.calc.tax)}</td><td>${lmPayMoney(r.calc.insuranceEmployee)}</td><td>${lmPayMoney(r.calc.martyrs)}</td><td class="font-bold">${lmPayMoney(r.calc.net)}</td><td><button class="portal-ghost-btn" onclick="lmPayDetails(decodeURIComponent('${encoded}'))">${hrText('عرض الحسبة','Breakdown')}</button></td></tr>`;
+}
+function lmPayRenderRows(keepPage=false){
  const target=document.getElementById('lm-payroll-table');if(!target)return;
  const q=String(document.getElementById('lm-pay-search')?.value||'').trim().toLowerCase();
  const employees=allEmployees.filter(e=>!q||String(getEmployeeCode(e)).toLowerCase()===q||getEmployeeName(e).toLowerCase().includes(q));
  lmPayrollState.results=employees.map(e=>({e,code:getEmployeeCode(e),input:lmPayEmployee(e)})).map(r=>({...r,calc:lmPayCalc(r.input)}));
  const columns=[['gross','الشامل / Gross'],['insurance','أجر الاشتراك / Insured wage'],['phone','اتصال / Phone'],['transport','انتقال / Transport'],['glasses','نظارة / Glasses'],['bonus','حافز / Bonus'],['meal','وجبة / Meal'],['overtime','إضافي مالي / OT'],['other','استحقاقات أخرى / Other'],['penalty','جزاء / Penalty'],['loan','قسط / Loan'],['medical','طبي / Medical'],['absence','غياب / Absence'],['lateness','تأخير / Lateness']];
- target.innerHTML=`<table class="hr-feature-table w-full text-xs"><thead><tr><th>Code / الكود</th><th>Name / الاسم</th>${columns.map(x=>`<th>${x[1]}</th>`).join('')}<th>Insured?</th><th>Other employer?</th><th>Tax / الضريبة</th><th>Insurance / التأمين</th><th>Martyrs / الشهداء</th><th>Net / الصافي</th><th>تفاصيل / Details</th></tr></thead><tbody>${lmPayrollState.results.map(r=>`<tr><td>${escapeHtml(r.code)}</td><td>${escapeHtml(getEmployeeName(r.e))}</td>${columns.map(([key])=>`<td><input aria-label="${key} ${escapeHtml(r.code)}" class="hr-feature-input" style="width:95px" type="text" inputmode="decimal" value="${lmPayMoney(lmPayNum(r.input[key])).replace(/,/g,'')}" onchange="lmPayEdit('${escapeHtml(r.code)}','${key}',this.value)"></td>`).join('')}<td><select class="hr-feature-input" onchange="lmPayEdit('${escapeHtml(r.code)}','insured',this.value)"><option value="true" ${r.input.insured?'selected':''}>Yes</option><option value="false" ${!r.input.insured?'selected':''}>No</option></select></td><td><select class="hr-feature-input" onchange="lmPayEdit('${escapeHtml(r.code)}','secondary',this.value)"><option value="false" ${!r.input.secondary?'selected':''}>No</option><option value="true" ${r.input.secondary?'selected':''}>10% withholding</option></select></td><td>${lmPayMoney(r.calc.tax)}</td><td>${lmPayMoney(r.calc.insuranceEmployee)}</td><td>${lmPayMoney(r.calc.martyrs)}</td><td class="font-bold">${lmPayMoney(r.calc.net)}</td><td><button class="portal-ghost-btn" onclick="lmPayDetails(decodeURIComponent('${encodeURIComponent(r.code)}'))">${hrText('عرض الحسبة','Breakdown')}</button></td></tr>`).join('')}</tbody></table>`;
- const count=document.getElementById('lm-pay-summary');if(count){const total=lmPayrollState.results.reduce((a,r)=>a+r.calc.net,0);count.textContent=`${employees.length} employees / موظف — Net total / إجمالي الصافي: ${lmPayMoney(total)} EGP`}
+ const pages=Math.max(1,Math.ceil(lmPayrollState.results.length/lmPayrollState.pageSize));
+ if(!keepPage)lmPayrollState.page=1;
+ lmPayrollState.page=Math.max(1,Math.min(pages,lmPayrollState.page));
+ const pageRows=lmPayrollState.results.slice((lmPayrollState.page-1)*lmPayrollState.pageSize,lmPayrollState.page*lmPayrollState.pageSize);
+ target.innerHTML=`<table class="hr-feature-table w-full text-xs"><thead><tr><th>Code / الكود</th><th>Name / الاسم</th>${columns.map(x=>`<th>${x[1]}</th>`).join('')}<th>Insured?</th><th>Other employer?</th><th>Tax / الضريبة</th><th>Insurance / التأمين</th><th>Martyrs / الشهداء</th><th>Net / الصافي</th><th>تفاصيل / Details</th></tr></thead><tbody>${pageRows.map(lmPayRowHtml).join('')}</tbody></table>`;
+ const nav=document.getElementById('lm-pay-pages');if(nav){nav.innerHTML=`<button type="button" class="portal-ghost-btn" onclick="lmPayChangePage(-1)" ${lmPayrollState.page===1?'disabled':''}>${hrText('السابق','Previous')}</button> <span style="padding:0 12px">${lmPayrollState.page} / ${pages} — ${lmPayrollState.results.length} ${hrText('موظف','employees')}</span> <button type="button" class="portal-ghost-btn" onclick="lmPayChangePage(1)" ${lmPayrollState.page===pages?'disabled':''}>${hrText('التالي','Next')}</button>`;}
+ lmPayUpdateSummary();
 }
 function lmPayCloseDetails(){document.getElementById('lm-pay-modal')?.remove();}
 function lmPayDetails(code){
@@ -3764,7 +3783,7 @@ function lmPayExport(){
 }
 function lmAnnualRaisePreview(){
  const root=document.getElementById('hr-payroll-view');if(!root)return;
- root.innerHTML=`<h1 class="text-2xl font-bold mb-3">${hrText('المرتبات — ورشة الحساب والمراجعة','Payroll — Calculation workbench')}</h1><p class="text-amber-300 mb-4 text-sm">${hrText('اختبار حسابات فقط — دون ترحيل إلى Firebase.','Calculation test only — no Firebase posting.')}</p><div class="glass-card rounded-xl p-3 mb-3 flex flex-wrap gap-3 items-end"><label>${hrText('بحث بالكود أو الاسم','Code/name')}<input id="lm-pay-search" class="hr-feature-input block" oninput="lmPayRenderRows()"></label><label>${hrText('الشهر','Month')}<input type="month" class="hr-feature-input block" value="${lmPayrollState.month}" onchange="lmPayrollState.month=this.value"></label><label class="portal-ghost-btn" style="cursor:pointer">${hrText('استيراد CSV','Import CSV')}<input type="file" accept=".csv,text/csv" style="display:none" onchange="lmPayImport(this.files[0]);this.value=''"></label><button class="portal-ghost-btn" onclick="lmPayShowReadiness()">${hrText('فحص جاهزية المرتبات','Payroll readiness check')}</button><button class="portal-action-btn" onclick="lmPayExport()">${hrText('تصدير كشف الحساب CSV','Export payroll CSV')}</button><button class="portal-ghost-btn" onclick="lmPayRaisePage()">${hrText('معاينة العلاوة السنوية','Annual raise preview')}</button></div><p class="text-xs text-slate-300 mb-3">${hrText('البدلات جزء من الشامل وليست إضافة عليه.','Allowances are included in gross.')}</p><p id="lm-pay-import-status" class="text-sky-300 text-sm mb-2"></p><div id="lm-pay-readiness" class="text-amber-300 mb-2" aria-live="polite"></div><div id="lm-pay-summary" class="text-sky-300 mb-2"></div><div id="lm-pay-pilot-tools" class="mb-3"></div><div class="overflow-x-auto glass-card rounded-xl" id="lm-payroll-table"></div><div id="lm-pay-raise" class="mt-4 hidden"></div>`;
+ root.innerHTML=`<h1 class="text-2xl font-bold mb-3">${hrText('المرتبات — ورشة الحساب والمراجعة','Payroll — Calculation workbench')}</h1><p class="text-amber-300 mb-4 text-sm">${hrText('اختبار حسابات فقط — دون ترحيل إلى Firebase.','Calculation test only — no Firebase posting.')}</p><div class="glass-card rounded-xl p-3 mb-3 flex flex-wrap gap-3 items-end"><label>${hrText('بحث بالكود أو الاسم','Code/name')}<input id="lm-pay-search" class="hr-feature-input block" oninput="lmPaySearch()"></label><label>${hrText('الشهر','Month')}<input type="month" class="hr-feature-input block" value="${lmPayrollState.month}" onchange="lmPayrollState.month=this.value"></label><label class="portal-ghost-btn" style="cursor:pointer">${hrText('استيراد CSV','Import CSV')}<input type="file" accept=".csv,text/csv" style="display:none" onchange="lmPayImport(this.files[0]);this.value=''"></label><button class="portal-ghost-btn" onclick="lmPayShowReadiness()">${hrText('فحص جاهزية المرتبات','Payroll readiness check')}</button><button class="portal-action-btn" onclick="lmPayExport()">${hrText('تصدير كشف الحساب CSV','Export payroll CSV')}</button><button class="portal-ghost-btn" onclick="lmPayRaisePage()">${hrText('معاينة العلاوة السنوية','Annual raise preview')}</button></div><p class="text-xs text-slate-300 mb-3">${hrText('البدلات جزء من الشامل وليست إضافة عليه.','Allowances are included in gross.')}</p><p id="lm-pay-import-status" class="text-sky-300 text-sm mb-2"></p><div id="lm-pay-readiness" class="text-amber-300 mb-2" aria-live="polite"></div><div id="lm-pay-summary" class="text-sky-300 mb-2"></div><div id="lm-pay-pilot-tools" class="mb-3"></div><div class="overflow-x-auto glass-card rounded-xl" id="lm-payroll-table"></div><div id="lm-pay-pages" class="flex flex-wrap justify-center items-center gap-2 mt-3 mb-4"></div><div id="lm-pay-raise" class="mt-4 hidden"></div>`;
  lmPayRenderRows();
  lmSafePilotMount();
 }
