@@ -3710,24 +3710,29 @@ async function lmPayLinkAttendance(){
  const cycleComplete=lmPayCycleIsClosed(period);
  if(status)status.textContent=hrText('جارٍ قراءة البصمات والورديات من Firebase...','Reading punches and shift plans from Firebase...');
  try{
-  const paths=['hr_imports/attendance','shift_plans','manual_attendance_punches','attendance_requests','approved_attendance'];
+  // Use exactly the attendance tab's source normalization, including device-origin
+  // detection and deduplication. Do not independently re-interpret imported punches.
+  const paths=['hr_imports/attendance','shift_plans','manual_attendance_punches','attendance_requests'];
   const snaps=await Promise.all(paths.map(path=>db.ref(path).once('value')));
-  const [imports,plans,manual,requests,approved]=snaps.map(x=>x.val()||{}),rows=[],issues=[];
+  const [imports,plans,manual,requests]=snaps.map(x=>x.val()||{}),rows=[],issues=[];
   Object.entries(imports).forEach(([batchId,batch])=>Object.entries(batch?.records||{}).forEach(([i,r])=>{
    if(!r||!r.code||!r.timestamp)return;
-   rows.push({id:batchId+':'+i,code:String(r.code),date:String(r.timestamp).slice(0,10),timestamp:r.timestamp,origin:'device',status:'IMPORTED'});
+   const source=String(r.source||'').toLowerCase();
+   const origin=/zkteco|device|finger|zk|[1-4]/.test(source)?'device':'unknown';
+   rows.push({id:batchId+':'+i,code:String(r.code),date:String(r.timestamp).slice(0,10),timestamp:r.timestamp,origin,status:'IMPORTED'});
   }));
-  Object.entries(manual).forEach(([id,r])=>{if(r&&r.code&&r.date&&r.time)rows.push({id,code:String(r.code),date:r.date,time:r.time,origin:'manual',status:'APPROVED'});});
-  // ESS requests are not automatically financially trusted; only approved records can enter calculations.
+  Object.entries(manual).forEach(([id,r])=>{if(r&&r.code&&r.date&&r.time)rows.push({id,code:String(r.code),date:r.date,time:r.time,timestamp:r.date+'T'+r.time+':00',origin:'manual',status:'APPROVED'});});
   Object.entries(requests).forEach(([code,entries])=>Object.entries(entries||{}).forEach(([id,r])=>{
    if(!r||!r.clientDate||!r.clientTime)return;
    if(r.verificationStatus==='APPROVED'||r.status==='APPROVED')rows.push({id,code:String(code),date:r.clientDate,time:r.clientTime,origin:'ess',status:'APPROVED'});
   }));
+  const seen=new Set();
+  const deduped=rows.filter(r=>{if(r.origin!=='device')return true;const key=r.code+'|'+String(r.timestamp||r.date+' '+r.time);if(seen.has(key))return false;seen.add(key);return true;});
   const validCodes=new Set(allEmployees.map(e=>String(getEmployeeCode(e))));
   // Scope by the 09:00 operational day, not raw calendar date. Include next-day exits
   // for the final workday, while excluding next-day check-ins after 09:00.
   const workdayOf=r=>{const date=lmAttDate(r),time=lmAttTime(r);if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return '';if(!/^\d{1,2}:\d{2}/.test(time))return date;const h=Number(time.split(':')[0]);if(h>=9)return date;const d=new Date(date+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-1);return d.toISOString().slice(0,10);};
-  const scoped=rows.map(r=>({...r,reportWorkday:workdayOf(r)})).filter(r=>validCodes.has(r.code)&&r.reportWorkday>=period.start&&r.reportWorkday<=period.lastAttendanceDate);
+  const scoped=deduped.map(r=>({...r,reportWorkday:workdayOf(r)})).filter(r=>validCodes.has(r.code)&&r.reportWorkday>=period.start&&r.reportWorkday<=period.lastAttendanceDate);
   const diagnostic880=rows.filter(r=>r.code==='880').map(r=>({date:lmAttDate(r),time:lmAttTime(r),origin:r.origin,workday:workdayOf(r),inCycle:workdayOf(r)>=period.start&&workdayOf(r)<=period.lastAttendanceDate}));
   lmPayAttendanceLink.raw880=diagnostic880;
   lmPayAttendanceLink.raw109=rows.filter(r=>r.code==='109').map(r=>({date:lmAttDate(r),time:lmAttTime(r),origin:r.origin,workday:workdayOf(r),inCycle:workdayOf(r)>=period.start&&workdayOf(r)<=period.lastAttendanceDate}));
@@ -3754,6 +3759,7 @@ async function lmPayLinkAttendance(){
   // Even an empty attendance cycle must link zero OT for all employees;
   // otherwise stale payroll overrides could become fictitious overtime.
   if(!verifiedTotal)issues.push('NO_VERIFIED_ATTENDANCE_DAYS');
+  if(rows.some(r=>r.origin==='unknown'))issues.push('UNRECOGNIZED_IMPORT_SOURCE');
   // Missing days cannot be interpreted as absence or rest without validated schedules.
   lmPayAttendanceLink.month=lmPayrollState.month;
   lmPayAttendanceLink.byCode=byCode;
@@ -3784,12 +3790,12 @@ function lmPayRenderAttendancePreview(){
  const detail109=(link.daily||[]).filter(d=>String(d.code)==='109').map(d=>`<tr><td>${escapeHtml(d.date)}</td><td>${escapeHtml(d.shift)}</td><td>${d.hours===null?'—':d.hours}</td><td>${d.dayOt===null?'—':d.dayOt}</td><td>${d.nightOt===null?'—':d.nightOt}</td><td>${escapeHtml(d.reason||'OK')}</td></tr>`).join('');
  const raw109=(link.raw109||[]).slice(0,120).map(r=>`<tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.time)}</td><td>${escapeHtml(r.origin)}</td><td>${escapeHtml(r.workday)}</td><td>${r.inCycle?'YES':'NO'}</td></tr>`).join('');
  const d109=`<details class="mt-3" open><summary>${hrText('تشخيص الموظف 109 يومًا بيوم','Employee 109 daily diagnostics')}</summary><div class="overflow-x-auto"><table class="hr-feature-table w-full text-xs"><thead><tr><th>Date</th><th>Shift</th><th>Hours</th><th>Day OT</th><th>Night OT</th><th>Reason</th></tr></thead><tbody>${detail109||'<tr><td colspan="6">No processed attendance days for 109</td></tr>'}</tbody></table></div><h4 class="font-bold mt-3">${hrText('البصمات الخام للموظف 109','Raw punches for employee 109')}</h4><div class="overflow-x-auto"><table class="hr-feature-table w-full text-xs"><thead><tr><th>Date</th><th>Time</th><th>Source</th><th>Workday</th><th>In cycle?</th></tr></thead><tbody>${raw109||'<tr><td colspan="5">No source records found for 109</td></tr>'}</tbody></table></div></details>`;
- target.innerHTML=head+`<div class="overflow-x-auto"><table class="hr-feature-table w-full text-xs"><thead><tr><th>${hrText('الكود','Code')}</th><th>${hrText('الاسم','Name')}</th><th>${hrText('إضافي نهاري (ساعة)','Day OT (h)')}</th><th>${hrText('إضافي ليلي (ساعة)','Night OT (h)')}</th><th>${hrText('الحالة','Status')}</th><th>${hrText('قيمة الإضافي التجريبية','Simulated OT amount')}</th><th>${hrText('ملاحظات','Notes')}</th></tr></thead><tbody>${rows||`<tr><td colspan="7">${hrText('لا توجد بصمات مؤهلة في الدورة','No eligible punches in this cycle')}</td></tr>`}</tbody></table></div>`+detailHtml+d109;
+ target.innerHTML=head+(link.issues?.length?'<p class="text-amber-300 text-xs mb-2">'+escapeHtml(link.issues.join(' | '))+'</p>':'')+`<div class="overflow-x-auto"><table class="hr-feature-table w-full text-xs"><thead><tr><th>${hrText('الكود','Code')}</th><th>${hrText('الاسم','Name')}</th><th>${hrText('إضافي نهاري (ساعة)','Day OT (h)')}</th><th>${hrText('إضافي ليلي (ساعة)','Night OT (h)')}</th><th>${hrText('الحالة','Status')}</th><th>${hrText('قيمة الإضافي التجريبية','Simulated OT amount')}</th><th>${hrText('ملاحظات','Notes')}</th></tr></thead><tbody>${rows||`<tr><td colspan="7">${hrText('لا توجد بصمات مؤهلة في الدورة','No eligible punches in this cycle')}</td></tr>`}</tbody></table></div>`+detailHtml+d109;
 }
 function lmPayLinkedInput(e,input){
  const code=String(getEmployeeCode(e));
  const active=lmPayAttendanceLink.month===lmPayrollState.month&&!!lmPayAttendanceLink.period;
- if(!active)return input;
+ if(!active)return {...input,overtime:0};
  const linked=lmPayAttendanceLink.byCode[code];
  // Attendance is the ONLY overtime source once the cycle link has loaded.
  // No punches => zero calculated overtime, NOT a legacy manual override.
