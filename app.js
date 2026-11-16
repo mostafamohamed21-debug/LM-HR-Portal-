@@ -3712,36 +3712,47 @@ async function lmPayLinkAttendance(){
  try{
   // Use exactly the attendance tab's source normalization, including device-origin
   // detection and deduplication. Do not independently re-interpret imported punches.
-  const paths=['hr_imports/attendance','shift_plans','manual_attendance_punches','attendance_requests'];
+  // Match the Unified Daily Attendance report: identical source paths,
+  // import normalization, duplicate filtering, pairing, and work-hour engine.
+  // Do NOT calculate a second payroll-only punch interpretation.
+  const paths=['hr_imports/attendance','shift_plans','manual_attendance_punches'];
   const snaps=await Promise.all(paths.map(path=>db.ref(path).once('value')));
-  const [imports,plans,manual,requests]=snaps.map(x=>x.val()||{}),rows=[],issues=[];
+  const [imports,plans,manual]=snaps.map(x=>x.val()||{}),rows=[],issues=[];
   Object.entries(imports).forEach(([batchId,batch])=>Object.entries(batch?.records||{}).forEach(([i,r])=>{
-   if(!r||!r.code||!r.timestamp)return;
+   if(!r||typeof r!=='object')return;
    const source=String(r.source||'').toLowerCase();
-   const origin=/zkteco|device|finger|zk|[1-4]/.test(source)?'device':'unknown';
-   rows.push({id:batchId+':'+i,code:String(r.code),date:String(r.timestamp).slice(0,10),timestamp:r.timestamp,origin,status:'IMPORTED'});
+   rows.push({id:batchId+':'+i,code:String(r.code||''),date:String(r.timestamp||'').slice(0,10),timestamp:r.timestamp,punch:r.type,status:'IMPORTED',origin:/zkteco|device|finger|zk|[1-4]/.test(source)?'device':'unknown'});
   }));
-  Object.entries(manual).forEach(([id,r])=>{if(r&&r.code&&r.date&&r.time)rows.push({id,code:String(r.code),date:r.date,time:r.time,timestamp:r.date+'T'+r.time+':00',origin:'manual',status:'APPROVED'});});
-  Object.entries(requests).forEach(([code,entries])=>Object.entries(entries||{}).forEach(([id,r])=>{
-   if(!r||!r.clientDate||!r.clientTime)return;
-   if(r.verificationStatus==='APPROVED'||r.status==='APPROVED')rows.push({id,code:String(code),date:r.clientDate,time:r.clientTime,origin:'ess',status:'APPROVED'});
-  }));
+  Object.entries(manual).forEach(([id,r])=>{if(r&&r.code&&r.date&&r.time)rows.push({id,code:String(r.code),date:r.date,time:r.time,timestamp:r.date+'T'+r.time+':00',punch:r.punchType,origin:'manual',status:'MANUAL'});});
   const seen=new Set();
   const deduped=rows.filter(r=>{if(r.origin!=='device')return true;const key=r.code+'|'+String(r.timestamp||r.date+' '+r.time);if(seen.has(key))return false;seen.add(key);return true;});
   const validCodes=new Set(allEmployees.map(e=>String(getEmployeeCode(e))));
-  // Scope by the 09:00 operational day, not raw calendar date. Include next-day exits
-  // for the final workday, while excluding next-day check-ins after 09:00.
-  const workdayOf=r=>{const date=lmAttDate(r),time=lmAttTime(r);if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return '';if(!/^\d{1,2}:\d{2}/.test(time))return date;const h=Number(time.split(':')[0]);if(h>=9)return date;const d=new Date(date+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-1);return d.toISOString().slice(0,10);};
-  const scoped=deduped.map(r=>({...r,reportWorkday:workdayOf(r)})).filter(r=>validCodes.has(r.code)&&r.reportWorkday>=period.start&&r.reportWorkday<=period.lastAttendanceDate);
-  const diagnostic880=rows.filter(r=>r.code==='880').map(r=>({date:lmAttDate(r),time:lmAttTime(r),origin:r.origin,workday:workdayOf(r),inCycle:workdayOf(r)>=period.start&&workdayOf(r)<=period.lastAttendanceDate}));
-  lmPayAttendanceLink.raw880=diagnostic880;
-  lmPayAttendanceLink.raw109=rows.filter(r=>r.code==='109').map(r=>({date:lmAttDate(r),time:lmAttTime(r),origin:r.origin,workday:workdayOf(r),inCycle:workdayOf(r)>=period.start&&workdayOf(r)<=period.lastAttendanceDate}));
-  const oldPlans=lmAttWorkspace.shiftPlans;
-  lmAttWorkspace.shiftPlans=plans;
-  let daily;try{daily=lmAttWorkHourRows(scoped);}finally{lmAttWorkspace.shiftPlans=oldPlans;}
+  // Classification must use exactly the same rules as the attendance screen.
+  // In particular, an A-shift 08:54 punch belongs to its calendar day,
+  // not the preceding day merely because it is before 09:00.
+  const oldRows=lmAttWorkspace.rows,oldPlans=lmAttWorkspace.shiftPlans;
+  let daily,scoped;
+  try{
+   lmAttWorkspace.rows=deduped.filter(r=>validCodes.has(String(r.code)));
+   lmAttWorkspace.shiftPlans=plans;
+   lmAttClassify();
+   scoped=lmAttWorkspace.rows.filter(r=>r.reportWorkday>=period.start&&r.reportWorkday<=period.lastAttendanceDate);
+   daily=lmAttWorkHourRows(scoped);
+   // The unified report only treats complete PAIRED days as financial evidence.
+   const paired=new Map();
+   for(const r of scoped){const key=String(r.code)+'|'+r.reportWorkday;const a=paired.get(key)||[];a.push(r);paired.set(key,a);}
+   daily=daily.map(d=>{
+    const items=paired.get(d.code+'|'+d.date)||[];
+    const valid=items.length>=2&&items.every(r=>r.reportPairStatus==='PAIRED');
+    return valid?d:{...d,dayOt:null,nightOt:null,ot:null,reason:d.reason||'UNPAIRED_ATTENDANCE'};
+   });
+  }finally{lmAttWorkspace.rows=oldRows;lmAttWorkspace.shiftPlans=oldPlans;}
+  const workdayOf=r=>r.reportWorkday||lmAttDate(r);
+  lmPayAttendanceLink.raw880=deduped.filter(r=>String(r.code)==='880').map(r=>({date:lmAttDate(r),time:lmAttTime(r),origin:r.origin,workday:workdayOf(r),inCycle:workdayOf(r)>=period.start&&workdayOf(r)<=period.lastAttendanceDate}));
+  lmPayAttendanceLink.raw109=deduped.filter(r=>String(r.code)==='109').map(r=>({date:lmAttDate(r),time:lmAttTime(r),origin:r.origin,workday:workdayOf(r),inCycle:workdayOf(r)>=period.start&&workdayOf(r)<=period.lastAttendanceDate}));
   const byCode={};
   lmPayAttendanceLink.daily=daily;
-  lmPayAttendanceLink.sourceCounts={imports:rows.filter(r=>r.origin==='device').length,manual:rows.filter(r=>r.origin==='manual').length,ess:rows.filter(r=>r.origin==='ess').length,scoped:scoped.length};
+  lmPayAttendanceLink.sourceCounts={imports:rows.filter(r=>r.origin==='device').length,manual:rows.filter(r=>r.origin==='manual').length,ess:0,scoped:scoped.length};
   daily.forEach(d=>{
    const o=byCode[d.code]||(byCode[d.code]={day:0,night:0,verifiedDays:0,review:[]});
    if(d.reason||d.dayOt===null||d.nightOt===null){o.review.push(d.date+': '+(d.reason||'UNVERIFIED'));return;}
