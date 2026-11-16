@@ -3743,15 +3743,17 @@ async function lmPayLinkAttendance(){
    if(d.shift!=='A'){o.review.push(d.date+': SHIFT_'+d.shift+'_MONTHLY_POLICY_REQUIRED');return;}
    o.day+=d.dayOt;o.night+=d.nightOt;o.verifiedDays++;
   });
+  // Include employees with no punch records explicitly so zero is auditable.
+  for(const employee of allEmployees){
+   const code=String(getEmployeeCode(employee)||'');
+   if(code&&!byCode[code])byCode[code]={day:0,night:0,verifiedDays:0,review:['NO_PUNCHES_IN_CYCLE']};
+  }
   // Never silently zero every employee when the source is empty or cannot be verified.
   // Zero OT is permitted only for employees with at least one verified attendance day.
   const verifiedTotal=Object.values(byCode).reduce((n,v)=>n+(v.verifiedDays||0),0);
-  if(!verifiedTotal){
-   lmPayAttendanceLink.month=null;lmPayAttendanceLink.period=null;lmPayAttendanceLink.byCode={};
-   lmPayRenderRows(true);lmPayRenderAttendancePreview();
-   if(status)status.textContent=hrText('لم يتم ترحيل أي قيمة: لا توجد أيام حضور مؤكدة للحساب في هذه الدورة. راجع الشهر ومصادر البصمات والتعيينات.','No amounts linked: no verified attendance days for this cycle. Check month, punch sources and shift plans.');
-   return;
-  }
+  // Even an empty attendance cycle must link zero OT for all employees;
+  // otherwise stale payroll overrides could become fictitious overtime.
+  if(!verifiedTotal)issues.push('NO_VERIFIED_ATTENDANCE_DAYS');
   // Missing days cannot be interpreted as absence or rest without validated schedules.
   lmPayAttendanceLink.month=lmPayrollState.month;
   lmPayAttendanceLink.byCode=byCode;
@@ -3787,11 +3789,13 @@ function lmPayRenderAttendancePreview(){
 function lmPayLinkedInput(e,input){
  const code=String(getEmployeeCode(e));
  const active=lmPayAttendanceLink.month===lmPayrollState.month&&!!lmPayAttendanceLink.period;
- const linked=active?lmPayAttendanceLink.byCode[code]:null;
- // An employee without verified attendance is NOT equivalent to a verified zero.
- // Keep the pre-link draft untouched, and surface that uncertainty in the preview.
- if(!active||!linked||!(linked.verifiedDays>0))return input;
- const day=Math.max(0,Number(linked.day)||0),night=Math.max(0,Number(linked.night)||0);
+ if(!active)return input;
+ const linked=lmPayAttendanceLink.byCode[code];
+ // Attendance is the ONLY overtime source once the cycle link has loaded.
+ // No punches => zero calculated overtime, NOT a legacy manual override.
+ // Review-only days also cannot generate a financial amount.
+ const day=linked&&linked.verifiedDays>0?Math.max(0,Number(linked.day)||0):0;
+ const night=linked&&linked.verifiedDays>0?Math.max(0,Number(linked.night)||0):0;
  const rate=lmPayNum(input.gross)/30/7;
  return {...input,overtime:lmPayRound(day*rate*1.35+night*rate*1.70)};
 }
