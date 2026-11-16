@@ -3696,7 +3696,7 @@ function lmPayCalc(input){
  return {earning,insuredWage,insuranceEmployee,employerInsurance,excluded,taxableMonth,annualTaxable,tax,martyrs,deductions,net:lmPayRound(earning-deductions),penalty,loan,medical,absence,lateness};
 }
 /* Live attendance -> payroll draft: cycle-scoped, read-only, fail closed. */
-const lmPayAttendanceLink={month:null,byCode:{},issues:[],status:'NOT_LOADED'};
+const lmPayAttendanceLink={month:null,byCode:{},issues:[],status:'NOT_LOADED',period:null,cycleComplete:false,dayCount:0};
 function lmPayCycleIsClosed(period){
  // Operational day 09:00 to 09:00 next day in Cairo; close only after last day is complete.
  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -3707,7 +3707,7 @@ async function lmPayLinkAttendance(){
  const status=document.getElementById('lm-pay-att-link-status');
  if(!portalIsAdmin()){if(status)status.textContent=hrText('يلزم حساب المدير','Admin required');return;}
  let period;try{period=LactoPayrollCycle.schedule(lmPayrollState.month,lmSafeCycleSettings());}catch(e){if(status)status.textContent=e.message;return;}
- if(!lmPayCycleIsClosed(period)){lmPayAttendanceLink.month=null;lmPayAttendanceLink.byCode={};if(status)status.textContent=hrText('الدورة لم تكتمل: لا ترحيل قبل اكتمال يوم الحضور الأخير 09:00 صباح اليوم التالي.','Cycle still open: no financial effect until last operational day completes at 09:00 next morning.');lmPayRenderRows(true);return;}
+ const cycleComplete=lmPayCycleIsClosed(period);
  if(status)status.textContent=hrText('جارٍ قراءة البصمات والورديات من Firebase...','Reading punches and shift plans from Firebase...');
  try{
   const paths=['hr_imports/attendance','shift_plans','manual_attendance_punches','attendance_requests','approved_attendance'];
@@ -3739,11 +3739,26 @@ async function lmPayLinkAttendance(){
   lmPayAttendanceLink.month=lmPayrollState.month;
   lmPayAttendanceLink.byCode=byCode;
   lmPayAttendanceLink.issues=issues;
-  lmPayAttendanceLink.status='DRAFT_FROM_LIVE_DATA';
+  lmPayAttendanceLink.status=cycleComplete?'DRAFT_FROM_LIVE_DATA':'EARLY_SIMULATION';
+  lmPayAttendanceLink.period=period;
+  lmPayAttendanceLink.cycleComplete=cycleComplete;
+  lmPayAttendanceLink.dayCount=daily.length;
   lmPayRenderRows(true);
   const review=Object.values(byCode).reduce((n,x)=>n+x.review.length,0);
   if(status)status.textContent=hrText('تم الربط الفعلي لمسودة الإضافي A فقط؛ أيام B/C/D والحالات غير المكتملة معلّقة للمراجعة، ولا تُحسب خصومات تلقائيًا.','Live A overtime linked to payroll draft; B/C/D and uncertain days held for review. No automatic deductions.')+' '+daily.length+' days / '+review+' review.';
- }catch(e){lmPayAttendanceLink.month=null;lmPayAttendanceLink.byCode={};lmPayRenderRows(true);if(status)status.textContent=hrText('فشل تحميل المصدر؛ لم تُطبق أي مؤثرات: ','Source read failed; no effects applied: ')+(e.message||e);}
+ }catch(e){lmPayAttendanceLink.month=null;lmPayAttendanceLink.byCode={};lmPayRenderRows(true);lmPayRenderAttendancePreview();if(status)status.textContent=hrText('فشل تحميل المصدر؛ لم تُطبق أي مؤثرات: ','Source read failed; no effects applied: ')+(e.message||e);}
+}
+function lmPayRenderAttendancePreview(){
+ const target=document.getElementById('lm-pay-att-preview');if(!target)return;
+ const link=lmPayAttendanceLink;
+ if(link.month!==lmPayrollState.month||!link.period){target.innerHTML='';return;}
+ const entries=Object.entries(link.byCode).sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true}));
+ const count=entries.reduce((n,[,v])=>n+v.review.length,0);
+ const label=hrText('معاينة مؤثرات الحضور (تجريبية، لا تُنشر)','Attendance effects preview (simulation, not published)');
+ const state=link.cycleComplete?hrText('الدورة مكتملة','Cycle complete'):hrText('الدورة مفتوحة — القيم مؤقتة','Cycle open — provisional values');
+ const head=`<div class="flex flex-wrap gap-3 items-center mb-2"><strong>${label}</strong><span class="text-amber-300">${state}</span><span>${escapeHtml(link.period.start)} → ${escapeHtml(link.period.lastAttendanceDate)}</span><span>${link.dayCount} ${hrText('يوم حضور','attendance days')} / ${count} ${hrText('للمراجعة','to review')}</span></div>`;
+ const rows=entries.map(([code,v])=>{const emp=allEmployees.find(e=>String(getEmployeeCode(e))===code);const name=emp?getEmployeeName(emp):'';const gross=emp?lmPayNum(lmPayEmployee(emp).gross):0;const rate=gross/30/7;const amount=lmPayRound(v.day*rate*1.35+v.night*rate*1.70);return `<tr><td>${escapeHtml(code)}</td><td>${escapeHtml(name)}</td><td>${lmPayMoney(v.day)}</td><td>${lmPayMoney(v.night)}</td><td>${v.review.length?hrText('معلّق للمراجعة','Review required'):hrText('مؤكد مبدئيًا','Preliminarily verified')}</td><td>${v.review.length?'—':lmPayMoney(amount)}</td><td>${escapeHtml(v.review.join(' | ')||'—')}</td></tr>`;}).join('');
+ target.innerHTML=head+`<div class="overflow-x-auto"><table class="hr-feature-table w-full text-xs"><thead><tr><th>${hrText('الكود','Code')}</th><th>${hrText('الاسم','Name')}</th><th>${hrText('إضافي نهاري (ساعة)','Day OT (h)')}</th><th>${hrText('إضافي ليلي (ساعة)','Night OT (h)')}</th><th>${hrText('الحالة','Status')}</th><th>${hrText('قيمة الإضافي التجريبية','Simulated OT amount')}</th><th>${hrText('ملاحظات','Notes')}</th></tr></thead><tbody>${rows||`<tr><td colspan="7">${hrText('لا توجد بصمات مؤهلة في الدورة','No eligible punches in this cycle')}</td></tr>`}</tbody></table></div>`;
 }
 function lmPayLinkedInput(e,input){
  const code=String(getEmployeeCode(e)),linked=lmPayAttendanceLink.month===lmPayrollState.month?lmPayAttendanceLink.byCode[code]:null;
@@ -3752,7 +3767,7 @@ function lmPayLinkedInput(e,input){
  const rate=lmPayNum(input.gross)/30/7;
  return {...input,overtime:lmPayRound(linked.day*rate*1.35+linked.night*rate*1.70)};
 }
-function lmPayChangeMonth(value){lmPayrollState.month=value;lmPayAttendanceLink.month=null;lmPayAttendanceLink.byCode={};lmSafeCycleShow();lmPayRenderRows();const el=document.getElementById('lm-pay-att-link-status');if(el)el.textContent=hrText('تم تغيير الدورة: اضغط ربط الحضور لإعادة القراءة.','Cycle changed: reload attendance link.');}
+function lmPayChangeMonth(value){lmPayrollState.month=value;lmPayAttendanceLink.month=null;lmPayAttendanceLink.byCode={};lmPayAttendanceLink.period=null;lmPayRenderAttendancePreview();lmSafeCycleShow();lmPayRenderRows();const el=document.getElementById('lm-pay-att-link-status');if(el)el.textContent=hrText('تم تغيير الدورة: اضغط ربط الحضور لإعادة القراءة.','Cycle changed: reload attendance link.');}
 function lmPayEmployee(e){
  const code=getEmployeeCode(e),base={gross:lmPayNum(lmPayField(e,['الراتب الشامل','المرتب الشامل','gross salary','gross_salary','total salary','الشامل','الاجر الشامل','الأجر الشامل','comprehensiveSalary','grossSalary'])),insurance:lmPayNum(lmPayField(e,['أجر الاشتراك التأميني','insuranceContributionWage','insuranceWage','insuredWage'])),phone:0,transport:0,glasses:0,bonus:0,meal:0,overtime:0,other:0,penalty:0,loan:0,medical:0,absence:0,lateness:0,included:1,insured:!!lmPayNum(lmPayField(e,['أجر الاشتراك التأميني','insuranceContributionWage','insuranceWage','insuredWage'])),secondary:false};
  return lmPayLinkedInput(e,{...base,...(lmPayrollState.overrides[code]||{})});
@@ -3849,7 +3864,7 @@ function lmPayExport(){
 }
 function lmAnnualRaisePreview(){
  const root=document.getElementById('hr-payroll-view');if(!root)return;
- root.innerHTML=`<h1 class="text-2xl font-bold mb-3">${hrText('المرتبات — ورشة الحساب والمراجعة','Payroll — Calculation workbench')}</h1><p class="text-amber-300 mb-4 text-sm">${hrText('اختبار حسابات فقط — دون ترحيل إلى Firebase.','Calculation test only — no Firebase posting.')}</p><div class="glass-card rounded-xl p-3 mb-3 flex flex-wrap gap-3 items-end"><label>${hrText('بحث بالكود أو الاسم','Code/name')}<input id="lm-pay-search" class="hr-feature-input block" oninput="lmPaySearch()"></label><label>${hrText('الشهر','Month')}<input type="month" class="hr-feature-input block" value="${lmPayrollState.month}" onchange="lmPayChangeMonth(this.value)"></label><label class="portal-ghost-btn" style="cursor:pointer">${hrText('استيراد CSV','Import CSV')}<input type="file" accept=".csv,text/csv" style="display:none" onchange="lmPayImport(this.files[0]);this.value=''"></label><button class="portal-ghost-btn" onclick="lmPayShowReadiness()">${hrText('فحص جاهزية المرتبات','Payroll readiness check')}</button><button class="portal-action-btn" onclick="lmPayExport()">${hrText('تصدير كشف الحساب CSV','Export payroll CSV')}</button><button class="portal-ghost-btn" onclick="lmPayRaisePage()">${hrText('معاينة العلاوة السنوية','Annual raise preview')}</button></div><p class="text-xs text-slate-300 mb-3">${hrText('البدلات جزء من الشامل وليست إضافة عليه.','Allowances are included in gross.')}</p><p id="lm-pay-import-status" class="text-sky-300 text-sm mb-2"></p><div class="glass-card rounded-xl p-3 mb-3"><button class="portal-action-btn" onclick="lmPayLinkAttendance()">${hrText('ربط البصمات بالمرتبات للدورة المكتملة','Link attendance to completed payroll cycle')}</button><p id="lm-pay-att-link-status" class="text-sky-300 text-xs mt-2">${hrText('لم يتم تحميل مؤثرات الحضور بعد','Attendance effects not loaded yet')}</p></div><div id="lm-pay-readiness" class="text-amber-300 mb-2" aria-live="polite"></div><div id="lm-pay-summary" class="text-sky-300 mb-2"></div><div id="lm-pay-pilot-tools" class="mb-3"></div><div class="overflow-x-auto glass-card rounded-xl" id="lm-payroll-table"></div><div id="lm-pay-pages" class="flex flex-wrap justify-center items-center gap-2 mt-3 mb-4"></div><div id="lm-pay-raise" class="mt-4 hidden"></div>`;
+ root.innerHTML=`<h1 class="text-2xl font-bold mb-3">${hrText('المرتبات — ورشة الحساب والمراجعة','Payroll — Calculation workbench')}</h1><p class="text-amber-300 mb-4 text-sm">${hrText('اختبار حسابات فقط — دون ترحيل إلى Firebase.','Calculation test only — no Firebase posting.')}</p><div class="glass-card rounded-xl p-3 mb-3 flex flex-wrap gap-3 items-end"><label>${hrText('بحث بالكود أو الاسم','Code/name')}<input id="lm-pay-search" class="hr-feature-input block" oninput="lmPaySearch()"></label><label>${hrText('الشهر','Month')}<input type="month" class="hr-feature-input block" value="${lmPayrollState.month}" onchange="lmPayChangeMonth(this.value)"></label><label class="portal-ghost-btn" style="cursor:pointer">${hrText('استيراد CSV','Import CSV')}<input type="file" accept=".csv,text/csv" style="display:none" onchange="lmPayImport(this.files[0]);this.value=''"></label><button class="portal-ghost-btn" onclick="lmPayShowReadiness()">${hrText('فحص جاهزية المرتبات','Payroll readiness check')}</button><button class="portal-action-btn" onclick="lmPayExport()">${hrText('تصدير كشف الحساب CSV','Export payroll CSV')}</button><button class="portal-ghost-btn" onclick="lmPayRaisePage()">${hrText('معاينة العلاوة السنوية','Annual raise preview')}</button></div><p class="text-xs text-slate-300 mb-3">${hrText('البدلات جزء من الشامل وليست إضافة عليه.','Allowances are included in gross.')}</p><p id="lm-pay-import-status" class="text-sky-300 text-sm mb-2"></p><div class="glass-card rounded-xl p-3 mb-3"><button class="portal-action-btn" onclick="lmPayLinkAttendance()">${hrText('معاينة وربط البصمات تجريبيًا','Preview and simulate attendance link')}</button><p id="lm-pay-att-link-status" class="text-sky-300 text-xs mt-2">${hrText('لم يتم تحميل مؤثرات الحضور بعد','Attendance effects not loaded yet')}</p><div id="lm-pay-att-preview" class="mt-3 text-sm"></div></div><div id="lm-pay-readiness" class="text-amber-300 mb-2" aria-live="polite"></div><div id="lm-pay-summary" class="text-sky-300 mb-2"></div><div id="lm-pay-pilot-tools" class="mb-3"></div><div class="overflow-x-auto glass-card rounded-xl" id="lm-payroll-table"></div><div id="lm-pay-pages" class="flex flex-wrap justify-center items-center gap-2 mt-3 mb-4"></div><div id="lm-pay-raise" class="mt-4 hidden"></div>`;
  lmPayRenderRows();
  lmSafePilotMount();
 }
