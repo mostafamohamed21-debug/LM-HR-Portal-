@@ -3738,11 +3738,20 @@ async function lmPayLinkAttendance(){
   lmPayAttendanceLink.daily=daily;
   lmPayAttendanceLink.sourceCounts={imports:rows.filter(r=>r.origin==='device').length,manual:rows.filter(r=>r.origin==='manual').length,ess:rows.filter(r=>r.origin==='ess').length,scoped:scoped.length};
   daily.forEach(d=>{
-   const o=byCode[d.code]||(byCode[d.code]={day:0,night:0,review:[]});
+   const o=byCode[d.code]||(byCode[d.code]={day:0,night:0,verifiedDays:0,review:[]});
    if(d.reason||d.dayOt===null||d.nightOt===null){o.review.push(d.date+': '+(d.reason||'UNVERIFIED'));return;}
    if(d.shift!=='A'){o.review.push(d.date+': SHIFT_'+d.shift+'_MONTHLY_POLICY_REQUIRED');return;}
-   o.day+=d.dayOt;o.night+=d.nightOt;
+   o.day+=d.dayOt;o.night+=d.nightOt;o.verifiedDays++;
   });
+  // Never silently zero every employee when the source is empty or cannot be verified.
+  // Zero OT is permitted only for employees with at least one verified attendance day.
+  const verifiedTotal=Object.values(byCode).reduce((n,v)=>n+(v.verifiedDays||0),0);
+  if(!verifiedTotal){
+   lmPayAttendanceLink.month=null;lmPayAttendanceLink.period=null;lmPayAttendanceLink.byCode={};
+   lmPayRenderRows(true);lmPayRenderAttendancePreview();
+   if(status)status.textContent=hrText('لم يتم ترحيل أي قيمة: لا توجد أيام حضور مؤكدة للحساب في هذه الدورة. راجع الشهر ومصادر البصمات والتعيينات.','No amounts linked: no verified attendance days for this cycle. Check month, punch sources and shift plans.');
+   return;
+  }
   // Missing days cannot be interpreted as absence or rest without validated schedules.
   lmPayAttendanceLink.month=lmPayrollState.month;
   lmPayAttendanceLink.byCode=byCode;
@@ -3766,7 +3775,7 @@ function lmPayRenderAttendancePreview(){
  const state=link.cycleComplete?hrText('الدورة مكتملة','Cycle complete'):hrText('الدورة مفتوحة — القيم مؤقتة','Cycle open — provisional values');
  const diagnostic=link.sourceCounts||{};
  const head=`<div class="flex flex-wrap gap-3 items-center mb-2"><strong>${label}</strong><span class="text-amber-300">${state}</span><span>${escapeHtml(link.period.start)} → ${escapeHtml(link.period.lastAttendanceDate)}</span><span>${link.dayCount} ${hrText('يوم حضور','attendance days')} / ${count} ${hrText('للمراجعة','to review')}</span></div>`;
- const rows=entries.map(([code,v])=>{const emp=allEmployees.find(e=>String(getEmployeeCode(e))===code);const name=emp?getEmployeeName(emp):'';const gross=emp?lmPayNum(lmPayEmployee(emp).gross):0;const rate=gross/30/7;const amount=lmPayRound(v.day*rate*1.35+v.night*rate*1.70);return `<tr><td>${escapeHtml(code)}</td><td>${escapeHtml(name)}</td><td>${lmPayMoney(v.day)}</td><td>${lmPayMoney(v.night)}</td><td>${v.review.length?hrText('معلّق للمراجعة','Review required'):hrText('مؤكد مبدئيًا','Preliminarily verified')}</td><td>${lmPayMoney(amount)}</td><td>${escapeHtml(v.review.join(' | ')||'—')}</td></tr>`;}).join('');
+ const rows=entries.map(([code,v])=>{const emp=allEmployees.find(e=>String(getEmployeeCode(e))===code);const name=emp?getEmployeeName(emp):'';const gross=emp?lmPayNum(lmPayEmployee(emp).gross):0;const rate=gross/30/7;const amount=lmPayRound(v.day*rate*1.35+v.night*rate*1.70);return `<tr><td>${escapeHtml(code)}</td><td>${escapeHtml(name)}</td><td>${lmPayMoney(v.day)}</td><td>${lmPayMoney(v.night)}</td><td>${!(v.verifiedDays>0)?hrText('لا توجد أيام مؤكدة','No verified days'):v.review.length?hrText('محسوب جزئيًا — توجد أيام للمراجعة','Partially calculated — review days'):hrText('مؤكد مبدئيًا','Preliminarily verified')}</td><td>${lmPayMoney(amount)}</td><td>${escapeHtml(v.review.join(' | ')||'—')}</td></tr>`;}).join('');
  const detail=(link.daily||[]).filter(d=>String(d.code)==='880').map(d=>`<tr><td>${escapeHtml(d.date)}</td><td>${escapeHtml(d.shift)}</td><td>${d.hours===null?'—':d.hours}</td><td>${d.dayOt===null?'—':d.dayOt}</td><td>${d.nightOt===null?'—':d.nightOt}</td><td>${escapeHtml(d.reason||'OK')}</td></tr>`).join('');
  const raw880=(link.raw880||[]).slice(0,120).map(r=>`<tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.time)}</td><td>${escapeHtml(r.origin)}</td><td>${escapeHtml(r.workday)}</td><td>${r.inCycle?'YES':'NO'}</td></tr>`).join('');
  const detailHtml=`<details class="mt-3" open><summary>${hrText('تشخيص الموظف 880 يومًا بيوم','Employee 880 daily diagnostics')}</summary><p class="text-xs">Source records: ${diagnostic.imports||0} device / ${diagnostic.manual||0} manual / ${diagnostic.ess||0} ESS; in cycle: ${diagnostic.scoped||0}</p><div class="overflow-x-auto"><table class="hr-feature-table w-full text-xs"><thead><tr><th>Date</th><th>Shift</th><th>Hours</th><th>Day OT</th><th>Night OT</th><th>Reason</th></tr></thead><tbody>${detail||'<tr><td colspan="6">No processed attendance days for 880</td></tr>'}</tbody></table></div><h4 class="font-bold mt-3">${hrText('البصمات الخام للموظف 880','Raw punches for employee 880')}</h4><div class="overflow-x-auto"><table class="hr-feature-table w-full text-xs"><thead><tr><th>Date</th><th>Time</th><th>Source</th><th>Workday</th><th>In cycle?</th></tr></thead><tbody>${raw880||'<tr><td colspan="5">No source records found for 880</td></tr>'}</tbody></table></div></details>`;
@@ -3776,13 +3785,13 @@ function lmPayRenderAttendancePreview(){
  target.innerHTML=head+`<div class="overflow-x-auto"><table class="hr-feature-table w-full text-xs"><thead><tr><th>${hrText('الكود','Code')}</th><th>${hrText('الاسم','Name')}</th><th>${hrText('إضافي نهاري (ساعة)','Day OT (h)')}</th><th>${hrText('إضافي ليلي (ساعة)','Night OT (h)')}</th><th>${hrText('الحالة','Status')}</th><th>${hrText('قيمة الإضافي التجريبية','Simulated OT amount')}</th><th>${hrText('ملاحظات','Notes')}</th></tr></thead><tbody>${rows||`<tr><td colspan="7">${hrText('لا توجد بصمات مؤهلة في الدورة','No eligible punches in this cycle')}</td></tr>`}</tbody></table></div>`+detailHtml+d109;
 }
 function lmPayLinkedInput(e,input){
- const code=String(getEmployeeCode(e)),linked=lmPayAttendanceLink.month===lmPayrollState.month?lmPayAttendanceLink.byCode[code]:null;
- // Once a cycle has been successfully linked, ONLY verified punch-derived OT is used.
- // No matching days means zero OT, not a stale local override or CSV import amount.
- if(lmPayAttendanceLink.month!==lmPayrollState.month||!lmPayAttendanceLink.period)return input;
- const day=linked?Math.max(0,Number(linked.day)||0):0;
- const night=linked?Math.max(0,Number(linked.night)||0):0;
- // Gross / 30 / 7 is the provisional hourly basis; no unapproved absence deductions.
+ const code=String(getEmployeeCode(e));
+ const active=lmPayAttendanceLink.month===lmPayrollState.month&&!!lmPayAttendanceLink.period;
+ const linked=active?lmPayAttendanceLink.byCode[code]:null;
+ // An employee without verified attendance is NOT equivalent to a verified zero.
+ // Keep the pre-link draft untouched, and surface that uncertainty in the preview.
+ if(!active||!linked||!(linked.verifiedDays>0))return input;
+ const day=Math.max(0,Number(linked.day)||0),night=Math.max(0,Number(linked.night)||0);
  const rate=lmPayNum(input.gross)/30/7;
  return {...input,overtime:lmPayRound(day*rate*1.35+night*rate*1.70)};
 }
