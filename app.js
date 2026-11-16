@@ -3348,19 +3348,14 @@ function lmAttWorkHourRows(rows){
  }
  const round=n=>Math.round(n*100)/100;
  for(const [key,items] of groups){
-  const [code,date]=key.split('|'),savedPlan=(lmAttWorkspace.shiftPlans||{})[lmV5ShiftKey(code,date)];
-  // Default A applies only when no assignment exists. Explicit REST/LEAVE/CANCEL
-  // always overrides the fallback; never write the fallback into Firebase.
-  const plan=savedPlan||{code,date,shift:'A',pattern:'short',kind:'WORK',defaulted:true};
-  const shift=String(plan.shift||'').toUpperCase(),pattern=String(plan.pattern||'');
+  const [code,date]=key.split('|'),plan=(lmAttWorkspace.shiftPlans||{})[lmV5ShiftKey(code,date)];
+  const shift=String(plan?.shift||'').toUpperCase(),pattern=String(plan?.pattern||'');
   const times=items.filter(r=>r.origin==='device'||r.status==='APPROVED').map(r=>{
    const stamp=Date.parse(lmAttDate(r)+'T'+lmAttTime(r));return {stamp,r};
   }).filter(x=>Number.isFinite(x.stamp)).sort((a,b)=>a.stamp-b.stamp);
   const distinct=times.filter((x,i)=>!i||x.stamp!==times[i-1].stamp);
   let hours=null,ot=null,dayOt=null,nightOt=null,reason='';
-  if(plan.kind==='REST'||plan.kind==='LEAVE')reason='PROTECTED_'+plan.kind;
-  else if(plan.cancelled||plan.kind!=='WORK')reason='NO_ACTIVE_SHIFT_PLAN';
-  else if(plan.defaulted&&[5,6].includes(new Date(date+'T12:00:00Z').getUTCDay()))reason='DEFAULT_A_WEEKLY_REST_REVIEW';
+  if(!plan||plan.kind!=='WORK'||plan.cancelled)reason='NO_ACTIVE_SHIFT_PLAN';
   else if(distinct.length<2)reason='MISSING_OUT_PUNCH';
   else if(items.some(r=>r.origin==='ess'&&r.status!=='APPROVED'))reason='PENDING_ESS_REVIEW';
   else if(!['A','B','C','D'].includes(shift))reason='INVALID_SHIFT';
@@ -3379,7 +3374,7 @@ function lmAttWorkHourRows(rows){
     else reason='SHIFT_D_POLICY_REQUIRED';
    }
   }
-  results.push({code,date,shift,pattern,defaulted:!!plan.defaulted,hours,ot,dayOt,nightOt,reason,sourceIds:[...new Set(items.map(r=>r.id).filter(Boolean))]});
+  results.push({code,date,shift,pattern,hours,ot,dayOt,nightOt,reason,sourceIds:[...new Set(items.map(r=>r.id).filter(Boolean))]});
  }
  return results.sort((a,b)=>a.date.localeCompare(b.date)||a.code.localeCompare(b.code));
 }
@@ -3695,217 +3690,9 @@ function lmPayCalc(input){
  const deductions=lmPayRound(insuranceEmployee+tax+martyrs+penalty+loan+medical+absence+lateness);
  return {earning,insuredWage,insuranceEmployee,employerInsurance,excluded,taxableMonth,annualTaxable,tax,martyrs,deductions,net:lmPayRound(earning-deductions),penalty,loan,medical,absence,lateness};
 }
-/* Live attendance -> payroll draft: cycle-scoped, read-only, fail closed. */
-const lmPayAttendanceLink={month:null,byCode:{},issues:[],status:'NOT_LOADED',period:null,cycleComplete:false,dayCount:0};
-function lmPayCycleIsClosed(period){
- // Operational day 09:00 to 09:00 next day in Cairo; close only after last day is complete.
- const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
- const hour=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Africa/Cairo',hour:'2-digit',hourCycle:'h23'}).format(new Date()));
- return today>period.endExclusive||(today===period.endExclusive&&hour>=9);
-}
-// Automatic, read-only attendance-to-payroll preview. Firebase listeners update the
-// open payroll view; no manual link action and no background payroll posting.
-const lmPayAuto={refs:[],timer:null,busy:false,dirty:false,requestId:0};
-function lmPayAutoSchedule(){
- if(!document.getElementById('hr-payroll-view')||!document.getElementById('lm-pay-att-link-status'))return;
- if(lmPayAuto.timer)clearTimeout(lmPayAuto.timer);
- lmPayAuto.timer=setTimeout(()=>{lmPayAuto.timer=null;lmPayAutoRefresh();},350);
-}
-async function lmPayAutoRefresh(){
- if(!document.getElementById('lm-pay-att-link-status'))return;
- if(lmPayAuto.busy){lmPayAuto.dirty=true;return;}
- lmPayAuto.busy=true;
- try{await lmPayLinkAttendance();}
- finally{lmPayAuto.busy=false;if(lmPayAuto.dirty){lmPayAuto.dirty=false;lmPayAutoSchedule();}}
-}
-function lmPayAutoStart(){
- // A single set of listeners for the entire session, not one per page visit.
- if(!lmPayAuto.refs.length&&typeof db!=='undefined'&&db){
-  for(const path of ['hr_imports/attendance','shift_plans','manual_attendance_punches']){
-   const ref=db.ref(path),callback=()=>lmPayAutoSchedule();
-   ref.on('value',callback,()=>lmPayAutoSchedule());
-   lmPayAuto.refs.push({ref,callback});
-  }
- }
- lmPayAutoSchedule();
-}
-async function lmPayLinkAttendance(){
- const status=document.getElementById('lm-pay-att-link-status');
- if(!portalIsAdmin()){if(status)status.textContent=hrText('يلزم حساب المدير','Admin required');return;}
- let period;try{period=LactoPayrollCycle.schedule(lmPayrollState.month,lmSafeCycleSettings());}catch(e){if(status)status.textContent=e.message;return;}
- const cycleComplete=lmPayCycleIsClosed(period);
- if(status)status.textContent=hrText('جارٍ قراءة البصمات والورديات من Firebase...','Reading punches and shift plans from Firebase...');
- try{
-  // Use exactly the attendance tab's source normalization, including device-origin
-  // detection and deduplication. Do not independently re-interpret imported punches.
-  // Match the Unified Daily Attendance report: identical source paths,
-  // import normalization, duplicate filtering, pairing, and work-hour engine.
-  // Do NOT calculate a second payroll-only punch interpretation.
-  const paths=['hr_imports/attendance','shift_plans','manual_attendance_punches'];
-  const snaps=await Promise.all(paths.map(path=>db.ref(path).once('value')));
-  const [imports,plans,manual]=snaps.map(x=>x.val()||{}),rows=[],issues=[];
-  Object.entries(imports).forEach(([batchId,batch])=>Object.entries(batch?.records||{}).forEach(([i,r])=>{
-   if(!r||typeof r!=='object')return;
-   const source=String(r.source||'').toLowerCase();
-   rows.push({id:batchId+':'+i,code:String(r.code||''),date:String(r.timestamp||'').slice(0,10),timestamp:r.timestamp,punch:r.type,status:'IMPORTED',origin:/zkteco|device|finger|zk|[1-4]/.test(source)?'device':'unknown'});
-  }));
-  Object.entries(manual).forEach(([id,r])=>{if(r&&r.code&&r.date&&r.time)rows.push({id,code:String(r.code),date:r.date,time:r.time,timestamp:r.date+'T'+r.time+':00',punch:r.punchType,origin:'manual',status:'MANUAL'});});
-  const seen=new Set();
-  const deduped=rows.filter(r=>{if(r.origin!=='device')return true;const key=r.code+'|'+String(r.timestamp||r.date+' '+r.time);if(seen.has(key))return false;seen.add(key);return true;});
-  const validCodes=new Set(allEmployees.map(e=>String(getEmployeeCode(e))));
-  // Classification must use exactly the same rules as the attendance screen.
-  // In particular, an A-shift 08:54 punch belongs to its calendar day,
-  // not the preceding day merely because it is before 09:00.
-  const oldRows=lmAttWorkspace.rows,oldPlans=lmAttWorkspace.shiftPlans;
-  let daily,scoped;
-  try{
-   lmAttWorkspace.rows=deduped.filter(r=>validCodes.has(String(r.code)));
-   lmAttWorkspace.shiftPlans=plans;
-   lmAttClassify();
-   scoped=lmAttWorkspace.rows.filter(r=>r.reportWorkday>=period.start&&r.reportWorkday<=period.lastAttendanceDate);
-   daily=lmAttWorkHourRows(scoped);
-   // The unified report only treats complete PAIRED days as financial evidence.
-   const paired=new Map();
-   for(const r of scoped){const key=String(r.code)+'|'+r.reportWorkday;const a=paired.get(key)||[];a.push(r);paired.set(key,a);}
-   daily=daily.map(d=>{
-    const items=paired.get(d.code+'|'+d.date)||[];
-    const valid=items.length>=2&&items.every(r=>r.reportPairStatus==='PAIRED');
-    return valid?d:{...d,dayOt:null,nightOt:null,ot:null,reason:d.reason||'UNPAIRED_ATTENDANCE'};
-   });
-  }finally{lmAttWorkspace.rows=oldRows;lmAttWorkspace.shiftPlans=oldPlans;}
-  const workdayOf=r=>r.reportWorkday||lmAttDate(r);
-  lmPayAttendanceLink.raw880=deduped.filter(r=>String(r.code)==='880').map(r=>({date:lmAttDate(r),time:lmAttTime(r),origin:r.origin,workday:workdayOf(r),inCycle:workdayOf(r)>=period.start&&workdayOf(r)<=period.lastAttendanceDate}));
-  lmPayAttendanceLink.raw109=deduped.filter(r=>String(r.code)==='109').map(r=>({date:lmAttDate(r),time:lmAttTime(r),origin:r.origin,workday:workdayOf(r),inCycle:workdayOf(r)>=period.start&&workdayOf(r)<=period.lastAttendanceDate}));
-  const byCode={};
-  lmPayAttendanceLink.daily=daily;
-  lmPayAttendanceLink.sourceCounts={imports:rows.filter(r=>r.origin==='device').length,manual:rows.filter(r=>r.origin==='manual').length,ess:0,scoped:scoped.length};
-  daily.forEach(d=>{
-   const o=byCode[d.code]||(byCode[d.code]={day:0,night:0,verifiedDays:0,review:[]});
-   if(d.reason||d.dayOt===null||d.nightOt===null){o.review.push(d.date+': '+(d.reason||'UNVERIFIED'));return;}
-   if(d.shift!=='A'){o.review.push(d.date+': SHIFT_'+d.shift+'_MONTHLY_POLICY_REQUIRED');return;}
-   o.day+=d.dayOt;o.night+=d.nightOt;o.verifiedDays++;
-  });
-  // Include employees with no punch records explicitly so zero is auditable.
-  for(const employee of allEmployees){
-   const code=String(getEmployeeCode(employee)||'');
-   if(code&&!byCode[code])byCode[code]={day:0,night:0,verifiedDays:0,review:['NO_PUNCHES_IN_CYCLE']};
-  }
-  // Never silently zero every employee when the source is empty or cannot be verified.
-  // Zero OT is permitted only for employees with at least one verified attendance day.
-  const verifiedTotal=Object.values(byCode).reduce((n,v)=>n+(v.verifiedDays||0),0);
-  // Even an empty attendance cycle must link zero OT for all employees;
-  // otherwise stale payroll overrides could become fictitious overtime.
-  if(!verifiedTotal)issues.push('NO_VERIFIED_ATTENDANCE_DAYS');
-  if(rows.some(r=>r.origin==='unknown'))issues.push('UNRECOGNIZED_IMPORT_SOURCE');
-  // Missing days cannot be interpreted as absence or rest without validated schedules.
-  lmPayAttendanceLink.month=lmPayrollState.month;
-  lmPayAttendanceLink.byCode=byCode;
-  lmPayAttendanceLink.issues=issues;
-  lmPayAttendanceLink.status=cycleComplete?'DRAFT_FROM_LIVE_DATA':'EARLY_SIMULATION';
-  lmPayAttendanceLink.period=period;
-  lmPayAttendanceLink.cycleComplete=cycleComplete;
-  lmPayAttendanceLink.dayCount=daily.length;
-  lmPayRenderRows(true);
-  lmOtRadarRender();
-  lmOtRadarNotify();
-  const review=Object.values(byCode).reduce((n,x)=>n+x.review.length,0);
-  if(status)status.textContent=hrText('تم الربط الفعلي لمسودة الإضافي A فقط؛ أيام B/C/D والحالات غير المكتملة معلّقة للمراجعة، ولا تُحسب خصومات تلقائيًا.','Live A overtime linked to payroll draft; B/C/D and uncertain days held for review. No automatic deductions.')+' '+daily.length+' days / '+review+' review.';
- }catch(e){lmPayAttendanceLink.month=null;lmPayAttendanceLink.byCode={};lmPayRenderRows(true);lmPayRenderAttendancePreview();if(status)status.textContent=hrText('فشل تحميل المصدر؛ لم تُطبق أي مؤثرات: ','Source read failed; no effects applied: ')+(e.message||e);}
-}
-function lmPayRenderAttendancePreview(){
- const target=document.getElementById('lm-pay-att-preview');if(!target)return;
- const link=lmPayAttendanceLink;
- if(link.month!==lmPayrollState.month||!link.period){target.innerHTML='';return;}
- const entries=Object.entries(link.byCode).sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true}));
- const count=entries.reduce((n,[,v])=>n+v.review.length,0);
- const label=hrText('معاينة مؤثرات الحضور (تجريبية، لا تُنشر)','Attendance effects preview (simulation, not published)');
- const state=link.cycleComplete?hrText('الدورة مكتملة','Cycle complete'):hrText('الدورة مفتوحة — القيم مؤقتة','Cycle open — provisional values');
- const diagnostic=link.sourceCounts||{};
- const head=`<div class="flex flex-wrap gap-3 items-center mb-2"><strong>${label}</strong><span class="text-amber-300">${state}</span><span>${escapeHtml(link.period.start)} → ${escapeHtml(link.period.lastAttendanceDate)}</span><span>${link.dayCount} ${hrText('يوم حضور','attendance days')} / ${count} ${hrText('للمراجعة','to review')}</span></div>`;
- const rows=entries.map(([code,v])=>{const emp=allEmployees.find(e=>String(getEmployeeCode(e))===code);const name=emp?getEmployeeName(emp):'';const gross=emp?lmPayNum(lmPayEmployee(emp).gross):0;const rate=gross/30/7;const amount=lmPayRound(v.day*rate*1.35+v.night*rate*1.70);return `<tr><td>${escapeHtml(code)}</td><td>${escapeHtml(name)}</td><td>${lmPayMoney(v.day)}</td><td>${lmPayMoney(v.night)}</td><td>${!(v.verifiedDays>0)?hrText('لا توجد أيام مؤكدة','No verified days'):v.review.length?hrText('محسوب جزئيًا — توجد أيام للمراجعة','Partially calculated — review days'):hrText('مؤكد مبدئيًا','Preliminarily verified')}</td><td>${lmPayMoney(amount)}</td><td>${escapeHtml(v.review.join(' | ')||'—')}</td></tr>`;}).join('');
- const detail=(link.daily||[]).filter(d=>String(d.code)==='880').map(d=>`<tr><td>${escapeHtml(d.date)}</td><td>${escapeHtml(d.shift)}</td><td>${d.hours===null?'—':d.hours}</td><td>${d.dayOt===null?'—':d.dayOt}</td><td>${d.nightOt===null?'—':d.nightOt}</td><td>${escapeHtml(d.reason||'OK')}</td></tr>`).join('');
- const raw880=(link.raw880||[]).slice(0,120).map(r=>`<tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.time)}</td><td>${escapeHtml(r.origin)}</td><td>${escapeHtml(r.workday)}</td><td>${r.inCycle?'YES':'NO'}</td></tr>`).join('');
- const detailHtml=`<details class="mt-3" open><summary>${hrText('تشخيص الموظف 880 يومًا بيوم','Employee 880 daily diagnostics')}</summary><p class="text-xs">Source records: ${diagnostic.imports||0} device / ${diagnostic.manual||0} manual / ${diagnostic.ess||0} ESS; in cycle: ${diagnostic.scoped||0}</p><div class="overflow-x-auto"><table class="hr-feature-table w-full text-xs"><thead><tr><th>Date</th><th>Shift</th><th>Hours</th><th>Day OT</th><th>Night OT</th><th>Reason</th></tr></thead><tbody>${detail||'<tr><td colspan="6">No processed attendance days for 880</td></tr>'}</tbody></table></div><h4 class="font-bold mt-3">${hrText('البصمات الخام للموظف 880','Raw punches for employee 880')}</h4><div class="overflow-x-auto"><table class="hr-feature-table w-full text-xs"><thead><tr><th>Date</th><th>Time</th><th>Source</th><th>Workday</th><th>In cycle?</th></tr></thead><tbody>${raw880||'<tr><td colspan="5">No source records found for 880</td></tr>'}</tbody></table></div></details>`;
- const detail109=(link.daily||[]).filter(d=>String(d.code)==='109').map(d=>`<tr><td>${escapeHtml(d.date)}</td><td>${escapeHtml(d.shift)}</td><td>${d.hours===null?'—':d.hours}</td><td>${d.dayOt===null?'—':d.dayOt}</td><td>${d.nightOt===null?'—':d.nightOt}</td><td>${escapeHtml(d.reason||'OK')}</td></tr>`).join('');
- const raw109=(link.raw109||[]).slice(0,120).map(r=>`<tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.time)}</td><td>${escapeHtml(r.origin)}</td><td>${escapeHtml(r.workday)}</td><td>${r.inCycle?'YES':'NO'}</td></tr>`).join('');
- const d109=`<details class="mt-3" open><summary>${hrText('تشخيص الموظف 109 يومًا بيوم','Employee 109 daily diagnostics')}</summary><div class="overflow-x-auto"><table class="hr-feature-table w-full text-xs"><thead><tr><th>Date</th><th>Shift</th><th>Hours</th><th>Day OT</th><th>Night OT</th><th>Reason</th></tr></thead><tbody>${detail109||'<tr><td colspan="6">No processed attendance days for 109</td></tr>'}</tbody></table></div><h4 class="font-bold mt-3">${hrText('البصمات الخام للموظف 109','Raw punches for employee 109')}</h4><div class="overflow-x-auto"><table class="hr-feature-table w-full text-xs"><thead><tr><th>Date</th><th>Time</th><th>Source</th><th>Workday</th><th>In cycle?</th></tr></thead><tbody>${raw109||'<tr><td colspan="5">No source records found for 109</td></tr>'}</tbody></table></div></details>`;
- target.innerHTML=head+(link.issues?.length?'<p class="text-amber-300 text-xs mb-2">'+escapeHtml(link.issues.join(' | '))+'</p>':'')+`<div class="overflow-x-auto"><table class="hr-feature-table w-full text-xs"><thead><tr><th>${hrText('الكود','Code')}</th><th>${hrText('الاسم','Name')}</th><th>${hrText('إضافي نهاري (ساعة)','Day OT (h)')}</th><th>${hrText('إضافي ليلي (ساعة)','Night OT (h)')}</th><th>${hrText('الحالة','Status')}</th><th>${hrText('قيمة الإضافي التجريبية','Simulated OT amount')}</th><th>${hrText('ملاحظات','Notes')}</th></tr></thead><tbody>${rows||`<tr><td colspan="7">${hrText('لا توجد بصمات مؤهلة في الدورة','No eligible punches in this cycle')}</td></tr>`}</tbody></table></div>`+detailHtml+d109;
-}
-/* OT expense radar: report-only, consumes the VERIFIED attendance-to-payroll link.
-   No alternate punch processing, no payroll posting, no automatic deductions. */
-const lmOtRadarThreshold=0.60;
-const lmOtRadarFilters={department:'',query:'',alertOnly:false};
-function lmOtRadarRows(){
- if(lmPayAttendanceLink.month!==lmPayrollState.month||!lmPayAttendanceLink.period)return [];
- return allEmployees.map(e=>{
-  const code=String(getEmployeeCode(e)||'');
-  const input=lmPayEmployee(e);
-  const gross=lmPayNum(input.gross);
-  const linked=lmPayAttendanceLink.byCode[code];
-  const day=linked&&linked.verifiedDays>0?Math.max(0,Number(linked.day)||0):0;
-  const night=linked&&linked.verifiedDays>0?Math.max(0,Number(linked.night)||0):0;
-  const amount=lmPayRound(input.overtime);
-  const ratio=gross>0?amount/gross:null;
-  const department=String(lmPayField(e,['القسم','الإدارة','department','Department','departmentName','القسم عربي','اسم القسم'])||'');
-  return {code,name:getEmployeeName(e),department,gross,day,night,amount,ratio,alert:ratio!==null&&ratio>=lmOtRadarThreshold,verified:linked?.verifiedDays||0};
- });
-}
-function lmOtRadarRender(){
- const host=document.getElementById('lm-ot-radar');if(!host)return;
- const ready=lmPayAttendanceLink.month===lmPayrollState.month&&!!lmPayAttendanceLink.period;
- if(!ready){host.innerHTML='<p class="text-amber-300 text-sm">'+hrText('حمّل ربط الحضور لعرض تقرير الإضافي لهذه الدورة.','Load the attendance link to view this cycle overtime report.')+'</p>';return;}
- const all=lmOtRadarRows(),depts=[...new Set(all.map(r=>r.department).filter(Boolean))].sort();
- const q=(document.getElementById('lm-pay-search')?.value||lmOtRadarFilters.query||'').trim().toLowerCase();
- const rows=all.filter(r=>(!lmOtRadarFilters.department||r.department===lmOtRadarFilters.department)&&(!q||r.code.toLowerCase().includes(q)||String(r.name).toLowerCase().includes(q))&&(!lmOtRadarFilters.alertOnly||r.alert));
- const money=n=>lmPayMoney(n);
- const total=rows.reduce((n,r)=>n+r.amount,0),alerts=rows.filter(r=>r.alert).length;
- const options='<option value="">'+hrText('كل الأقسام','All departments')+'</option>'+depts.map(d=>'<option value="'+escapeHtml(d)+'" '+(d===lmOtRadarFilters.department?'selected':'')+'>'+escapeHtml(d)+'</option>').join('');
- host.innerHTML=`<div class="flex flex-wrap justify-between items-center gap-3 mb-3"><div><h3 class="font-bold text-sky-300">${hrText('رادار الإضافي — الشركة بالكامل','Company overtime radar')}</h3><p class="text-xs text-slate-300">${escapeHtml(lmPayAttendanceLink.period.start)} → ${escapeHtml(lmPayAttendanceLink.period.lastAttendanceDate)} | ${hrText('التنبيه عند 60% أو أكثر من الشامل','Alert at 60% or more of gross')}</p></div><button type="button" class="portal-ghost-btn" onclick="lmOtRadarExport()">${hrText('تصدير تقرير الإضافي CSV','Export OT report CSV')}</button></div>
- <div class="flex flex-wrap gap-3 items-end mb-3"><label class="text-sm">${hrText('القسم','Department')}<select id="lm-ot-dept" class="hr-feature-input block" onchange="lmOtRadarFilters.department=this.value;lmOtRadarRender()">${options}</select></label><label class="flex gap-2 items-center text-sm"><input type="checkbox" ${lmOtRadarFilters.alertOnly?'checked':''} onchange="lmOtRadarFilters.alertOnly=this.checked;lmOtRadarRender()">${hrText('الواصلون للحد فقط','At threshold only')}</label></div>
- <div class="flex flex-wrap gap-4 mb-3 text-sm"><strong>${hrText('الموظفون','Employees')}: ${rows.length}</strong><strong>${hrText('إجمالي الإضافي','Total OT')}: ${money(total)} ${hrText('جنيه','EGP')}</strong><strong class="text-amber-300">${hrText('تنبيهات 60%','60% alerts')}: ${alerts}</strong></div>
- <div class="overflow-x-auto"><table class="hr-feature-table w-full text-xs"><thead><tr><th>${hrText('الكود','Code')}</th><th>${hrText('الموظف','Employee')}</th><th>${hrText('القسم','Department')}</th><th>${hrText('الشامل','Gross')}</th><th>${hrText('نهاري (س)','Day h')}</th><th>${hrText('ليلي (س)','Night h')}</th><th>${hrText('الإضافي (ج)','OT EGP')}</th><th>${hrText('النسبة','Ratio')}</th><th>${hrText('الحالة','Status')}</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${escapeHtml(r.code)}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.department)}</td><td>${money(r.gross)}</td><td>${money(r.day)}</td><td>${money(r.night)}</td><td>${money(r.amount)}</td><td class="${r.alert?'text-amber-300 font-bold':''}">${r.ratio===null?'—':(r.ratio*100).toFixed(1)+'%'}</td><td>${r.alert?'⚠ '+hrText('وصل للحد','At limit'):r.verified?hrText('أقل من الحد','Below limit'):hrText('لا توجد أيام مؤكدة','No verified days')}</td></tr>`).join('')||'<tr><td colspan="9">—</td></tr>'}</tbody></table></div><p class="text-xs text-slate-300 mt-2">${hrText('تقرير تجريبي من ساعات الإضافي المؤكدة للوردية A فقط. الورديات الأخرى لا تُحسب ماليًا هنا حتى اعتماد منطقها. لا يؤثر التقرير على المرتبات.','Simulation from verified A-shift overtime only. Other shifts are not financially calculated here yet. Report does not alter payroll.')}</p>`;
-}
-function lmOtRadarExport(){
- const q=(document.getElementById('lm-pay-search')?.value||lmOtRadarFilters.query||'').trim().toLowerCase();
- const rows=lmOtRadarRows().filter(r=>(!lmOtRadarFilters.department||r.department===lmOtRadarFilters.department)&&(!q||r.code.toLowerCase().includes(q)||String(r.name).toLowerCase().includes(q))&&(!lmOtRadarFilters.alertOnly||r.alert));
- const lines=[['Cycle','Code','Name','Department','Gross','Day OT hours','Night OT hours','OT amount','Ratio percent','Threshold reached'],...rows.map(r=>[lmPayrollState.month,r.code,r.name,r.department,r.gross,r.day,r.night,r.amount,r.ratio===null?'':(r.ratio*100).toFixed(2),r.alert?'YES':'NO'])];
- const csv='﻿'+lines.map(a=>a.map(x=>'"'+String(x??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
- const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='overtime_report_'+lmPayrollState.month+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);
-}
-function lmOtRadarNotify(){
- if(!portalIsAdmin())return;
- const hits=lmOtRadarRows().filter(r=>r.alert);
- if(!hits.length)return;
- // One toast per cycle per employee; changing month resets the scope naturally.
- const fresh=hits.filter(r=>{try{return localStorage.getItem('lm-ot-radar-seen-v1:'+lmPayrollState.month+':'+r.code)!=='1';}catch(_){return true;}});
- if(!fresh.length)return;
- const old=document.getElementById('lm-ot-radar-toast');if(old)old.remove();
- const box=document.createElement('aside');box.id='lm-ot-radar-toast';box.setAttribute('role','alert');box.dir=currentLang==='ar'?'rtl':'ltr';
- box.style.cssText='position:fixed;right:18px;bottom:24px;z-index:99999;width:min(390px,calc(100vw - 36px));max-height:65vh;overflow:auto;border:1px solid rgba(251,191,36,.5);border-radius:16px;padding:16px;background:var(--card-bg,rgba(20,32,48,.96));color:var(--text-color,#f8fafc);box-shadow:0 18px 50px rgba(0,0,0,.4);backdrop-filter:blur(20px)';
- const items=fresh.slice(0,5).map(r=>`<div style="padding:9px 0;border-bottom:1px solid rgba(148,163,184,.25)"><strong>${escapeHtml(r.name)} (${escapeHtml(r.code)})</strong><div style="font-size:12px">${lmPayMoney(r.amount)} / ${lmPayMoney(r.gross)} ${hrText('جنيه','EGP')} — <strong style="color:#fbbf24">${(r.ratio*100).toFixed(1)}%</strong></div></div>`).join('');
- box.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><strong>⚠ ${hrText('تنبيه حد الإضافي 60%','Overtime 60% threshold alert')}</strong><button type="button" class="portal-ghost-btn" onclick="lmOtRadarDismiss()" aria-label="Close">×</button></div>${items}${fresh.length>5?'<p>+'+(fresh.length-5)+'</p>':''}<p style="font-size:12px;margin-top:10px">${hrText('تنبيه رقابي فقط — لا خصم ولا تعديل للمستحقات.','Monitoring only — no deductions or changes to pay.')}</p><button type="button" class="portal-action-btn" style="margin-top:10px" onclick="lmOtRadarDismiss()">${hrText('تم الاطلاع','Acknowledged')}</button>`;
- document.body.appendChild(box);
- box.dataset.codes=JSON.stringify(fresh.map(r=>r.code));box.dataset.month=lmPayrollState.month;
-}
-function lmOtRadarDismiss(){const box=document.getElementById('lm-ot-radar-toast');if(!box)return;let codes=[];try{codes=JSON.parse(box.dataset.codes||'[]')}catch(_){}for(const code of codes){try{localStorage.setItem('lm-ot-radar-seen-v1:'+box.dataset.month+':'+code,'1')}catch(_){}}box.remove();}
-
-function lmPayLinkedInput(e,input){
- const code=String(getEmployeeCode(e));
- const active=lmPayAttendanceLink.month===lmPayrollState.month&&!!lmPayAttendanceLink.period;
- if(!active)return {...input,overtime:0};
- const linked=lmPayAttendanceLink.byCode[code];
- // Attendance is the ONLY overtime source once the cycle link has loaded.
- // No punches => zero calculated overtime, NOT a legacy manual override.
- // Review-only days also cannot generate a financial amount.
- const day=linked&&linked.verifiedDays>0?Math.max(0,Number(linked.day)||0):0;
- const night=linked&&linked.verifiedDays>0?Math.max(0,Number(linked.night)||0):0;
- const rate=lmPayNum(input.gross)/30/7;
- return {...input,overtime:lmPayRound(day*rate*1.35+night*rate*1.70)};
-}
-function lmPayChangeMonth(value){lmPayrollState.month=value;lmPayAttendanceLink.month=null;lmPayAttendanceLink.byCode={};lmPayAttendanceLink.period=null;lmPayAttendanceLink.raw880=[];lmPayAttendanceLink.raw109=[];lmPayRenderAttendancePreview();lmSafeCycleShow();lmPayRenderRows();lmOtRadarRender();const el=document.getElementById('lm-pay-att-link-status');if(el)el.textContent=hrText('جارٍ تحديث مؤثرات الدورة تلقائيًا...','Updating cycle effects automatically...');lmPayAutoSchedule();}
 function lmPayEmployee(e){
  const code=getEmployeeCode(e),base={gross:lmPayNum(lmPayField(e,['الراتب الشامل','المرتب الشامل','gross salary','gross_salary','total salary','الشامل','الاجر الشامل','الأجر الشامل','comprehensiveSalary','grossSalary'])),insurance:lmPayNum(lmPayField(e,['أجر الاشتراك التأميني','insuranceContributionWage','insuranceWage','insuredWage'])),phone:0,transport:0,glasses:0,bonus:0,meal:0,overtime:0,other:0,penalty:0,loan:0,medical:0,absence:0,lateness:0,included:1,insured:!!lmPayNum(lmPayField(e,['أجر الاشتراك التأميني','insuranceContributionWage','insuranceWage','insuredWage'])),secondary:false};
- return lmPayLinkedInput(e,{...base,...(lmPayrollState.overrides[code]||{})});
+ return {...base,...(lmPayrollState.overrides[code]||{})};
 }
 function lmPayEdit(code,key,value){
  if(!lmPayrollState.overrides[code])lmPayrollState.overrides[code]={};
@@ -3920,7 +3707,7 @@ function lmPayUpdateSummary(){
  count.textContent=`${lmPayrollState.results.length} employees / موظف — Net total / إجمالي الصافي: ${lmPayMoney(total)} EGP`;
 }
 function lmPayChangePage(delta){lmPayrollState.page+=delta;lmPayRenderRows(true);}
-function lmPaySearch(){lmPayrollState.page=1;lmPayRenderRows();lmOtRadarRender();}
+function lmPaySearch(){lmPayrollState.page=1;lmPayRenderRows();}
 function lmPayRowHtml(r){
  const columns=['gross','insurance','phone','transport','glasses','bonus','meal','overtime','other','penalty','loan','medical','absence','lateness'];
  const code=String(r.code),safe=escapeHtml(code),encoded=encodeURIComponent(code);
@@ -3994,16 +3781,14 @@ function lmPayShowReadiness(){
 function lmPayExport(){
  const headers=['Code','Name','Gross','Insurance Wage','Phone','Transport','Glasses','Bonus','Meal','Overtime','Other','Penalty','Loan','Medical','Absence','Lateness','Insured','Secondary employer','Earnings','Insurance deduction','Tax base monthly','Tax base annual','Income tax','Martyrs fund','Total deductions','Net','Status'];
  const lines=[headers,...lmPayrollState.results.map(r=>[r.code,getEmployeeName(r.e),...['gross','insurance','phone','transport','glasses','bonus','meal','overtime','other','penalty','loan','medical','absence','lateness'].map(k=>r.input[k]),r.input.insured,r.input.secondary,r.calc.earning,r.calc.insuranceEmployee,r.calc.taxableMonth,r.calc.annualTaxable,r.calc.tax,r.calc.martyrs,r.calc.deductions,r.calc.net,'SIMULATION_NOT_APPROVED'])];
- const csv='﻿'+lines.map(row=>row.map(x=>'"'+String(x??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
+ const csv='\ufeff'+lines.map(row=>row.map(x=>'"'+String(x??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='payroll_simulation_'+lmPayrollState.month+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);
 }
 function lmAnnualRaisePreview(){
  const root=document.getElementById('hr-payroll-view');if(!root)return;
- root.innerHTML=`<h1 class="text-2xl font-bold mb-3">${hrText('المرتبات — ورشة الحساب والمراجعة','Payroll — Calculation workbench')}</h1><div class="glass-card rounded-xl p-3 mb-3 flex flex-wrap gap-3 items-end"><label>${hrText('بحث بالكود أو الاسم','Code/name')}<input id="lm-pay-search" class="hr-feature-input block" oninput="lmPaySearch()"></label><label>${hrText('الشهر','Month')}<input type="month" class="hr-feature-input block lm-pay-month-picker" style="min-width:175px;max-width:210px;border-radius:10px;padding:9px 12px;color:inherit;background:var(--input-bg,rgba(15,23,42,.28));color-scheme:dark light" value="${lmPayrollState.month}" onchange="lmPayChangeMonth(this.value)"></label><label class="portal-ghost-btn" style="cursor:pointer">${hrText('استيراد CSV','Import CSV')}<input type="file" accept=".csv,text/csv" style="display:none" onchange="lmPayImport(this.files[0]);this.value=''"></label><button class="portal-ghost-btn" onclick="lmPayShowReadiness()">${hrText('فحص جاهزية المرتبات','Payroll readiness check')}</button><button class="portal-action-btn" onclick="lmPayExport()">${hrText('تصدير كشف الحساب CSV','Export payroll CSV')}</button><button class="portal-ghost-btn" onclick="lmPayRaisePage()">${hrText('معاينة العلاوة السنوية','Annual raise preview')}</button></div><p id="lm-pay-import-status" class="text-sky-300 text-sm mb-2"></p><details class="glass-card rounded-xl p-3 mb-3"><summary class="font-bold text-sky-300" style="cursor:pointer">${hrText('إعدادات الدورة والمطابقة','Cycle settings and reconciliation')}</summary><div id="lm-pay-pilot-tools" class="mt-3"></div></details><details class="glass-card rounded-xl p-3 mb-3"><summary class="font-bold text-sky-300" style="cursor:pointer">${hrText('تفاصيل ربط الحضور','Attendance link details')} <span id="lm-pay-att-link-status" class="text-xs"></span></summary><div id="lm-pay-att-preview" class="mt-3 text-sm"></div></details><details class="glass-card rounded-xl p-3 mb-3"><summary class="font-bold text-sky-300" style="cursor:pointer">${hrText('تقرير الإضافي والتنبيهات 60%','Overtime report and 60% alerts')}</summary><section class="mt-3" id="lm-ot-radar"></section></details><div id="lm-pay-readiness" class="text-amber-300 mb-2" aria-live="polite"></div><div id="lm-pay-summary" class="text-sky-300 mb-2"></div><div class="overflow-x-auto glass-card rounded-xl" id="lm-payroll-table"></div><div id="lm-pay-pages" class="flex flex-wrap justify-center items-center gap-2 mt-3 mb-4"></div><div id="lm-pay-raise" class="mt-4 hidden"></div>`;
+ root.innerHTML=`<h1 class="text-2xl font-bold mb-3">${hrText('المرتبات — ورشة الحساب والمراجعة','Payroll — Calculation workbench')}</h1><p class="text-amber-300 mb-4 text-sm">${hrText('اختبار حسابات فقط — دون ترحيل إلى Firebase.','Calculation test only — no Firebase posting.')}</p><div class="glass-card rounded-xl p-3 mb-3 flex flex-wrap gap-3 items-end"><label>${hrText('بحث بالكود أو الاسم','Code/name')}<input id="lm-pay-search" class="hr-feature-input block" oninput="lmPaySearch()"></label><label>${hrText('الشهر','Month')}<input type="month" class="hr-feature-input block" value="${lmPayrollState.month}" onchange="lmPayrollState.month=this.value"></label><label class="portal-ghost-btn" style="cursor:pointer">${hrText('استيراد CSV','Import CSV')}<input type="file" accept=".csv,text/csv" style="display:none" onchange="lmPayImport(this.files[0]);this.value=''"></label><button class="portal-ghost-btn" onclick="lmPayShowReadiness()">${hrText('فحص جاهزية المرتبات','Payroll readiness check')}</button><button class="portal-action-btn" onclick="lmPayExport()">${hrText('تصدير كشف الحساب CSV','Export payroll CSV')}</button><button class="portal-ghost-btn" onclick="lmPayRaisePage()">${hrText('معاينة العلاوة السنوية','Annual raise preview')}</button></div><p class="text-xs text-slate-300 mb-3">${hrText('البدلات جزء من الشامل وليست إضافة عليه.','Allowances are included in gross.')}</p><p id="lm-pay-import-status" class="text-sky-300 text-sm mb-2"></p><div id="lm-pay-readiness" class="text-amber-300 mb-2" aria-live="polite"></div><div id="lm-pay-summary" class="text-sky-300 mb-2"></div><div id="lm-pay-pilot-tools" class="mb-3"></div><div class="overflow-x-auto glass-card rounded-xl" id="lm-payroll-table"></div><div id="lm-pay-pages" class="flex flex-wrap justify-center items-center gap-2 mt-3 mb-4"></div><div id="lm-pay-raise" class="mt-4 hidden"></div>`;
  lmPayRenderRows();
  lmSafePilotMount();
- lmOtRadarRender();
- lmPayAutoStart();
 }
 const lmRaiseDraft={rate:7,year:2027,referenceVerified:false};
 function lmPayRaisePage(){
@@ -4128,9 +3913,9 @@ const DAY_MS=86400000;
 function iso(d){return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0')}
 function date(y,m,day){return new Date(Date.UTC(y,m-1,Math.min(day,new Date(Date.UTC(y,m,0)).getUTCDate())))}
 function addDays(d,n){return new Date(d.getTime()+n*DAY_MS)}
-function cycle(month,startDay=21){if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw Error('Invalid month');const d=Number(startDay);if(!Number.isInteger(d)||d<1||d>31)throw Error('Invalid start day');const [y,m]=month.split('-').map(Number);const start=date(y,m-1,d);const next=date(y,m,d);if(next<=start)throw Error('Invalid cycle dates');return {id:month,start:iso(start),endExclusive:iso(next),lastAttendanceDate:iso(addDays(next,-1)),calendarDays:Math.round((next-start)/DAY_MS),salaryDivisor:30};}
-function config(v){const x={startDay:Number(v.startDay),salaryDivisor:30,hrReviewLeadDays:Number(v.hrReviewLeadDays),financeReviewLeadDays:Number(v.financeReviewLeadDays),deadlineDay:Number(v.deadlineDay)};if(!Number.isInteger(x.startDay)||x.startDay<1||x.startDay>31)throw Error('Start day must be 1–31');if(!Number.isInteger(x.hrReviewLeadDays)||x.hrReviewLeadDays<1||x.hrReviewLeadDays>10)throw Error('HR review lead must be 1–10 days');if(!Number.isInteger(x.financeReviewLeadDays)||x.financeReviewLeadDays<0||x.financeReviewLeadDays>=x.hrReviewLeadDays)throw Error('Finance lead must precede HR review');if(!Number.isInteger(x.deadlineDay)||x.deadlineDay<1||x.deadlineDay>31)throw Error('Invalid deadline day');return x;}
-function schedule(month,settings){const c=config(settings),period=cycle(month,c.startDay),end=new Date(period.endExclusive+'T00:00:00Z');const [y,m]=month.split('-').map(Number);return {...period,hrReviewDate:iso(addDays(end,-c.hrReviewLeadDays)),financeReviewDate:iso(addDays(end,-c.financeReviewLeadDays)),nominalDeadlineDay:c.deadlineDay,deadlineDate:iso(date(y,m,c.deadlineDay))};}
+function cycle(month,startDay=25){if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw Error('Invalid month');const d=Number(startDay);if(!Number.isInteger(d)||d<1||d>31)throw Error('Invalid start day');const [y,m]=month.split('-').map(Number);const start=date(y,m,d);const next=date(y,m+1,d);if(next<=start)throw Error('Invalid cycle dates');return {id:month,start:iso(start),endExclusive:iso(next),lastAttendanceDate:iso(addDays(next,-1)),calendarDays:Math.round((next-start)/DAY_MS),salaryDivisor:30};}
+function config(v){const x={startDay:Number(v.startDay),salaryDivisor:30,hrReviewLeadDays:Number(v.hrReviewLeadDays),financeReviewLeadDays:Number(v.financeReviewLeadDays),deadlineDay:Number(v.deadlineDay)};if(!Number.isInteger(x.startDay)||x.startDay<1||x.startDay>28)throw Error('Start day must be 1–28 to avoid month-end ambiguity');if(!Number.isInteger(x.hrReviewLeadDays)||x.hrReviewLeadDays<1||x.hrReviewLeadDays>10)throw Error('HR review lead must be 1–10 days');if(!Number.isInteger(x.financeReviewLeadDays)||x.financeReviewLeadDays<0||x.financeReviewLeadDays>=x.hrReviewLeadDays)throw Error('Finance lead must precede HR review');if(!Number.isInteger(x.deadlineDay)||x.deadlineDay<1||x.deadlineDay>31)throw Error('Invalid deadline day');return x;}
+function schedule(month,settings){const c=config(settings),period=cycle(month,c.startDay),end=new Date(period.endExclusive+'T00:00:00Z');return {...period,hrReviewDate:iso(addDays(end,-c.hrReviewLeadDays)),financeReviewDate:iso(addDays(end,-c.financeReviewLeadDays)),nominalDeadlineDay:c.deadlineDay};}
 function money(v){const n=Number(v);if(!Number.isFinite(n)||n<0)throw Error('Invalid amount');return Math.round((n+Number.EPSILON)*100)/100}
 function reconcile(newRows,oldRows){if(!Array.isArray(newRows)||!Array.isArray(oldRows))throw Error('Invalid rows');const make=(rows,side)=>{const m=new Map();for(const r of rows){const code=String(r.code??'').trim();if(!/^[\w-]{1,40}$/.test(code))throw Error('Invalid employee code in '+side);if(m.has(code))throw Error('Duplicate code '+code+' in '+side);m.set(code,money(r.net));}return m};const a=make(newRows,'new'),b=make(oldRows,'existing');return [...new Set([...a.keys(),...b.keys()])].sort((x,y)=>x.localeCompare(y,undefined,{numeric:true})).map(code=>({code,existing:b.get(code)??null,newSystem:a.get(code)??null,difference:a.has(code)&&b.has(code)?Math.round((a.get(code)-b.get(code))*100)/100:null,status:!a.has(code)?'MISSING_NEW':!b.has(code)?'MISSING_EXISTING':Math.abs(a.get(code)-b.get(code))<.005?'MATCH':'DIFFERENCE'}));}
 return {cycle,config,schedule,reconcile};
@@ -4140,7 +3925,7 @@ return {cycle,config,schedule,reconcile};
 /* Integrated, non-posting payroll tools. Baseline UI and employee/leave workflows unchanged. */
 const lmSafeCycleSettingsKey='lm-payroll-cycle-review-v2';
 function lmSafeCycleSettings(){
- const defaults={startDay:21,hrReviewLeadDays:2,financeReviewLeadDays:0,deadlineDay:30};
+ const defaults={startDay:25,hrReviewLeadDays:2,financeReviewLeadDays:0,deadlineDay:30};
  try{return LactoPayrollCycle.config({...defaults,...JSON.parse(localStorage.getItem(lmSafeCycleSettingsKey)||'{}')});}catch(_){return defaults;}
 }
 function lmSafePilotMount(){
@@ -4151,18 +3936,17 @@ function lmSafePilotMount(){
  <p class="text-xs my-2">CSV: Code,Net</p>
  <input id="lm-safe-csv" type="file" accept=".csv,text/csv" class="hr-feature-input" onchange="lmSafeCompare(this.files[0]);this.value=''"><div id="lm-safe-comparison" class="overflow-x-auto mt-3"></div>
  <hr class="my-4 border-slate-600">
- <div class="flex flex-wrap gap-3 items-end"><label>${hrText('يوم بداية الدورة','Cycle start day')}<input id="lm-safe-start" type="number" min="1" max="31" class="hr-feature-input block" oninput="lmSafeCycleDraftPreview()" value="${s.startDay}"></label>
- <label>${hrText('مراجعة HR قبل النهاية بأيام','HR review lead days')}<input id="lm-safe-hr" type="number" min="1" max="10" class="hr-feature-input block" oninput="lmSafeCycleDraftPreview()" value="${s.hrReviewLeadDays}"></label>
- <label>${hrText('مراجعة المالية قبل النهاية بأيام','Finance review lead days')}<input id="lm-safe-fin" type="number" min="0" max="9" class="hr-feature-input block" oninput="lmSafeCycleDraftPreview()" value="${s.financeReviewLeadDays}"></label>
- <label>${hrText('موعد الإرسال المستهدف','Target day')}<input id="lm-safe-deadline" type="number" min="1" max="31" class="hr-feature-input block" oninput="lmSafeCycleDraftPreview()" value="${s.deadlineDay}"></label>
+ <div class="flex flex-wrap gap-3 items-end"><label>${hrText('يوم بداية الدورة','Cycle start day')}<input id="lm-safe-start" type="number" min="1" max="28" class="hr-feature-input block" value="${s.startDay}"></label>
+ <label>${hrText('مراجعة HR قبل النهاية بأيام','HR review lead days')}<input id="lm-safe-hr" type="number" min="1" max="10" class="hr-feature-input block" value="${s.hrReviewLeadDays}"></label>
+ <label>${hrText('مراجعة المالية قبل النهاية بأيام','Finance review lead days')}<input id="lm-safe-fin" type="number" min="0" max="9" class="hr-feature-input block" value="${s.financeReviewLeadDays}"></label>
+ <label>${hrText('موعد الإرسال المستهدف','Target day')}<input id="lm-safe-deadline" type="number" min="1" max="31" class="hr-feature-input block" value="${s.deadlineDay}"></label>
  <button type="button" class="portal-action-btn" onclick="lmSafeCycleSave()">${hrText('حفظ إعدادات الدورة','Save cycle settings')}</button></div>
- <p class="text-xs text-slate-300 mt-2">${hrText('الأيام 29–31 تُضبط تلقائيًا على آخر يوم فعلي في الشهر الأقصر. اختيار الشهر من حقل الشهر أعلى الصفحة.','Days 29–31 use the actual last day of shorter months. Select the payroll month above.')}</p><p id="lm-safe-period" class="text-sm mt-3 text-sky-300" aria-live="polite"></p>
+ <p id="lm-safe-period" class="text-sm mt-3 text-sky-300" aria-live="polite"></p>
 </section>`;
  lmSafeCycleShow();
 }
-function lmSafeCycleShow(){const el=document.getElementById('lm-safe-period');if(!el)return;try{const s=LactoPayrollCycle.schedule(lmPayrollState.month,lmSafeCycleSettings());el.textContent=`${hrText('من','From')} ${s.start} → ${hrText('إلى','To')} ${s.lastAttendanceDate} | ${s.calendarDays} ${hrText('يوم','days')} | HR: ${s.hrReviewDate} | ${hrText('المالية','Finance')}: ${s.financeReviewDate} | ${hrText('الإرسال','Send')}: ${s.deadlineDate}`;}catch(e){el.textContent=e.message}}
-function lmSafeCycleDraftPreview(){const el=document.getElementById('lm-safe-period');if(!el)return;try{const n=id=>Number(document.getElementById(id)?.value);const c=LactoPayrollCycle.config({startDay:n('lm-safe-start'),hrReviewLeadDays:n('lm-safe-hr'),financeReviewLeadDays:n('lm-safe-fin'),deadlineDay:n('lm-safe-deadline')});const p=LactoPayrollCycle.schedule(lmPayrollState.month,c);el.textContent=`${hrText('معاينة غير محفوظة','Unsaved preview')}: ${p.start} → ${p.lastAttendanceDate} | HR: ${p.hrReviewDate} | ${hrText('المالية','Finance')}: ${p.financeReviewDate} | ${hrText('الإرسال','Send')}: ${p.deadlineDate}`;}catch(e){el.textContent=e.message;}}
-function lmSafeCycleSave(){const val=id=>Number(document.getElementById(id).value);const box=document.getElementById('lm-safe-period');try{const c=LactoPayrollCycle.config({startDay:val('lm-safe-start'),hrReviewLeadDays:val('lm-safe-hr'),financeReviewLeadDays:val('lm-safe-fin'),deadlineDay:val('lm-safe-deadline')});localStorage.setItem(lmSafeCycleSettingsKey,JSON.stringify(c));lmPayAttendanceLink.month=null;lmPayAttendanceLink.byCode={};lmPayAttendanceLink.period=null;lmPayRenderAttendancePreview();lmPayRenderRows(true);lmSafeCycleShow();lmPayAutoSchedule();}catch(e){box.textContent=e.message}}
+function lmSafeCycleShow(){const el=document.getElementById('lm-safe-period');if(!el)return;try{const s=LactoPayrollCycle.schedule(lmPayrollState.month,lmSafeCycleSettings());el.textContent=`${s.start} → ${s.lastAttendanceDate} | ${s.calendarDays} calendar days | salary ÷ 30 | HR: ${s.hrReviewDate} | Finance: ${s.financeReviewDate}`;}catch(e){el.textContent=e.message}}
+function lmSafeCycleSave(){const val=id=>Number(document.getElementById(id).value);const box=document.getElementById('lm-safe-period');try{const c=LactoPayrollCycle.config({startDay:val('lm-safe-start'),hrReviewLeadDays:val('lm-safe-hr'),financeReviewLeadDays:val('lm-safe-fin'),deadlineDay:val('lm-safe-deadline')});localStorage.setItem(lmSafeCycleSettingsKey,JSON.stringify(c));lmSafeCycleShow();}catch(e){box.textContent=e.message}}
 async function lmSafeCompare(file){if(!file)return;const box=document.getElementById('lm-safe-comparison');try{const text=await file.text();const lines=lmPayParseCSV(text.replace(/^\ufeff/,''));const h=lines.shift().map(v=>v.trim().toLowerCase()),ci=h.findIndex(x=>['code','employee code','الكود'].includes(x)),ni=h.findIndex(x=>['net','net salary','الصافي'].includes(x));if(ci<0||ni<0)throw Error('CSV requires Code and Net');const old=lines.filter(x=>x.some(y=>y.trim())).map(x=>({code:x[ci],net:x[ni]}));const current=lmPayrollState.results.map(x=>({code:String(x.code),net:x.calc.net}));const rows=LactoPayrollCycle.reconcile(current,old);box.replaceChildren();const p=document.createElement('p');p.textContent=`${rows.length} employees | ${rows.filter(x=>x.status==='MATCH').length} matched | ${rows.filter(x=>x.status!=='MATCH').length} require review`;box.append(p);const table=document.createElement('table');table.className='hr-feature-table w-full text-xs';const tr=document.createElement('tr');for(const h of ['Code','Existing','New','Difference','Status']){const th=document.createElement('th');th.textContent=h;tr.append(th)}table.append(tr);for(const r of rows){const tr=document.createElement('tr');for(const value of [r.code,r.existing,r.newSystem,r.difference,r.status]){const td=document.createElement('td');td.textContent=value===null?'—':String(value);tr.append(td)}table.append(tr)}box.append(table);}catch(e){box.textContent='Comparison error: '+e.message}}
 
 
