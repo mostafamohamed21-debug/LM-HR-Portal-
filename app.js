@@ -4191,6 +4191,41 @@ function lmRaiseSaveDraft(){
  if(typeof module!=='undefined'&&module.exports)module.exports={calculate};
 })(typeof window!=='undefined'?window:globalThis);
 
+/* Shift D cycle settlement: deterministic PREVIEW only; no leave/payroll writes. */
+(function(root){'use strict';
+ const round=x=>Math.round((x+Number.EPSILON)*100)/100;
+ const num=(x,name)=>{if(typeof x!=='number'||!Number.isFinite(x)||x<0)throw Error('INVALID_'+name);return x;};
+ function preview(input){
+  if(!input||!input.period||!/^\d{4}-\d{2}-\d{2}$/.test(input.period.start)||!/^\d{4}-\d{2}-\d{2}$/.test(input.period.endExclusive)||input.period.start>=input.period.endExclusive)throw Error('PAYROLL_CYCLE_REQUIRED');
+  const credited=new Set(), flags=[], seen=new Set();
+  for(const x of input.records||[]){
+   if(!x||!x.id||seen.has(String(x.id))){flags.push('DUPLICATE_OR_MISSING_RECORD');continue;}
+   seen.add(String(x.id));
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(x.date)||x.date<input.period.start||x.date>=input.period.endExclusive){flags.push('OUTSIDE_CYCLE');continue;}
+   if(x.payrollHold||x.status==='PENDING_REVIEW'){flags.push('PENDING_ATTENDANCE');continue;}
+   if(['APPROVED','REST','LEAVE','SICK','CANCEL_SHIFT'].includes(x.status))credited.add(x.date);
+   else flags.push('UNRECOGNIZED_DAY_STATUS');
+  }
+  const deficitDays=Math.max(0,19-credited.size), requiredHours=deficitDays*7;
+  const earned=num(input.earnedOvertimeHours,'OVERTIME'), leave=num(input.availableLeaveDays,'LEAVE');
+  const offsetOvertime=round(Math.min(requiredHours,earned));
+  const afterOvertime=round(requiredHours-offsetOvertime);
+  const offsetLeaveDays=round(Math.min(leave,afterOvertime/7));
+  const outstandingHours=round(Math.max(0,afterOvertime-offsetLeaveDays*7));
+  const approval=input.approval||null;
+  let approved=false, carriedHours=0, salaryDeductionHours=0;
+  if(approval){
+   const carry=num(approval.carryHours,'CARRY'), salary=num(approval.salaryDeductionHours,'SALARY_DEDUCTION');
+   if(Math.abs(carry+salary-outstandingHours)>.011)flags.push('APPROVAL_ALLOCATION_MISMATCH');
+   if(!approval.actor||!approval.reason||!approval.approvedAt||!approval.approvalId)flags.push('APPROVAL_AUDIT_REQUIRED');
+   if(flags.length===0&&approval.status==='APPROVED'){approved=true;carriedHours=carry;salaryDeductionHours=salary;}
+  }
+  return {requiredDays:19,creditedDays:credited.size,deficitDays,requiredHours,offsetOvertimeHours:offsetOvertime,remainingOvertimeHours:round(earned-offsetOvertime),proposedLeaveDays:offsetLeaveDays,outstandingHours,carriedHours,salaryDeductionHours,approved,readyForPosting:approved&&flags.length===0,flags,alerts:[...(deficitDays?['SHIFT_D_DAY_DEFICIT']:[]),...(offsetOvertime?['OVERTIME_OFFSET_PROPOSED']:[]),...(offsetLeaveDays?['LEAVE_OFFSET_PROPOSED']:[]),...(outstandingHours?['ADMIN_APPROVAL_REQUIRED']:[])],note:'PREVIEW_ONLY: no leave balance, overtime or salary is changed by this function'};
+ }
+ root.LactoShiftDSettlement=Object.freeze({preview});
+ if(typeof module!=='undefined'&&module.exports)module.exports={preview};
+})(typeof window!=='undefined'?window:globalThis);
+
 /* Phase 4: auditable, read-only shift-to-payroll preview; no database writes. */
 (function(root){'use strict';
  const round=n=>Math.round((n+Number.EPSILON)*100)/100;
