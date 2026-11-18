@@ -3572,18 +3572,20 @@ async function lmV5ShiftCSaveRotation(){
  try{
   const snap=await db.ref('shift_plans').once('value'),latest=snap.val()||{};
   const conflicts=selected.filter(r=>Object.prototype.hasOwnProperty.call(latest,lmV5ShiftKey(r.code,r.date)));
-  if(conflicts.length){msg.textContent=lmV5ShiftT('تم إيقاف العملية: يوجد ','Stopped: ')+conflicts.length+lmV5ShiftT(' يوم له جدول محفوظ بالفعل. حدث البيانات واستبعد الأيام المتعارضة.',' existing scheduled days. Refresh and exclude conflicting dates.');return;}
+  const exceptions=(await db.ref('shift_exceptions').once('value')).val()||{};
   const unique=new Set(selected.map(r=>lmV5ShiftKey(r.code,r.date)));
   if(unique.size!==selected.length){msg.textContent=lmV5ShiftT('تحديد مكرر؛ أعد تحميل الجدول','Duplicate selection; refresh the table');return;}
-  const yes=await lmDialog(lmV5ShiftT('تأكيد إنشاء دورة C لعدد ','Create Shift C rotation for ')+selected.length+lmV5ShiftT(' يوم؟ البداية ',' employee-days? Start ')+anchor+' / '+phase+lmV5ShiftT('. لن تتغير المرتبات أو الإجازات.','. No payroll or leave balances will change.'),true);
+  const exceptionCount=selected.filter(r=>exceptions[lmV5ShiftKey(r.code,r.date)]).length;
+  const yes=await lmDialog(lmV5ShiftT('إعادة تعيين دورة C لعدد ','Reassign Shift C for ')+selected.length+lmV5ShiftT(' يوم، منها ',' employee-days, including ')+conflicts.length+lmV5ShiftT(' يوم محفوظ سابقًا و',' existing plans and ')+exceptionCount+lmV5ShiftT(' إجراء خاص سيتم إزالته؟ سيتم حفظ سجل التغيير، دون تعديل المرتبات أو الإجازات.',' exceptions to clear? All changes are audited; payroll and leave stay unchanged.'),true);
   if(!yes)return;
   const uid=portalAuth.currentUser.uid,now=firebase.database.ServerValue.TIMESTAMP,updates={};
   for(const r of selected){
    const rotation=lmV5ShiftCRotation(anchor,r.date,phase),key=lmV5ShiftKey(r.code,r.date);
    const plan={code:r.code,date:r.date,shift:'C',pattern:rotation.pattern||'rest',kind:rotation.kind,cancelled:false,reason,department:r.dept,rotationAnchor:anchor,rotationStartPhase:phase,rotationDay:rotation.dayOfRotation,source:'C_ROTATION',updatedBy:uid,updatedByCode:'778',updatedAt:now};
    updates['shift_plans/'+key]=plan;
+   if(exceptions[key])updates['shift_exceptions/'+key]=null;
    const auditKey=db.ref('shift_audit').push().key;
-   updates['shift_audit/'+auditKey]={key,code:r.code,date:r.date,previous:{},next:plan,actorUid:uid,actorCode:'778',at:now,reason,action:'CREATE_C_ROTATION'};
+   updates['shift_audit/'+auditKey]={key,code:r.code,date:r.date,previous:latest[key]||{},previousException:exceptions[key]||{},next:plan,actorUid:uid,actorCode:'778',at:now,reason,action:latest[key]?'REPLACE_C_ROTATION':'CREATE_C_ROTATION'};
   }
   // Firebase multi-path update is atomic; audit is create-only in server rules.
   msg.textContent=lmV5ShiftT('جاري حفظ الجدول وسجل التدقيق...','Saving schedule and audit...');
@@ -3615,11 +3617,13 @@ async function lmV5ShiftSavePlan(){
  }
  const rows=lmV5ShiftExpandSelection();if(!rows.length||rows.length>100||reason.length<4){msg.textContent=lmV5ShiftT('حدد 1–100 يوم واكتب سببًا واضحًا','Select 1–100 days and enter a reason');return;}
  const pattern=document.getElementById('lm-v5-pattern').value;if(shift==='A'&&pattern!=='short'){msg.textContent=lmV5ShiftT('الوردية A بالنمط القصير فقط','Shift A requires the short pattern');return;}
- const latest=(await db.ref('shift_plans').once('value')).val()||{};
- if(rows.some(r=>Object.prototype.hasOwnProperty.call(latest,lmV5ShiftKey(r.code,r.date)))){msg.textContent=lmV5ShiftT('يوجد جدول محفوظ بالفعل؛ لا يمكن استبداله من شاشة التعيين','Existing schedules cannot be overwritten here');return;}
- if(!await lmDialog(lmV5ShiftT('حفظ الجدول للأيام المحددة؟','Save schedule for selected dates?'),true))return;
+ const [planSnap,exSnap]=await Promise.all([db.ref('shift_plans').once('value'),db.ref('shift_exceptions').once('value')]);
+ const latest=planSnap.val()||{},exceptions=exSnap.val()||{};
+ const existingCount=rows.filter(r=>latest[lmV5ShiftKey(r.code,r.date)]).length;
+ const exceptionCount=rows.filter(r=>exceptions[lmV5ShiftKey(r.code,r.date)]).length;
+ if(!await lmDialog(lmV5ShiftT('حفظ جدول جديد لعدد ','Save schedule for ')+rows.length+lmV5ShiftT(' يوم؟ سيتم استبدال ',' days? Replace ')+existingCount+lmV5ShiftT(' يوم محفوظ ومسح ',' existing plans and clear ')+exceptionCount+lmV5ShiftT(' إجراء خاص في الفترة المحددة فقط. كل التغييرات تُسجّل.',' exceptions in selected dates only. All changes are audited.'),true))return;
  const updates={},uid=portalAuth.currentUser.uid,now=firebase.database.ServerValue.TIMESTAMP;
- for(const r of rows){const key=lmV5ShiftKey(r.code,r.date),plan={code:r.code,date:r.date,shift,pattern,kind:'WORK',cancelled:false,reason,department:r.dept,updatedBy:uid,updatedByCode:'778',updatedAt:now};updates['shift_plans/'+key]=plan;updates['shift_audit/'+db.ref('shift_audit').push().key]={key,code:r.code,date:r.date,previous:{},next:plan,actorUid:uid,actorCode:'778',at:now,reason,action:'ASSIGN_SCHEDULE'};}
+ for(const r of rows){const key=lmV5ShiftKey(r.code,r.date),plan={code:r.code,date:r.date,shift,pattern,kind:'WORK',cancelled:false,reason,department:r.dept,updatedBy:uid,updatedByCode:'778',updatedAt:now};updates['shift_plans/'+key]=plan;if(exceptions[key])updates['shift_exceptions/'+key]=null;updates['shift_audit/'+db.ref('shift_audit').push().key]={key,code:r.code,date:r.date,previous:latest[key]||{},previousException:exceptions[key]||{},next:plan,actorUid:uid,actorCode:'778',at:now,reason,action:latest[key]?'REPLACE_SCHEDULE':'ASSIGN_SCHEDULE'};}
  try{await db.ref().update(updates);await lmV5ShiftLoad();msg.textContent=lmV5ShiftT('تم حفظ الجدول','Schedule saved');}catch(e){msg.textContent=e.message;}
 }
 async function lmV5ShiftSaveException(){
