@@ -3562,7 +3562,7 @@ async function lmV5ShiftCSaveRotation(){
  const anchor=document.getElementById('lm-v5-c-anchor')?.value;
  const phase=document.getElementById('lm-v5-c-start-phase')?.value;
  const reason=document.getElementById('lm-v5-reason')?.value.trim()||'';
- const selected=[...document.querySelectorAll('.lm-v5-check:checked')].map(el=>lmV5ShiftState.rows[Number(el.value)]).filter(Boolean);
+ const selected=lmV5ShiftExpandSelection();
  if(!lmV5ShiftDay(anchor)||!['long','night','rest'].includes(phase)){msg.textContent=lmV5ShiftT('اختر تاريخ بداية ونوع بداية صحيحين','Choose a valid rotation anchor and phase');return;}
  if(reason.length<4){msg.textContent=lmV5ShiftT('اكتب سبب التعيين (4 أحرف على الأقل)','Enter assignment reason (minimum 4 characters)');return;}
  if(!selected.length){msg.textContent=lmV5ShiftT('حدد أيام الموظفين المطلوب جدولتها','Select employee dates to schedule');return;}
@@ -3595,10 +3595,14 @@ async function lmV5ShiftCSaveRotation(){
 
 /* Schedule and exceptions are independent: an exception never mutates the base rotation. */
 function lmV5ShiftTab(mode){
- const plan=mode==='plan';document.getElementById('lm-v5-plan-section').style.display=plan?'block':'none';document.getElementById('lm-v5-exception-section').style.display=plan?'none':'block';
+ const plan=mode==='plan';lmV5ShiftState.activeTab=mode;document.getElementById('lm-v5-plan-section').style.display=plan?'block':'none';document.getElementById('lm-v5-exception-section').style.display=plan?'none':'block';
  document.getElementById('lm-v5-tab-plan').className=(plan?'portal-action-btn':'portal-ghost-btn')+' px-4 py-2';
  document.getElementById('lm-v5-tab-exception').className=(!plan?'portal-action-btn':'portal-ghost-btn')+' px-4 py-2';
+ lmV5ShiftRefresh();
 }
+function lmV5ShiftToggleAll(checked){document.querySelectorAll('#lm-v5-table .lm-v5-check').forEach(el=>{el.checked=!!checked;});}
+function lmV5ShiftExpandSelection(){const selected=lmV5ShiftSelected();if(lmV5ShiftState.activeTab!=='plan')return selected;const rows=lmV5ShiftState.rows||[];const codes=new Set(selected.map(r=>String(r.code)));return rows.filter(r=>codes.has(String(r.code)));}
+
 function lmV5ShiftTypeVisibility(){const c=document.getElementById('lm-v5-type')?.value==='C';for(const id of ['lm-v5-c-anchor-wrap','lm-v5-c-phase-wrap']){const e=document.getElementById(id);if(e)e.style.display=c?'block':'none';}const p=document.getElementById('lm-v5-pattern-wrap');if(p)p.style.display=c?'none':'block';}
 function lmV5ShiftSelected(){return [...document.querySelectorAll('.lm-v5-check:checked')].map(x=>lmV5ShiftState.rows[Number(x.value)]).filter(Boolean);}
 async function lmV5ShiftSavePlan(){
@@ -3609,7 +3613,7 @@ async function lmV5ShiftSavePlan(){
   try{await lmV5ShiftCSaveRotation();}finally{document.getElementById('lm-v5-reason').value=old;}
   return;
  }
- const rows=lmV5ShiftSelected();if(!rows.length||rows.length>100||reason.length<4){msg.textContent=lmV5ShiftT('حدد 1–100 يوم واكتب سببًا واضحًا','Select 1–100 days and enter a reason');return;}
+ const rows=lmV5ShiftExpandSelection();if(!rows.length||rows.length>100||reason.length<4){msg.textContent=lmV5ShiftT('حدد 1–100 يوم واكتب سببًا واضحًا','Select 1–100 days and enter a reason');return;}
  const pattern=document.getElementById('lm-v5-pattern').value;if(shift==='A'&&pattern!=='short'){msg.textContent=lmV5ShiftT('الوردية A بالنمط القصير فقط','Shift A requires the short pattern');return;}
  const latest=(await db.ref('shift_plans').once('value')).val()||{};
  if(rows.some(r=>Object.prototype.hasOwnProperty.call(latest,lmV5ShiftKey(r.code,r.date)))){msg.textContent=lmV5ShiftT('يوجد جدول محفوظ بالفعل؛ لا يمكن استبداله من شاشة التعيين','Existing schedules cannot be overwritten here');return;}
@@ -3668,7 +3672,13 @@ async function lmV5ShiftLoad(){const msg=document.getElementById('lm-v5-message'
 function lmV5ShiftEmployees(){const dept=document.getElementById('lm-v5-dept')?.value||'',q=lmV5Norm(document.getElementById('lm-v5-search')?.value||'');return (allEmployees||[]).filter(e=>{const code=getEmployeeCode(e);return code&&lmV5ShiftAllowed(e)&&(!dept||lmV5ShiftScope(e)===dept)&&(!q||lmV5Norm(code).includes(q)||lmV5Norm(e['اسم الموظف ']||'').includes(q)||lmV5Norm(e['emp_name _en']||'').includes(q));});}
 function lmV5ShiftRefresh(){const table=document.getElementById('lm-v5-table');if(!table)return;const emps=lmV5ShiftEmployees(),from=document.getElementById('lm-v5-from')?.value,to=document.getElementById('lm-v5-to')?.value;let dates=[];if(lmV5ShiftDay(from)&&lmV5ShiftDay(to)&&from<=to){for(let d=from;d<=to&&dates.length<32;d=lmV5ShiftAdd(d,1))dates.push(d)}if(lmV5ShiftDate(from)&&lmV5ShiftDate(to)&&(lmV5ShiftDate(to)-lmV5ShiftDate(from))/86400000>=32){table.textContent=lmV5ShiftT('الحد الأقصى 32 يومًا','Maximum range 32 days');return;}if(!dates.length){table.textContent=lmV5ShiftT('اختر نطاق تاريخ صحيحًا حتى 32 يومًا','Choose a valid range up to 32 days');return;}
  const rows=[];for(const e of emps)for(const date of dates){const code=getEmployeeCode(e),key=lmV5ShiftKey(code,date);rows.push({code,date,name:getEmployeeName(e),dept:lmV5ShiftScope(e),plan:lmV5ShiftState.plans[key]||null,exception:(lmV5ShiftState.exceptions||{})[key]||null});}
- lmV5ShiftState.rows=rows;table.innerHTML='<p class="text-xs text-slate-400 mb-2">'+rows.length+' '+lmV5ShiftT('صف · حدد الموظفين المطلوب تعديلهم','rows · select employees to edit')+'</p><table class="hr-feature-table w-full"><thead><tr>'+[lmV5ShiftT('تحديد','Select'),lmV5ShiftT('الكود','Code'),lmV5ShiftT('الموظف','Employee'),lmV5ShiftT('التاريخ','Date'),lmV5ShiftT('الوردية','Shift'),lmV5ShiftT('الحالة','Status'),lmV5ShiftT('السبب','Reason'),lmV5ShiftT('إجراء خاص','Exception')].map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+rows.slice(0,400).map((r,i)=>'<tr><td><input type="checkbox" class="lm-v5-check" value="'+i+'"></td><td>'+hrEscape(r.code)+'</td><td>'+hrEscape(r.name)+'</td><td>'+r.date+'</td><td>'+hrEscape(r.plan?.shift||'A')+' '+hrEscape(r.plan?.pattern||(r.plan?'':'short'))+'</td><td>'+hrEscape(r.plan?.kind||(r.plan?'—':'DEFAULT_A'))+'</td><td>'+hrEscape(r.plan?.reason||'')+'</td><td>'+hrEscape(r.exception?.kind||'—')+'</td></tr>').join('')+'</tbody></table>'+(rows.length>400?'<p class="text-amber-300">'+lmV5ShiftT('أول 400 صف فقط؛ ضيق الفلاتر للتعديل','Showing 400 rows; narrow filters to edit')+'</p>':'');}
+ lmV5ShiftState.rows=rows;
+ const planning=lmV5ShiftState.activeTab!=='exception';
+ const display=planning?emps.map(e=>{const code=getEmployeeCode(e),days=rows.filter(r=>String(r.code)===String(code)),first=days.find(r=>r.plan),types=[...new Set(days.filter(r=>r.plan).map(r=>r.plan.shift))];return {code,name:getEmployeeName(e),days,first,types};}):rows;
+ const head=planning?[lmV5ShiftT('تحديد','Select'),lmV5ShiftT('الكود','Code'),lmV5ShiftT('الموظف','Employee'),lmV5ShiftT('الوردية الحالية','Current shift'),lmV5ShiftT('بداية الدورة','Rotation start'),lmV5ShiftT('أيام محفوظة','Saved days')]:[lmV5ShiftT('تحديد','Select'),lmV5ShiftT('الكود','Code'),lmV5ShiftT('الموظف','Employee'),lmV5ShiftT('التاريخ','Date'),lmV5ShiftT('الوردية','Shift'),lmV5ShiftT('الحالة','Status'),lmV5ShiftT('إجراء خاص','Exception')];
+ const html=display.slice(0,400).map(r=>{const index=planning?rows.findIndex(x=>String(x.code)===String(r.code)):rows.indexOf(r);const cols=planning?[r.code,r.name,r.types.length?r.types.join(' / '):lmV5ShiftT('غير معين','Not assigned'),r.first?.plan?.rotationAnchor||'—',r.days.filter(x=>x.plan).length+' / '+r.days.length]:[r.code,r.name,r.date,r.plan?.shift||'—',r.plan?.kind||'—',r.exception?.kind||'—'];return '<tr><td><input type="checkbox" class="lm-v5-check" value="'+index+'"></td>'+cols.map(c=>'<td>'+hrEscape(String(c??''))+'</td>').join('')+'</tr>';}).join('');
+ table.innerHTML='<div class="flex items-center justify-between gap-3 mb-2"><span class="text-xs text-slate-400">'+display.length+' '+(planning?lmV5ShiftT('موظف','employees'):lmV5ShiftT('يوم','days'))+'</span><label class="text-xs text-sky-300" style="display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" onchange="lmV5ShiftToggleAll(this.checked)">'+lmV5ShiftT('تحديد الكل','Select all')+'</label></div><table class="hr-feature-table w-full"><thead><tr><th>'+lmV5ShiftT('تحديد','Select')+'</th>'+head.slice(1).map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+html+'</tbody></table>'+(display.length>400?'<p class="text-xs text-amber-300">'+lmV5ShiftT('اعرض مجموعة أصغر بالفلاتر لتحديد كل النتائج','Narrow filters to select all displayed results')+'</p>':'');}
+
 async function lmV5ShiftApply(){const msg=document.getElementById('lm-v5-message');if(!portalIsAdmin())return;const indexes=[...document.querySelectorAll('.lm-v5-check:checked')].map(x=>Number(x.value)),rows=indexes.map(i=>lmV5ShiftState.rows[i]).filter(Boolean);if(!rows.length){msg.textContent=lmV5ShiftT('حدد موظفًا واحدًا على الأقل','Select employees');return;}if(rows.length>100){msg.textContent=lmV5ShiftT('الحد الأقصى 100 تعديل في المرة','Maximum 100 changes');return;}
  const shift=document.getElementById('lm-v5-type').value,pattern=document.getElementById('lm-v5-pattern').value,action=document.getElementById('lm-v5-action').value,reason=document.getElementById('lm-v5-reason').value.trim();if(reason.length<4){msg.textContent=lmV5ShiftT('اكتب سببًا واضحًا (4 أحرف على الأقل)','Enter a reason (at least 4 characters)');return;}
  if(shift==='A'&&pattern!=='short'&&(action==='WORK'||action==='CANCEL_REST')){msg.textContent=lmV5ShiftT('الوردية A أساسية 09–16، والإضافي 17–21؛ اختر النمط القصير','Shift A is 09–16, overtime 17–21; select short');return;}
