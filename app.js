@@ -3366,10 +3366,12 @@ function lmAttWorkHourRows(rows){
   }).filter(x=>Number.isFinite(x.stamp)).sort((a,b)=>a.stamp-b.stamp);
   const distinct=times.filter((x,i)=>!i||x.stamp!==times[i-1].stamp);
   let hours=null,ot=null,dayOt=null,nightOt=null,reason='';
-  if(exception&&['CANCEL','REST'].includes(exception.kind))reason='EXCEPTION_'+exception.kind;
-  else if(exception&&['RECALL','CANCEL_REST'].includes(exception.kind)&&distinct.length<2)reason='RECALL_MISSING_PUNCH';
-  else if(plan.kind==='REST'||plan.kind==='LEAVE')reason='PROTECTED_'+plan.kind;
-  else if(plan.cancelled||plan.kind!=='WORK')reason='NO_ACTIVE_SHIFT_PLAN';
+  const isRestRecall=!!(exception&&['RECALL','CANCEL_REST'].includes(exception.kind));
+  if(exception&&exception.kind==='CANCEL')reason='EXCEPTION_CANCEL';
+  else if(exception&&exception.kind==='REST')reason='EXCEPTION_REST';
+  else if(isRestRecall&&distinct.length<2)reason='RECALL_MISSING_PUNCH';
+  else if((plan.kind==='REST'||plan.kind==='LEAVE')&&!isRestRecall)reason='PROTECTED_'+plan.kind;
+  else if(plan.cancelled||(plan.kind!=='WORK'&&!isRestRecall))reason='NO_ACTIVE_SHIFT_PLAN';
   else if(plan.defaulted&&[5,6].includes(new Date(date+'T12:00:00Z').getUTCDay()))reason='DEFAULT_A_WEEKLY_REST_REVIEW';
   else if(distinct.length<2)reason='MISSING_OUT_PUNCH';
   else if(items.some(r=>r.origin==='ess'&&r.status!=='APPROVED'))reason='PENDING_ESS_REVIEW';
@@ -3385,13 +3387,62 @@ function lmAttWorkHourRows(rows){
      const overlap=(a,b)=>Math.max(0,Math.min(last,Date.parse(date+'T'+b+':00'))-Math.max(first,Date.parse(date+'T'+a+':00')))/3600000;
      dayOt=round(overlap('17:00','18:00'));nightOt=round(overlap('18:00','21:00'));
      ot=round(dayOt+nightOt);
-    }else if(shift==='B'||shift==='C')reason='MONTHLY_OT_NOT_FINAL';
+    }else if(shift==='B'||shift==='C')reason=isRestRecall?'REST_RECALL_OVERTIME':'MONTHLY_OT_NOT_FINAL';
     else reason='SHIFT_D_POLICY_REQUIRED';
    }
   }
-  results.push({code,date,shift,pattern,defaulted:!!plan.defaulted,hours,ot,dayOt,nightOt,reason,sourceIds:[...new Set(items.map(r=>r.id).filter(Boolean))]});
+  results.push({code,date,shift,pattern,defaulted:!!plan.defaulted,hours,ot,dayOt,nightOt,reason,restRecall:isRestRecall,sourceIds:[...new Set(items.map(r=>r.id).filter(Boolean))]});
  }
  return results.sort((a,b)=>a.date.localeCompare(b.date)||a.code.localeCompare(b.code));
+}
+/* Shift C cycle overtime preview. Read-only: never posts to payroll or Firebase. */
+function lmAttShiftCCyclePreview(code){
+ try{
+  if(!code||typeof LactoPayrollCycle==='undefined'||typeof LactoShiftEngine==='undefined')return null;
+  const month=String(lmPayrollState?.month||'');
+  if(!/^\d{4}-\d{2}$/.test(month))return null;
+  const period=LactoPayrollCycle.schedule(month,lmSafeCycleSettings());
+  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  const through=today<period.lastAttendanceDate?today:period.lastAttendanceDate;
+  const plans=lmAttWorkspace.shiftPlans||{},exceptions=lmAttWorkspace.shiftExceptions||{};
+  const allDaily=lmAttWorkHourRows(lmAttWorkspace.rows||[]).filter(x=>String(x.code)===String(code));
+  const dailyByDate=new Map(allDaily.map(x=>[x.date,x]));
+  const records=[];let planDays=0,missingPlans=0,reviewDays=0;
+  for(let ms=Date.parse(period.start+'T12:00:00Z');ms<=Date.parse(through+'T12:00:00Z');ms+=86400000){
+   const date=new Date(ms).toISOString().slice(0,10),key=lmV5ShiftKey(code,date),plan=plans[key];
+   if(!plan||String(plan.shift||'').toUpperCase()!=='C'){missingPlans++;continue;}
+   planDays++;
+   const ex=exceptions[key],day=dailyByDate.get(date);
+   if(ex?.kind==='CANCEL'){
+    records.push({id:'cancel:'+date,date,status:'CANCEL_SHIFT'});continue;
+   }
+   if(plan.kind==='REST'&&!['RECALL','CANCEL_REST'].includes(ex?.kind)){
+    records.push({id:'rest:'+date,date,status:'REST'});continue;
+   }
+   if(plan.kind==='LEAVE'){
+    records.push({id:'leave:'+date,date,status:'LEAVE'});continue;
+   }
+   if(day&&day.hours!==null&&(day.reason==='MONTHLY_OT_NOT_FINAL'||day.reason==='REST_RECALL_OVERTIME')){
+    records.push({id:'work:'+date,date,status:'APPROVED',hours:day.hours,restRecall:!!day.restRecall});
+   }else{
+    records.push({id:'review:'+date,date,status:'PENDING_REVIEW'});reviewDays++;
+   }
+  }
+  if(missingPlans){return {period,ready:false,reason:'SHIFT_PLAN_COVERAGE_INCOMPLETE',missingPlans,planDays,reviewDays};}
+  const result=LactoShiftEngine.calculate({shift:'C',records,period:{start:period.start,endExclusive:period.endExclusive}});
+  const cycleClosed=today>=period.endExclusive;
+  return {...result,period,cycleClosed,planDays,reviewDays,asOf:through,ready:!!result.readyForPayroll&&cycleClosed};
+ }catch(error){return {ready:false,reason:'CYCLE_PREVIEW_ERROR',message:error?.message||String(error)};}
+}
+function lmAttShiftCCycleSummary(code){
+ const x=lmAttShiftCCyclePreview(code);if(!x)return '';
+ const title=hrText('معاينة إضافي الوردية C — دورة المرتبات','Shift C overtime preview — payroll cycle');
+ if(x.reason==='SHIFT_PLAN_COVERAGE_INCOMPLETE')return '<div class="rounded-lg border border-amber-500/40 p-3 mb-3 text-amber-200"><strong>'+title+'</strong><p>'+hrText('لا يمكن اعتماد إجمالي الإضافي: جدول الوردية C غير مكتمل في ','Cannot finalize overtime: Shift C schedule is incomplete for ')+x.missingPlans+' '+hrText('يوم/أيام داخل الدورة.','day(s) in this cycle.')+'</p></div>';
+ if(x.reason==='CYCLE_PREVIEW_ERROR')return '<div class="rounded-lg border border-amber-500/40 p-3 mb-3 text-amber-200"><strong>'+title+'</strong><p>'+lmAttSafe(x.message||x.reason)+'</p></div>';
+ const earned=Number(x.overtimeEarnedHours||0),payable=Number(x.payableOvertimeHours||0);
+ const status=x.ready?hrText('الدورة مكتملة — معاينة جاهزة للمراجعة','Cycle complete — preview ready for review'):hrText('معاينة مؤقتة — توجد أيام أو أدلة تحتاج مراجعة','Provisional preview — days or evidence require review');
+ const note=hrText('المستهدف 132 ساعة فعلية. الإضافي الخام يُعرض بعد خصم المستهدف، وساعات استدعاء الراحة تضاف كإضافي مستقل. لا يوجد ترحيل للمرتبات.','Target is 132 actual hours. Raw overtime is calculated above the target; verified rest-recall hours are added separately. Nothing is posted to payroll.');
+ return '<div class="rounded-lg border border-sky-500/30 p-3 mb-3"><div class="flex flex-wrap justify-between gap-2"><strong class="text-sky-300">'+title+'</strong><span class="text-amber-200">'+status+'</span></div><p class="text-xs mt-1">'+lmAttSafe(x.period.start)+' → '+lmAttSafe(x.period.lastAttendanceDate)+' | '+hrText('حتى','Through')+' '+lmAttSafe(x.asOf||'—')+'</p><div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3"><div><small>'+hrText('الساعات الفعلية','Actual hours')+'</small><div class="font-bold">'+Number(x.workedHours||0).toFixed(2)+'</div></div><div><small>'+hrText('المستهدف','Target')+'</small><div class="font-bold">132.00</div></div><div><small>'+hrText('الإضافي المكتسب خام','Raw overtime earned')+'</small><div class="font-bold text-sky-300">'+earned.toFixed(2)+'</div></div><div><small>'+hrText('المتاح بعد تسويات الإلغاء','Payable after cancellation offsets')+'</small><div class="font-bold">'+payable.toFixed(2)+'</div></div></div><p class="text-xs mt-2">'+note+'</p>'+(x.flags?.length?'<p class="text-xs text-amber-200 mt-2">'+hrText('أسباب المراجعة: ','Review flags: ')+lmAttSafe(x.flags.map(f=>f.reason).join(' | '))+'</p>':'')+'</div>';
 }
 function lmAttRenderHours(rows){
  const host=document.getElementById('lm-att-hours-summary');if(!host)return;
@@ -4542,7 +4593,9 @@ function lmLeaveCloseFullReport(){
    const values=[items[0].code,lmAttEmployeeName(items[0]),day,shift?.shift||plan?.shift||'—',first?lmAttTime(first.r):'—',complete?lmAttTime(last.r):'—',elapsed,shift?.ot==null?'—':shift.ot.toFixed(2),shift?.dayOt==null?'—':(Math.round(shift.dayOt*135)/100).toFixed(2),shift?.nightOt==null?'—':(Math.round(shift.nightOt*170)/100).toFixed(2),shift?.ot==null?'—':(Math.round((shift.dayOt*1.35+shift.nightOt*1.70)*100)/100).toFixed(2),state,actionLabel,exceptionReason||'—'];
    return '<tr>'+values.map(v=>'<td>'+lmAttSafe(v)+'</td>').join('')+'<td>'+map+'</td></tr>';
   });
-  summary.innerHTML='<div class="flex flex-wrap justify-between items-center gap-2 mb-3"><h3 class="font-bold text-sky-300">'+hrText('السجل اليومي الموحد','Unified daily attendance')+'</h3><span class="text-xs text-amber-200">'+hrText('الأيام الخالية من البصمات للعرض فقط؛ الإضافي مبدئي حسب سياسة الوردية','No-punch days are display-only; overtime is provisional under shift policy')+'</span></div>'+
+  const selectedCodes=[...new Set([...groups.keys()].map(k=>k.slice(0,k.indexOf('|'))))];
+  const cCycleSummaries=selectedCodes.map(code=>{const hasC=Object.entries(lmAttWorkspace.shiftPlans||{}).some(([key,p])=>key.startsWith(String(code).replace(/[.#$\[\]/]/g,'_')+'_')&&String(p?.shift||'').toUpperCase()==='C');return hasC?lmAttShiftCCycleSummary(code):'';}).join('');
+  summary.innerHTML='<div class="flex flex-wrap justify-between items-center gap-2 mb-3"><h3 class="font-bold text-sky-300">'+hrText('السجل اليومي الموحد','Unified daily attendance')+'</h3><span class="text-xs text-amber-200">'+hrText('الأيام الخالية من البصمات للعرض فقط؛ الإضافي مبدئي حسب سياسة الوردية','No-punch days are display-only; overtime is provisional under shift policy')+'</span></div>'+cCycleSummaries+
    '<div class="overflow-x-auto"><table class="hr-feature-table w-full"><thead><tr>'+th.map(x=>'<th>'+lmAttSafe(x)+'</th>').join('')+'</tr></thead><tbody>'+tableRows.join('')+'</tbody></table></div>'+
    (groups.size>500?'<p class="text-xs mt-2">'+hrText('أول 500 يوم؛ الحركات الأصلية والتصدير محفوظان','First 500 days; original events and export retained')+'</p>':'');
  };
