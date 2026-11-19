@@ -4505,11 +4505,25 @@ function lmLeaveCloseFullReport(){
    if(!groups.has(key))groups.set(key,[]);
    groups.get(key).push(r);
   }
+  // In report mode, materialize every calendar day for an explicitly selected
+  // employee. Empty days are display-only rows; they are never saved as punches.
+  const from=document.getElementById('lm-att-from')?.value||'',to=document.getElementById('lm-att-to')?.value||'';
+  const selectedCode=document.getElementById('lm-att-code')?.value.trim()||'';
+  const emptyDays=[];
+  if(lmAttWorkspace.mode==='report' && /^\d+$/.test(selectedCode) && /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) && from<=to){
+   const start=Date.parse(from+'T12:00:00Z'),end=Date.parse(to+'T12:00:00Z');
+   if(Number.isFinite(start)&&Number.isFinite(end)&&(end-start)/86400000<=400){
+    for(let ms=start;ms<=end;ms+=86400000){
+     const date=new Date(ms).toISOString().slice(0,10),key=selectedCode+'|'+date;
+     if(!groups.has(key)){const placeholder={id:'display-only:'+key,code:selectedCode,date,time:'',origin:'display-only',status:'NO_PUNCH',reportWorkday:date};groups.set(key,[placeholder]);emptyDays.push(placeholder);}
+    }
+   }
+  }
   const shiftRows=new Map(lmAttWorkHourRows(rows).map(r=>[r.code+'|'+r.date,r]));
   const th=[hrText('الكود','Code'),hrText('الموظف','Employee'),hrText('التاريخ','Date'),hrText('الوردية','Shift'),hrText('الحضور','In'),hrText('الانصراف','Out'),hrText('المدة الفعلية','Elapsed'),hrText('إضافي خام','Raw OT'),hrText('نهاري × 1.35','Day × 1.35'),hrText('ليلي × 1.70','Night × 1.70'),hrText('إضافي بالمعامل','Weighted OT'),hrText('الحالة','Status'),hrText('إجراء الوردية','Shift action'),hrText('سبب الإجراء','Action reason'),hrText('الموقع','Location')];
   const tableRows=[...groups].sort((a,b)=>b[0].localeCompare(a[0])).slice(0,500).map(([key,items])=>{
-   const sorted=items.map(r=>({r,ms:Date.parse(lmAttDate(r)+'T'+lmAttTime(r))})).filter(x=>Number.isFinite(x.ms)).sort((a,b)=>a.ms-b.ms);
-   const first=sorted[0],last=sorted[sorted.length-1],day=key.slice(key.indexOf('|')+1),shift=shiftRows.get(key);
+   const sorted=items.filter(r=>r.origin!=='display-only').map(r=>({r,ms:Date.parse(lmAttDate(r)+'T'+lmAttTime(r))})).filter(x=>Number.isFinite(x.ms)).sort((a,b)=>a.ms-b.ms);
+   const first=sorted[0],last=sorted[sorted.length-1],day=key.slice(key.indexOf('|')+1),shift=shiftRows.get(key),isEmptyDay=items.every(r=>r.origin==='display-only');
    const complete=sorted.length>=2&&last.ms>first.ms&&last.ms-first.ms<=20*3600000
      &&items.every(r=>r.reportPairStatus==='PAIRED');
    const minutes=complete?Math.floor((last.ms-first.ms)/60000):null;
@@ -4518,15 +4532,17 @@ function lmLeaveCloseFullReport(){
    const exceptionKind=exception?.kind||items.find(r=>r.origin==='exception')?.exceptionKind||'';
    const exceptionReason=exception?.reason||items.find(r=>r.origin==='exception')?.exceptionReason||'';
    const actionLabel=exceptionKind?lmAttExceptionLabel(exceptionKind):'—';
-   const state=exceptionKind==='CANCEL'?hrText('إلغاء عمل — مسجل','Work cancelled — recorded'):
+   const state=isEmptyDay?hrText('لا توجد بصمات','No punches'):
+     exceptionKind==='CANCEL'?hrText('إلغاء عمل — مسجل','Work cancelled — recorded'):
      exceptionKind==='REST'?hrText('راحة استثنائية — مسجلة','Exceptional rest — recorded'):
      exceptionKind==='RECALL'||exceptionKind==='CANCEL_REST'?hrText('استدعاء — مراجعة البصمات','Recall — review punches'):
      complete?hrText('زوج بصمات','Paired'):hrText('ناقص / مراجعة','Incomplete / review');
    const map=items.map(x=>lmAttMapLink(x)).find(x=>x!=='—')||'—';
-   const values=[items[0].code,lmAttEmployeeName(items[0]),day,shift?.shift||'—',first?lmAttTime(first.r):'—',complete?lmAttTime(last.r):'—',elapsed,shift?.ot==null?'—':shift.ot.toFixed(2),shift?.dayOt==null?'—':(Math.round(shift.dayOt*135)/100).toFixed(2),shift?.nightOt==null?'—':(Math.round(shift.nightOt*170)/100).toFixed(2),shift?.ot==null?'—':(Math.round((shift.dayOt*1.35+shift.nightOt*1.70)*100)/100).toFixed(2),state,actionLabel,exceptionReason||'—'];
+   const plan=(lmAttWorkspace.shiftPlans||{})[lmV5ShiftKey(items[0].code,day)];
+   const values=[items[0].code,lmAttEmployeeName(items[0]),day,shift?.shift||plan?.shift||'—',first?lmAttTime(first.r):'—',complete?lmAttTime(last.r):'—',elapsed,shift?.ot==null?'—':shift.ot.toFixed(2),shift?.dayOt==null?'—':(Math.round(shift.dayOt*135)/100).toFixed(2),shift?.nightOt==null?'—':(Math.round(shift.nightOt*170)/100).toFixed(2),shift?.ot==null?'—':(Math.round((shift.dayOt*1.35+shift.nightOt*1.70)*100)/100).toFixed(2),state,actionLabel,exceptionReason||'—'];
    return '<tr>'+values.map(v=>'<td>'+lmAttSafe(v)+'</td>').join('')+'<td>'+map+'</td></tr>';
   });
-  summary.innerHTML='<div class="flex flex-wrap justify-between items-center gap-2 mb-3"><h3 class="font-bold text-sky-300">'+hrText('السجل اليومي الموحد','Unified daily attendance')+'</h3><span class="text-xs text-amber-200">'+hrText('المدة الفعلية من أول وآخر بصمة؛ الإضافي مبدئي','Elapsed time from first/last punch; overtime provisional')+'</span></div>'+
+  summary.innerHTML='<div class="flex flex-wrap justify-between items-center gap-2 mb-3"><h3 class="font-bold text-sky-300">'+hrText('السجل اليومي الموحد','Unified daily attendance')+'</h3><span class="text-xs text-amber-200">'+hrText('الأيام الخالية من البصمات للعرض فقط؛ الإضافي مبدئي حسب سياسة الوردية','No-punch days are display-only; overtime is provisional under shift policy')+'</span></div>'+
    '<div class="overflow-x-auto"><table class="hr-feature-table w-full"><thead><tr>'+th.map(x=>'<th>'+lmAttSafe(x)+'</th>').join('')+'</tr></thead><tbody>'+tableRows.join('')+'</tbody></table></div>'+
    (groups.size>500?'<p class="text-xs mt-2">'+hrText('أول 500 يوم؛ الحركات الأصلية والتصدير محفوظان','First 500 days; original events and export retained')+'</p>':'');
  };
