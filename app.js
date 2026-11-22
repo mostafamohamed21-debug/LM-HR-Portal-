@@ -3093,7 +3093,7 @@ function lmUnifiedAlertsDraw(){
 
 
 // Attendance workspace UI: real source records, no payroll/shift calculations.
-const lmAttWorkspace={rows:[],loading:false,mode:'today',shiftPlans:{},shiftPlansLoaded:false,leaveRequests:{},leaveRequestsLoaded:false};
+const lmAttWorkspace={rows:[],loading:false,mode:'today',shiftPlans:{},shiftPlansLoaded:false,shiftExceptions:{}};
 function lmAttMode(mode){lmAttWorkspace.mode=mode==='report'?'report':'today';const filters=document.getElementById('lm-att-filters');if(filters)filters.style.display=lmAttFiltersOpen?'grid':'none';const title=document.getElementById('lm-att-mode-title');if(title)title.textContent=lmAttWorkspace.mode==='today'?hrText('حركات اليوم','Today punches'):hrText('تقرير الحضور والانصراف','Attendance history report');lmAttFilter();}
 function lmAttSafe(v){return escapeHtml(String(v??''));}
 function lmAttDate(r){return String(r.date||r.clientDate||r.timestamp||'').slice(0,10);}
@@ -3271,13 +3271,13 @@ async function lmAttLoad(){
  const rows=[],errors=[];
  const add=(r)=>{if(r&&typeof r==='object')rows.push(r)};
  try{
-  const jobs=[['attendance_requests/2','ess'],['approved_attendance/2','approved'],['hr_imports/attendance','imports'],['shift_plans','plans'],['manual_attendance_punches','manual'],['leave_requests','leaves']];
+  const jobs=[['attendance_requests/2','ess'],['approved_attendance/2','approved'],['hr_imports/attendance','imports'],['shift_plans','plans'],['shift_exceptions','exceptions'],['manual_attendance_punches','manual']];
   const results=await Promise.allSettled(jobs.map(([path])=>db.ref(path).once('value')));
   results.forEach((res,i)=>{
    const [path,kind]=jobs[i];if(res.status!=='fulfilled'){errors.push(path);return;}
    const val=res.value.val()||{};
    if(kind==='plans'){lmAttWorkspace.shiftPlans=val;lmAttWorkspace.shiftPlansLoaded=true;return;}
-   if(kind==='leaves'){lmAttWorkspace.leaveRequests=val;lmAttWorkspace.leaveRequestsLoaded=true;return;}
+   if(kind==='exceptions'){lmAttWorkspace.shiftExceptions=val;return;}
    if(kind==='manual')Object.entries(val).forEach(([id,r])=>{if(r&&r.code&&r.date&&r.time)add({id,code:String(r.code),date:r.date,time:r.time,timestamp:r.date+'T'+(r.time.length===5?r.time+':00':r.time),punch:r.punchType,status:'MANUAL',origin:'manual',createdAt:r.createdAt,manualReason:r.reason});});
    if(kind==='ess')Object.entries(val).forEach(([id,r])=>add({id,code:'2',date:r.clientDate,time:r.clientTime,punch:r.punchType,status:r.verificationStatus||'PENDING_REVIEW',origin:'ess',location:r.location||null,createdAt:r.createdAt}));
    if(kind==='approved')Object.entries(val).forEach(([id,r])=>{if(!val||typeof r!=='object')return; /* Approved ledger is an approval of an ESS request, not a second punch. */});
@@ -3286,31 +3286,47 @@ async function lmAttLoad(){
  }catch(e){errors.push(e.message||'read failed')}
  const seenPunches=new Set();
  const uniqueRows=rows.filter(r=>{if(r.origin!=='device')return true;const key=String(r.code)+'|'+String(r.timestamp||r.date+' '+r.time);if(seenPunches.has(key))return false;seenPunches.add(key);return true;});
- lmAttWorkspace.rows=uniqueRows.sort((a,b)=>lmAttStamp(b)-lmAttStamp(a));lmAttWorkspace.loading=false;lmAttClassify();
+ // Exception events are separate report rows: never forge biometric punches.
+ const exceptionRows=Object.entries(lmAttWorkspace.shiftExceptions||{}).filter(([key,e])=>e&&e.code&&e.date&&['CANCEL','CANCEL_REST','REST','RECALL'].includes(String(e.kind||''))).map(([key,e])=>({id:'exception:'+key,code:String(e.code),date:String(e.date),time:'',origin:'exception',status:'EXCEPTION',exceptionKind:String(e.kind),exceptionReason:String(e.reason||''),reportWorkday:String(e.date)}));
+ lmAttWorkspace.rows=uniqueRows.concat(exceptionRows).sort((a,b)=>lmAttStamp(b)-lmAttStamp(a));lmAttWorkspace.loading=false;lmAttClassify();
  const warn=document.getElementById('lm-att-count');if(warn&&errors.length)warn.textContent=hrText('تعذر قراءة بعض المصادر: ','Some sources unavailable: ')+errors.join(', ');
  lmAttFilter();
 }
 // Display-only punch pairing. Never modifies imported records or Firebase.
 // Night-shift grouping is enabled only by an explicit saved shift plan.
 function lmAttClassify(){
- const plans=lmAttWorkspace.shiftPlans||{},groups=new Map();
+ const plans=lmAttWorkspace.shiftPlans||{},exceptions=lmAttWorkspace.shiftExceptions||{},groups=new Map();
  const dayBefore=d=>{const dt=new Date(d+'T12:00:00Z');if(!Number.isFinite(dt.getTime()))return '';dt.setUTCDate(dt.getUTCDate()-1);return dt.toISOString().slice(0,10);};
- const movementGap=5*60*1000;
  for(const r of lmAttWorkspace.rows){
   r.reportPunch='';r.reportWorkday=lmAttDate(r);r.reportPairStatus='';
+  if(r.origin==='exception'){r.reportPairStatus='EXCEPTION';continue;}
   const code=String(r.code||'').trim(),date=lmAttDate(r),time=lmAttTime(r),stamp=Date.parse(date+'T'+time);
-  if(!code||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(date)||!/^\d{1,2}:\d{2}/.test(time)||!Number.isFinite(stamp)){r.reportPairStatus='INVALID_TIME';continue;}
+  if(!code||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!/^\d{1,2}:\d{2}/.test(time)||!Number.isFinite(stamp)){r.reportPairStatus='INVALID_TIME';continue;}
   let workday=date;
   const previous=dayBefore(date),previousPlan=plans[lmV5ShiftKey(code,previous)];
-  const shift=String(previousPlan?.shift||'').toUpperCase(),pattern=String(previousPlan?.pattern||'').toLowerCase();
-  const activeNight=previousPlan?.kind==='WORK'&&!previousPlan?.cancelled&&['B','C','D'].includes(shift)&&pattern==='night';
-  // Attribute only punches close to the scheduled end of the previous night's shift.
-  // The following day's REST plan remains untouched; the punch belongs to the shift's start date.
-  if(activeNight){
-   const tpl=lmV5ShiftTemplate(shift,pattern,previous);
-   const end=tpl?.overnight?Date.parse(lmV5ShiftAdd(previous,1)+'T'+tpl.end+':00+02:00'):NaN;
-   if(Number.isFinite(end)&&stamp>=end-60*60*1000&&stamp<=end+60*60*1000)workday=previous;
-  }
+  // Attribute a morning checkout to the prior workday only when that date has
+  // an explicit overnight B/C/D assignment and the punch is near its planned
+  // end time. The current date's REST plan must remain REST; the checkout is
+  // not a new arrival or a workday on that date.
+  const previousShift=String(previousPlan?.shift||'').toUpperCase();
+  const previousKind=String(previousPlan?.kind||'').toUpperCase();
+  const previousPattern=String(previousPlan?.pattern||'').trim().toLowerCase();
+  const previousException=String(exceptions[lmV5ShiftKey(code,previous)]?.kind||'').toUpperCase();
+  const previousTemplate=previousPlan&&typeof lmV5ShiftTemplate==='function'
+    ?lmV5ShiftTemplate(previousShift,previousPattern,previous):null;
+  const clockMatch=/^(\d{1,2}):(\d{2})/.exec(time);
+  const endMatch=/^(\d{2}):(\d{2})$/.exec(previousTemplate?.end||'');
+  const punchMinute=clockMatch?Number(clockMatch[1])*60+Number(clockMatch[2]):NaN;
+  // Current overnight templates end at 09:00. Keep the one-hour late-checkout
+  // tolerance even when an older saved plan lacks its template metadata.
+  const endMinute=endMatch?Number(endMatch[1])*60+Number(endMatch[2]):(previousPattern==='night'?540:NaN);
+  const nearPlannedEnd=Number.isFinite(punchMinute)&&Number.isFinite(endMinute)
+    &&punchMinute>=0&&punchMinute<12*60&&Math.abs(punchMinute-endMinute)<=60;
+  const overnight=!!previousPlan&&!previousPlan.cancelled&&/night/.test(previousPattern)
+    &&['B','C','D'].includes(previousShift)&&!['REST','LEAVE','CANCEL','CANCELLED'].includes(previousKind)
+    &&!['CANCEL','REST'].includes(previousException)
+    &&(previousTemplate?.overnight===true||!previousTemplate);
+  if(overnight&&nearPlannedEnd)workday=previous;
   r.reportWorkday=workday;
   const key=code+'|'+workday;
   if(!groups.has(key))groups.set(key,[]);
@@ -3318,29 +3334,28 @@ function lmAttClassify(){
  }
  for(const group of groups.values()){
   group.sort((a,b)=>a.stamp-b.stamp);
-  // Cluster close timestamps as one physical movement (e.g. 09:04 and 09:07).
-  // Keep every source row visible, but never reinterpret a near-duplicate as IN and OUT.
-  const movements=[];
-  for(const x of group){
-   const last=movements[movements.length-1];
-   if(last&&x.stamp-last.stamp<=movementGap){last.items.push(x);continue;}
-   movements.push({stamp:x.stamp,items:[x]});
-  }
-  if(movements.length===1){for(const x of group)x.r.reportPairStatus=movements[0].items.length>1?'DUPLICATE_MOVEMENT':'SINGLE_PUNCH';continue;}
-  const first=movements[0],last=movements[movements.length-1];
-  if(last.stamp-first.stamp>20*3600000){for(const x of group)x.r.reportPairStatus='REVIEW_REQUIRED';continue;}
-  for(const movement of movements){
-   for(let i=0;i<movement.items.length;i++){
-    const x=movement.items[i];
-    if(i>0){x.r.reportPairStatus='DUPLICATE_MOVEMENT';x.r.reportPunch='DUPLICATE';}
-    else{x.r.reportPairStatus='PAIRED';x.r.reportPunch=movement===first?'IN':movement===last?'OUT':'INTERMEDIATE';}
-   }
-  }
+  const distinct=[];for(const x of group){if(!distinct.length||distinct[distinct.length-1].stamp!==x.stamp)distinct.push(x);}
+  if(distinct.length===1){for(const x of group)x.r.reportPairStatus='SINGLE_PUNCH';continue;}
+  const first=distinct[0].stamp,last=distinct[distinct.length-1].stamp;
+  // More than 20 hours between first and last indicates ambiguous grouping.
+  if(last-first>20*3600000){for(const x of group)x.r.reportPairStatus='REVIEW_REQUIRED';continue;}
+  for(const x of group){x.r.reportPairStatus='PAIRED';x.r.reportPunch=x.stamp===first?'IN':x.stamp===last?'OUT':'INTERMEDIATE';}
  }
 }
-function lmAttPunchLabel(r){const v=r.reportPunch||'';return v==='IN'?hrText('حضور','Check-in'):v==='OUT'?hrText('انصراف','Check-out'):v==='INTERMEDIATE'?hrText('بصمة وسطية','Intermediate'):r.reportPairStatus==='DUPLICATE_MOVEMENT'?hrText('تكرار لنفس الحركة','Duplicate movement'):r.reportPairStatus==='SINGLE_PUNCH'?hrText('بصمة واحدة — مراجعة','Single punch — review'):r.reportPairStatus==='REVIEW_REQUIRED'?hrText('تحتاج مراجعة','Review required'):hrText('غير محدد','Unclassified');}
+function lmAttPunchLabel(r){if(r.origin==='exception')return lmAttExceptionLabel(r.exceptionKind);const v=r.reportPunch||'';return v==='IN'?hrText('حضور','Check-in'):v==='OUT'?hrText('انصراف','Check-out'):v==='INTERMEDIATE'?hrText('بصمة وسطية','Intermediate'):r.reportPairStatus==='SINGLE_PUNCH'?hrText('بصمة واحدة — مراجعة','Single punch — review'):r.reportPairStatus==='REVIEW_REQUIRED'?hrText('تحتاج مراجعة','Review required'):hrText('غير محدد','Unclassified');}
+function lmAttExceptionLabel(kind){const labels={CANCEL:['إلغاء يوم عمل','Cancelled workday'],CANCEL_REST:['استدعاء من الراحة','Rest-day recall'],REST:['راحة استثنائية','Exceptional rest'],RECALL:['استدعاء للعمل','Recall to work']};const v=labels[kind];return v?hrText(v[0],v[1]):hrText('إجراء خاص','Exception');}
 function lmAttEmployeeName(r){return lmBilingualName(r.code,r.name||'');}
-function lmAttFiltered(){const code=document.getElementById('lm-att-code')?.value.trim()||'',from=document.getElementById('lm-att-from')?.value||'',to=document.getElementById('lm-att-to')?.value||'',src=document.getElementById('lm-att-source')?.value||'all',dept=document.getElementById('lm-att-dept')?.value||'';const selected=lmV5DeptGroups().find(d=>d.key===dept);return lmAttWorkspace.rows.filter(r=>{const date=lmAttWorkspace.mode==='report'?(r.reportWorkday||lmAttDate(r)):lmAttDate(r);if(lmAttWorkspace.mode==='today'&&date!==new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()) )return false;return (!selected||selected.codes.has(String(r.code||'')))&&(!code||String(r.code||'').includes(code))&&(!from||(date&&date>=from))&&(!to||(date&&date<=to))&&(src==='all'||r.origin===src)});}
+function lmAttFiltered(){const code=document.getElementById('lm-att-code')?.value.trim()||'',from=document.getElementById('lm-att-from')?.value||'',to=document.getElementById('lm-att-to')?.value||'',src=document.getElementById('lm-att-source')?.value||'all',dept=document.getElementById('lm-att-dept')?.value||'';const selected=lmV5DeptGroups().find(d=>d.key===dept);return lmAttWorkspace.rows.filter(r=>{const date=lmAttDate(r);if(lmAttWorkspace.mode==='today'&&date!==new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()) )return false;return (!selected||selected.codes.has(String(r.code||'')))&&(!code||String(r.code||'').includes(code))&&(!from||(date&&date>=from))&&(!to||(date&&date<=to))&&(src==='all'||r.origin===src)});}
+
+function lmAttFilteredWorkdays(){
+ const code=document.getElementById('lm-att-code')?.value.trim()||'',from=document.getElementById('lm-att-from')?.value||'',to=document.getElementById('lm-att-to')?.value||'',src=document.getElementById('lm-att-source')?.value||'all',dept=document.getElementById('lm-att-dept')?.value||'';
+ const selected=lmV5DeptGroups().find(d=>d.key===dept);
+ return lmAttWorkspace.rows.filter(r=>{
+  const day=String(r.reportWorkday||lmAttDate(r)||'');
+  if(lmAttWorkspace.mode==='today'&&day!==new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()))return false;
+  return (!selected||selected.codes.has(String(r.code||'')))&&(!code||String(r.code||'').includes(code))&&(!from||(day&&day>=from))&&(!to||(day&&day<=to))&&(src==='all'||r.origin===src);
+ });
+}
 function lmAttMapLink(r){
  const loc=r&&r.location;
  if(!loc||loc.lat===null||loc.lng===null||loc.lat===undefined||loc.lng===undefined)return '—';
@@ -3369,37 +3384,25 @@ function lmAttWorkHourRows(rows){
   if(!code||!/^\d{4}-\d{2}-\d{2}$/.test(date))continue;
   const key=code+'|'+date;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);
  }
- // Include saved schedule days even when the employee has no punch that day.
- const from=document.getElementById('lm-att-from')?.value||'',to=document.getElementById('lm-att-to')?.value||'',onlyCode=document.getElementById('lm-att-code')?.value.trim()||'';
- const deptKey=document.getElementById('lm-att-dept')?.value||'',deptGroup=lmV5DeptGroups().find(d=>d.key===deptKey);
- const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
- const inScope=(code,date)=>/^\d{4}-\d{2}-\d{2}$/.test(date)&&(!from||date>=from)&&(!to||date<=to)&&(lmAttWorkspace.mode!=='today'||date===today)&&(!onlyCode||String(code).includes(onlyCode))&&(!deptGroup||deptGroup.codes.has(String(code)));
- const plans=lmAttWorkspace.shiftPlans||{};
- for(const [key,plan] of Object.entries(plans)){
-  const date=String(plan?.date||key.slice(-10)),code=String(plan?.code||key.slice(0,-11)).replace(/_$/,'');
-  if(!code||!inScope(code,date))continue;
-  const groupKey=code+'|'+date;if(!groups.has(groupKey))groups.set(groupKey,[]);
- }
- // Approved dated leave requests also create daily rows, not just balance deductions.
- for(const [code,requests] of Object.entries(lmAttWorkspace.leaveRequests||{}))for(const req of Object.values(requests||{})){
-  if(!req||req.status!=='Approved'||!/^\d{4}-\d{2}-\d{2}$/.test(String(req.startDate||''))||!/^\d{4}-\d{2}-\d{2}$/.test(String(req.endDate||'')))continue;
-  let day=req.startDate,guard=0;while(day<=req.endDate&&guard++<370){if(inScope(code,day)){const groupKey=code+'|'+day;if(!groups.has(groupKey))groups.set(groupKey,[]);groups.get(groupKey).push({code,date:day,time:'',origin:'schedule',scheduleKind:'LEAVE',leaveType:req.type||'LEAVE',id:'leave:'+day});}day=lmV5ShiftAdd(day,1);if(!day)break;}
- }
  const round=n=>Math.round(n*100)/100;
  for(const [key,items] of groups){
   const [code,date]=key.split('|'),savedPlan=(lmAttWorkspace.shiftPlans||{})[lmV5ShiftKey(code,date)];
   // Default A applies only when no assignment exists. Explicit REST/LEAVE/CANCEL
   // always overrides the fallback; never write the fallback into Firebase.
-  const scheduleOnly=items.find(r=>r.scheduleKind==='LEAVE');
-  const plan=scheduleOnly?{code,date,shift:savedPlan?.shift||'—',pattern:savedPlan?.pattern||'',kind:'LEAVE',approvedLeave:true}:savedPlan||{code,date,shift:'A',pattern:'short',kind:'WORK',defaulted:true};
+  const exception=(lmAttWorkspace.shiftExceptions||{})[lmV5ShiftKey(code,date)];
+  const plan=savedPlan||{code,date,shift:'A',pattern:'short',kind:'WORK',defaulted:true};
   const shift=String(plan.shift||'').toUpperCase(),pattern=String(plan.pattern||'');
   const times=items.filter(r=>r.origin==='device'||r.origin==='manual'||r.status==='APPROVED').map(r=>{
    const stamp=Date.parse(lmAttDate(r)+'T'+lmAttTime(r));return {stamp,r};
   }).filter(x=>Number.isFinite(x.stamp)).sort((a,b)=>a.stamp-b.stamp);
-  const distinct=[];for(const x of times){if(!distinct.length||x.stamp-distinct[distinct.length-1].stamp>5*60*1000)distinct.push(x);}
+  const distinct=times.filter((x,i)=>!i||x.stamp!==times[i-1].stamp);
   let hours=null,ot=null,dayOt=null,nightOt=null,reason='';
-  if(plan.kind==='REST'||plan.kind==='LEAVE')reason='PROTECTED_'+plan.kind;
-  else if(plan.cancelled||plan.kind!=='WORK')reason='NO_ACTIVE_SHIFT_PLAN';
+  const isRestRecall=!!(exception&&['RECALL','CANCEL_REST'].includes(exception.kind));
+  if(exception&&exception.kind==='CANCEL')reason='EXCEPTION_CANCEL';
+  else if(exception&&exception.kind==='REST')reason='EXCEPTION_REST';
+  else if(isRestRecall&&distinct.length<2)reason='RECALL_MISSING_PUNCH';
+  else if((plan.kind==='REST'||plan.kind==='LEAVE')&&!isRestRecall)reason='PROTECTED_'+plan.kind;
+  else if(plan.cancelled||(plan.kind!=='WORK'&&!isRestRecall))reason='NO_ACTIVE_SHIFT_PLAN';
   else if(plan.defaulted&&[5,6].includes(new Date(date+'T12:00:00Z').getUTCDay()))reason='DEFAULT_A_WEEKLY_REST_REVIEW';
   else if(distinct.length<2)reason='MISSING_OUT_PUNCH';
   else if(items.some(r=>r.origin==='ess'&&r.status!=='APPROVED'))reason='PENDING_ESS_REVIEW';
@@ -3415,13 +3418,75 @@ function lmAttWorkHourRows(rows){
      const overlap=(a,b)=>Math.max(0,Math.min(last,Date.parse(date+'T'+b+':00'))-Math.max(first,Date.parse(date+'T'+a+':00')))/3600000;
      dayOt=round(overlap('17:00','18:00'));nightOt=round(overlap('18:00','21:00'));
      ot=round(dayOt+nightOt);
-    }else if(shift==='B'||shift==='C')reason='MONTHLY_OT_NOT_FINAL';
+    }else if(shift==='B'||shift==='C')reason=isRestRecall?'REST_RECALL_OVERTIME':'MONTHLY_OT_NOT_FINAL';
     else reason='SHIFT_D_POLICY_REQUIRED';
    }
   }
-  results.push({code,date,shift,pattern,defaulted:!!plan.defaulted,hours,ot,dayOt,nightOt,reason,sourceIds:[...new Set(items.map(r=>r.id).filter(Boolean))]});
+  results.push({code,date,shift,pattern,defaulted:!!plan.defaulted,hours,ot,dayOt,nightOt,reason,restRecall:isRestRecall,sourceIds:[...new Set(items.map(r=>r.id).filter(Boolean))]});
  }
  return results.sort((a,b)=>a.date.localeCompare(b.date)||a.code.localeCompare(b.code));
+}
+/* Shift C cycle overtime preview. Read-only: never posts to payroll or Firebase. */
+function lmAttShiftCCyclePreview(code,expectedShift='C'){
+ try{
+  if(!code||typeof LactoPayrollCycle==='undefined'||typeof LactoShiftEngine==='undefined')return null;
+  const month=String(lmPayrollState?.month||'');
+  if(!/^\d{4}-\d{2}$/.test(month))return null;
+  const period=LactoPayrollCycle.schedule(month,lmSafeCycleSettings());
+  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  const through=today<period.lastAttendanceDate?today:period.lastAttendanceDate;
+  const plans=lmAttWorkspace.shiftPlans||{},exceptions=lmAttWorkspace.shiftExceptions||{};
+  const originalRows=lmAttWorkspace.rows,originalPlans=lmAttWorkspace.shiftPlans,originalExceptions=lmAttWorkspace.shiftExceptions;
+  let allDaily;
+  try{
+   lmAttWorkspace.rows=(originalRows||[]).map(r=>({...r}));
+   lmAttWorkspace.shiftPlans=plans;
+   lmAttWorkspace.shiftExceptions=exceptions;
+   lmAttClassify();
+   allDaily=lmAttWorkHourRows(lmAttWorkspace.rows).filter(x=>String(x.code)===String(code));
+  }finally{
+   lmAttWorkspace.rows=originalRows;
+   lmAttWorkspace.shiftPlans=originalPlans;
+   lmAttWorkspace.shiftExceptions=originalExceptions;
+  }
+  const dailyByDate=new Map(allDaily.map(x=>[x.date,x]));
+  const records=[];let planDays=0,missingPlans=0,reviewDays=0;
+  for(let ms=Date.parse(period.start+'T12:00:00Z');ms<=Date.parse(through+'T12:00:00Z');ms+=86400000){
+   const date=new Date(ms).toISOString().slice(0,10),key=lmV5ShiftKey(code,date),plan=plans[key];
+   if(!plan||String(plan.shift||'').toUpperCase()!==expectedShift){missingPlans++;continue;}
+   planDays++;
+   const ex=exceptions[key],day=dailyByDate.get(date);
+   if(ex?.kind==='CANCEL'){
+    records.push({id:'cancel:'+date,date,status:'CANCEL_SHIFT'});continue;
+   }
+   if(plan.kind==='REST'&&!['RECALL','CANCEL_REST'].includes(ex?.kind)){
+    records.push({id:'rest:'+date,date,status:'REST'});continue;
+   }
+   if(plan.kind==='LEAVE'){
+    records.push({id:'leave:'+date,date,status:'LEAVE'});continue;
+   }
+   if(day&&day.hours!==null&&(day.reason==='MONTHLY_OT_NOT_FINAL'||day.reason==='REST_RECALL_OVERTIME')){
+    records.push({id:'work:'+date,date,status:'APPROVED',hours:day.hours,restRecall:!!day.restRecall});
+   }else{
+    records.push({id:'review:'+date,date,status:'PENDING_REVIEW'});reviewDays++;
+   }
+  }
+  if(missingPlans){return {period,ready:false,reason:'SHIFT_PLAN_COVERAGE_INCOMPLETE',missingPlans,planDays,reviewDays};}
+  const result=LactoShiftEngine.calculate({shift:expectedShift,records,period:{start:period.start,endExclusive:period.endExclusive}});
+  const cycleClosed=typeof lmPayCycleIsClosed==='function'?lmPayCycleIsClosed(period):today>=period.endExclusive;
+  return {...result,period,cycleClosed,planDays,reviewDays,asOf:through,ready:!!result.readyForPayroll&&cycleClosed};
+ }catch(error){return {ready:false,reason:'CYCLE_PREVIEW_ERROR',message:error?.message||String(error)};}
+}
+function lmAttShiftCCycleSummary(code,shift='C'){
+ const x=lmAttShiftCCyclePreview(code,shift);if(!x)return '';
+ const title=shift==='B'?hrText('معاينة إضافي الوردية B — دورة المرتبات','Shift B overtime preview — payroll cycle'):hrText('معاينة إضافي الوردية C — دورة المرتبات','Shift C overtime preview — payroll cycle');
+ if(x.reason==='SHIFT_PLAN_COVERAGE_INCOMPLETE')return '<div class="rounded-lg border border-amber-500/40 p-3 mb-3 text-amber-200"><strong>'+title+'</strong><p>'+hrText('لا يمكن اعتماد إجمالي الإضافي: جدول الوردية '+shift+' غير مكتمل في ','Cannot finalize overtime: Shift '+shift+' schedule is incomplete for ')+x.missingPlans+' '+hrText('يوم/أيام داخل الدورة.','day(s) in this cycle.')+'</p></div>';
+ if(x.reason==='CYCLE_PREVIEW_ERROR')return '<div class="rounded-lg border border-amber-500/40 p-3 mb-3 text-amber-200"><strong>'+title+'</strong><p>'+lmAttSafe(x.message||x.reason)+'</p></div>';
+ const earned=Number(x.overtimeEarnedHours||0),payable=Number(x.payableOvertimeHours||0);
+ const status=x.ready?hrText('الدورة مكتملة — معاينة جاهزة للمراجعة','Cycle complete — preview ready for review'):hrText('معاينة مؤقتة — توجد أيام أو أدلة تحتاج مراجعة','Provisional preview — days or evidence require review');
+ const target=shift==='B'?154:132;
+ const note=shift==='B'?hrText('المستهدف 154 ساعة فعلية. الإضافي الخام يُعرض بعد خصم المستهدف، وساعات استدعاء الراحة تضاف كإضافي مستقل. لا يوجد ترحيل للمرتبات.','Target is 154 actual hours. Raw overtime is calculated above the target; verified rest-recall hours are added separately. Nothing is posted to payroll.'):hrText('المستهدف 132 ساعة فعلية. الإضافي الخام يُعرض بعد خصم المستهدف، وساعات استدعاء الراحة تضاف كإضافي مستقل. لا يوجد ترحيل للمرتبات.','Target is 132 actual hours. Raw overtime is calculated above the target; verified rest-recall hours are added separately. Nothing is posted to payroll.');
+ return '<div class="rounded-lg border border-sky-500/30 p-3 mb-3"><div class="flex flex-wrap justify-between gap-2"><strong class="text-sky-300">'+title+'</strong><span class="text-amber-200">'+status+'</span></div><p class="text-xs mt-1">'+lmAttSafe(x.period.start)+' → '+lmAttSafe(x.period.lastAttendanceDate)+' | '+hrText('حتى','Through')+' '+lmAttSafe(x.asOf||'—')+'</p><div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3"><div><small>'+hrText('الساعات الفعلية','Actual hours')+'</small><div class="font-bold">'+Number(x.workedHours||0).toFixed(2)+'</div></div><div><small>'+hrText('المستهدف','Target')+'</small><div class="font-bold">'+target.toFixed(2)+'</div></div><div><small>'+hrText('الإضافي المكتسب خام','Raw overtime earned')+'</small><div class="font-bold text-sky-300">'+earned.toFixed(2)+'</div></div><div><small>'+hrText('المتاح بعد تسويات الإلغاء','Payable after cancellation offsets')+'</small><div class="font-bold">'+payable.toFixed(2)+'</div></div></div><p class="text-xs mt-2">'+note+'</p>'+(x.flags?.length?'<p class="text-xs text-amber-200 mt-2">'+hrText('أسباب المراجعة: ','Review flags: ')+lmAttSafe(x.flags.map(f=>f.reason).join(' | '))+'</p>':'')+'</div>';
 }
 function lmAttRenderHours(rows){
  const host=document.getElementById('lm-att-hours-summary');if(!host)return;
@@ -3433,9 +3498,9 @@ function lmAttRenderHours(rows){
  '<p class="text-sm mb-3">'+hrText('أيام محسوبة: ','Calculated days: ')+ready.length+' · '+hrText('تحتاج مراجعة: ','Review: ')+review.length+' · '+hrText('إضافي نهاري: ','Day OT: ')+day.toFixed(2)+' · '+hrText('إضافي ليلي: ','Night OT: ')+night.toFixed(2)+' · '+hrText('نهاري بالمعامل: ','Weighted day: ')+dayWeighted.toFixed(2)+' · '+hrText('ليلي بالمعامل: ','Weighted night: ')+nightWeighted.toFixed(2)+' · '+hrText('إجمالي مكافئ: ','Weighted total: ')+roundHours(dayWeighted+nightWeighted).toFixed(2)+'</p>'+
  (computed.length?'<div class="overflow-x-auto"><table class="hr-feature-table w-full"><thead><tr>'+[hrText('الكود','Code'),hrText('التاريخ','Date'),hrText('الوردية','Shift'),hrText('ساعات الحضور','Presence hours'),hrText('إضافي نهاري','Day OT'),hrText('إضافي ليلي','Night OT'),hrText('إجمالي الإضافي','Total OT'),hrText('نهاري × 1.35','Day × 1.35'),hrText('ليلي × 1.70','Night × 1.70'),hrText('الإجمالي بالمعامل','Weighted total'),hrText('الحالة','Status')].map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+computed.slice(0,500).map(x=>'<tr><td>'+lmAttSafe(x.code)+'</td><td>'+lmAttSafe(x.date)+'</td><td>'+lmAttSafe(x.shift||'—')+'</td><td>'+(x.hours===null?'—':x.hours.toFixed(2))+'</td><td>'+(x.dayOt===null?'—':x.dayOt.toFixed(2))+'</td><td>'+(x.nightOt===null?'—':x.nightOt.toFixed(2))+'</td><td>'+(x.ot===null?'—':x.ot.toFixed(2))+'</td><td>'+(x.dayOt===null?'—':roundHours(x.dayOt*1.35).toFixed(2))+'</td><td>'+(x.nightOt===null?'—':roundHours(x.nightOt*1.70).toFixed(2))+'</td><td>'+(x.ot===null?'—':roundHours(x.dayOt*1.35+x.nightOt*1.70).toFixed(2))+'</td><td>'+lmAttSafe(x.reason||'CALCULATED_NOT_POSTED')+'</td></tr>').join('')+'</tbody></table></div>':'<p class="text-sm text-slate-400">'+hrText('لا توجد بصمات مطابقة','No matching punches')+'</p>');
 }
-function lmAttFilter(){const el=document.getElementById('lm-att-table');if(!el)return;const rows=lmAttFiltered();lmAttRenderHours(rows);const kpi=document.getElementById('lm-att-kpis'),count=document.getElementById('lm-att-count');const cards=[[hrText('السجلات المعروضة','Records'),rows.length],[hrText('بصمات ESS','ESS punches'),rows.filter(r=>r.origin==='ess').length],[hrText('بصمات الأجهزة','Device punches'),rows.filter(r=>r.origin==='device').length],[hrText('بانتظار المراجعة','Pending review'),rows.filter(r=>r.status==='PENDING_REVIEW'||r.status==='HELD').length]];if(kpi)kpi.innerHTML=cards.map(([label,n])=>`<div class="rounded-xl border border-sky-500/20 bg-slate-900/40 p-3"><p class="text-xs text-slate-400">${label}</p><strong class="text-2xl text-sky-200">${n}</strong></div>`).join('');if(count)count.textContent=rows.length+' '+hrText('سجل مطابق للفلاتر','matching records');el.innerHTML=rows.length?`<table class="hr-feature-table w-full"><thead><tr>${[hrText('الكود','Code'),hrText('اسم الموظف','Employee name'),hrText('التاريخ','Date'),hrText('الوقت','Time'),hrText('الحركة','Punch'),hrText('المصدر','Source'),hrText('الحالة','Status'),hrText('الموقع','Location')].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.slice(0,500).map(r=>`<tr><td>${lmAttSafe(r.code)}</td><td>${lmAttSafe(lmAttEmployeeName(r))}</td><td>${lmAttSafe(r.reportWorkday||lmAttDate(r))}</td><td>${lmAttSafe(lmAttTime(r))}</td><td>${lmAttSafe(lmAttPunchLabel(r))}</td><td>${lmAttSafe(lmAttSource(r))}</td><td>${lmAttSafe(r.status)}</td><td>${lmAttMapLink(r)}</td></tr>`).join('')}</tbody></table>${rows.length>500?'<p class="text-xs mt-2">'+hrText('يتم عرض أول 500 سجل، ويشمل التصدير جميع السجلات المطابقة.','Showing first 500 records; export includes all filtered records.')+'</p>':''}`:`<p class="text-slate-400 p-4">${hrText('لا توجد سجلات مطابقة','No matching records')}</p>`;}
+function lmAttFilter(){const el=document.getElementById('lm-att-table');if(!el)return;const rows=lmAttFiltered();lmAttRenderHours(lmAttFilteredWorkdays());const kpi=document.getElementById('lm-att-kpis'),count=document.getElementById('lm-att-count');const cards=[[hrText('السجلات المعروضة','Records'),rows.length],[hrText('بصمات ESS','ESS punches'),rows.filter(r=>r.origin==='ess').length],[hrText('بصمات الأجهزة','Device punches'),rows.filter(r=>r.origin==='device').length],[hrText('بانتظار المراجعة','Pending review'),rows.filter(r=>r.status==='PENDING_REVIEW'||r.status==='HELD').length]];if(kpi)kpi.innerHTML=cards.map(([label,n])=>`<div class="rounded-xl border border-sky-500/20 bg-slate-900/40 p-3"><p class="text-xs text-slate-400">${label}</p><strong class="text-2xl text-sky-200">${n}</strong></div>`).join('');if(count)count.textContent=rows.length+' '+hrText('سجل مطابق للفلاتر','matching records');el.innerHTML=rows.length?`<table class="hr-feature-table w-full"><thead><tr>${[hrText('الكود','Code'),hrText('اسم الموظف','Employee name'),hrText('التاريخ','Date'),hrText('الوقت','Time'),hrText('الحركة','Punch'),hrText('المصدر','Source'),hrText('الحالة','Status'),hrText('الموقع','Location'),hrText('إجراء الوردية','Shift exception')].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.slice(0,500).map(r=>`<tr><td>${lmAttSafe(r.code)}</td><td>${lmAttSafe(lmAttEmployeeName(r))}</td><td>${lmAttSafe(lmAttDate(r))}</td><td>${lmAttSafe(lmAttTime(r))}</td><td>${lmAttSafe(lmAttPunchLabel(r))}</td><td>${lmAttSafe(lmAttSource(r))}</td><td>${lmAttSafe(r.status)}</td><td>${lmAttMapLink(r)}</td><td>${lmAttSafe(r.origin==='exception'?lmAttExceptionLabel(r.exceptionKind)+(r.exceptionReason?' — '+r.exceptionReason:''):(lmAttWorkspace.shiftExceptions||{})[lmV5ShiftKey(r.code,r.reportWorkday||lmAttDate(r))]?lmAttExceptionLabel(lmAttWorkspace.shiftExceptions[lmV5ShiftKey(r.code,r.reportWorkday||lmAttDate(r))].kind):'—')}</td></tr>`).join('')}</tbody></table>${rows.length>500?'<p class="text-xs mt-2">'+hrText('يتم عرض أول 500 سجل، ويشمل التصدير جميع السجلات المطابقة.','Showing first 500 records; export includes all filtered records.')+'</p>':''}`:`<p class="text-slate-400 p-4">${hrText('لا توجد سجلات مطابقة','No matching records')}</p>`;}
 function lmAttTime(r){const direct=String(r.time??r.clientTime??'').trim();if(direct)return direct;const stamp=String(r.timestamp??'').trim();const match=stamp.match(/(?:T|\s)(\d{1,2}:\d{2}(?::\d{2})?)/);return match?match[1]:'';}
-function lmAttExport(){const rows=lmAttFiltered();if(!rows.length)return;const cols=['code','employee_name','date','source_date','time','punch','pair_status','workday','origin','device','status','id','punch_id','device_id'];const esc=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const csv='\uFEFF'+[cols.join(','),...rows.map(r=>cols.map(k=>esc(k==='date'?(r.reportWorkday||lmAttDate(r)):k==='source_date'?lmAttDate(r):k==='time'?lmAttTime(r):k==='employee_name'?lmAttEmployeeName(r):k==='punch'?lmAttPunchLabel(r):k==='pair_status'?r.reportPairStatus:k==='workday'?r.reportWorkday:k==='punch_id'?(r.id||''):k==='device_id'?(r.device||''):r[k])).join(','))].join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='attendance_filtered.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function lmAttExport(){const rows=lmAttFiltered();if(!rows.length)return;const cols=['code','employee_name','date','time','punch','pair_status','workday','exception_kind','exception_reason','origin','device','status','id','punch_id','device_id'];const esc=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const csv='\uFEFF'+[cols.join(','),...rows.map(r=>cols.map(k=>esc(k==='date'?lmAttDate(r):k==='time'?lmAttTime(r):k==='employee_name'?lmAttEmployeeName(r):k==='punch'?lmAttPunchLabel(r):k==='pair_status'?r.reportPairStatus:k==='workday'?r.reportWorkday:k==='punch_id'?(r.id||''):k==='device_id'?(r.device||''):r[k])).join(','))].join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='attendance_filtered.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 
 // V5.4: refresh dynamic attendance controls on a language switch, retaining entered filters.
 function lmV54RefreshAttendanceLanguage(){
@@ -3610,18 +3675,20 @@ async function lmV5ShiftCSaveRotation(){
  try{
   const snap=await db.ref('shift_plans').once('value'),latest=snap.val()||{};
   const conflicts=selected.filter(r=>Object.prototype.hasOwnProperty.call(latest,lmV5ShiftKey(r.code,r.date)));
-  if(conflicts.length){msg.textContent=lmV5ShiftT('تم إيقاف العملية: يوجد ','Stopped: ')+conflicts.length+lmV5ShiftT(' يوم له جدول محفوظ بالفعل. حدث البيانات واستبعد الأيام المتعارضة.',' existing scheduled days. Refresh and exclude conflicting dates.');return;}
+  const exceptions=(await db.ref('shift_exceptions').once('value')).val()||{};
   const unique=new Set(selected.map(r=>lmV5ShiftKey(r.code,r.date)));
   if(unique.size!==selected.length){msg.textContent=lmV5ShiftT('تحديد مكرر؛ أعد تحميل الجدول','Duplicate selection; refresh the table');return;}
-  const yes=await lmDialog(lmV5ShiftT('تأكيد إنشاء دورة C لعدد ','Create Shift C rotation for ')+selected.length+lmV5ShiftT(' يوم؟ البداية ',' employee-days? Start ')+anchor+' / '+phase+lmV5ShiftT('. لن تتغير المرتبات أو الإجازات.','. No payroll or leave balances will change.'),true);
+  const exceptionCount=selected.filter(r=>exceptions[lmV5ShiftKey(r.code,r.date)]).length;
+  const yes=await lmDialog(lmV5ShiftT('إعادة تعيين دورة C لعدد ','Reassign Shift C for ')+selected.length+lmV5ShiftT(' يوم، منها ',' employee-days, including ')+conflicts.length+lmV5ShiftT(' يوم محفوظ سابقًا و',' existing plans and ')+exceptionCount+lmV5ShiftT(' إجراء خاص سيتم إزالته؟ سيتم حفظ سجل التغيير، دون تعديل المرتبات أو الإجازات.',' exceptions to clear? All changes are audited; payroll and leave stay unchanged.'),true);
   if(!yes)return;
   const uid=portalAuth.currentUser.uid,now=firebase.database.ServerValue.TIMESTAMP,updates={};
   for(const r of selected){
    const rotation=lmV5ShiftCRotation(anchor,r.date,phase),key=lmV5ShiftKey(r.code,r.date);
    const plan={code:r.code,date:r.date,shift:'C',pattern:rotation.pattern||'rest',kind:rotation.kind,cancelled:false,reason,department:r.dept,rotationAnchor:anchor,rotationStartPhase:phase,rotationDay:rotation.dayOfRotation,source:'C_ROTATION',updatedBy:uid,updatedByCode:'778',updatedAt:now};
    updates['shift_plans/'+key]=plan;
+   if(exceptions[key])updates['shift_exceptions/'+key]=null;
    const auditKey=db.ref('shift_audit').push().key;
-   updates['shift_audit/'+auditKey]={key,code:r.code,date:r.date,previous:{},next:plan,actorUid:uid,actorCode:'778',at:now,reason,action:'CREATE_C_ROTATION'};
+   updates['shift_audit/'+auditKey]={key,code:r.code,date:r.date,previous:latest[key]||{},previousException:exceptions[key]||{},next:plan,actorUid:uid,actorCode:'778',at:now,reason,action:latest[key]?'REPLACE_C_ROTATION':'CREATE_C_ROTATION'};
   }
   // Firebase multi-path update is atomic; audit is create-only in server rules.
   msg.textContent=lmV5ShiftT('جاري حفظ الجدول وسجل التدقيق...','Saving schedule and audit...');
@@ -3653,11 +3720,13 @@ async function lmV5ShiftSavePlan(){
  }
  const rows=lmV5ShiftExpandSelection();if(!rows.length||rows.length>100||reason.length<4){msg.textContent=lmV5ShiftT('حدد 1–100 يوم واكتب سببًا واضحًا','Select 1–100 days and enter a reason');return;}
  const pattern=document.getElementById('lm-v5-pattern').value;if(shift==='A'&&pattern!=='short'){msg.textContent=lmV5ShiftT('الوردية A بالنمط القصير فقط','Shift A requires the short pattern');return;}
- const latest=(await db.ref('shift_plans').once('value')).val()||{};
- if(rows.some(r=>Object.prototype.hasOwnProperty.call(latest,lmV5ShiftKey(r.code,r.date)))){msg.textContent=lmV5ShiftT('يوجد جدول محفوظ بالفعل؛ لا يمكن استبداله من شاشة التعيين','Existing schedules cannot be overwritten here');return;}
- if(!await lmDialog(lmV5ShiftT('حفظ الجدول للأيام المحددة؟','Save schedule for selected dates?'),true))return;
+ const [planSnap,exSnap]=await Promise.all([db.ref('shift_plans').once('value'),db.ref('shift_exceptions').once('value')]);
+ const latest=planSnap.val()||{},exceptions=exSnap.val()||{};
+ const existingCount=rows.filter(r=>latest[lmV5ShiftKey(r.code,r.date)]).length;
+ const exceptionCount=rows.filter(r=>exceptions[lmV5ShiftKey(r.code,r.date)]).length;
+ if(!await lmDialog(lmV5ShiftT('حفظ جدول جديد لعدد ','Save schedule for ')+rows.length+lmV5ShiftT(' يوم؟ سيتم استبدال ',' days? Replace ')+existingCount+lmV5ShiftT(' يوم محفوظ ومسح ',' existing plans and clear ')+exceptionCount+lmV5ShiftT(' إجراء خاص في الفترة المحددة فقط. كل التغييرات تُسجّل.',' exceptions in selected dates only. All changes are audited.'),true))return;
  const updates={},uid=portalAuth.currentUser.uid,now=firebase.database.ServerValue.TIMESTAMP;
- for(const r of rows){const key=lmV5ShiftKey(r.code,r.date),plan={code:r.code,date:r.date,shift,pattern,kind:'WORK',cancelled:false,reason,department:r.dept,updatedBy:uid,updatedByCode:'778',updatedAt:now};updates['shift_plans/'+key]=plan;updates['shift_audit/'+db.ref('shift_audit').push().key]={key,code:r.code,date:r.date,previous:{},next:plan,actorUid:uid,actorCode:'778',at:now,reason,action:'ASSIGN_SCHEDULE'};}
+ for(const r of rows){const key=lmV5ShiftKey(r.code,r.date),plan={code:r.code,date:r.date,shift,pattern,kind:'WORK',cancelled:false,reason,department:r.dept,updatedBy:uid,updatedByCode:'778',updatedAt:now};updates['shift_plans/'+key]=plan;if(exceptions[key])updates['shift_exceptions/'+key]=null;updates['shift_audit/'+db.ref('shift_audit').push().key]={key,code:r.code,date:r.date,previous:latest[key]||{},previousException:exceptions[key]||{},next:plan,actorUid:uid,actorCode:'778',at:now,reason,action:latest[key]?'REPLACE_SCHEDULE':'ASSIGN_SCHEDULE'};}
  try{await db.ref().update(updates);await lmV5ShiftLoad();msg.textContent=lmV5ShiftT('تم حفظ الجدول','Schedule saved');}catch(e){msg.textContent=e.message;}
 }
 async function lmV5ShiftSaveException(){
@@ -3894,7 +3963,7 @@ async function lmPayAutoRefresh(){
 function lmPayAutoStart(){
  // A single set of listeners for the entire session, not one per page visit.
  if(!lmPayAuto.refs.length&&typeof db!=='undefined'&&db){
-  for(const path of ['hr_imports/attendance','shift_plans','manual_attendance_punches']){
+  for(const path of ['hr_imports/attendance','shift_plans','shift_exceptions','manual_attendance_punches']){
    const ref=db.ref(path),callback=()=>lmPayAutoSchedule();
    ref.on('value',callback,()=>lmPayAutoSchedule());
    lmPayAuto.refs.push({ref,callback});
@@ -3914,9 +3983,9 @@ async function lmPayLinkAttendance(){
   // Match the Unified Daily Attendance report: identical source paths,
   // import normalization, duplicate filtering, pairing, and work-hour engine.
   // Do NOT calculate a second payroll-only punch interpretation.
-  const paths=['hr_imports/attendance','shift_plans','manual_attendance_punches'];
+  const paths=['hr_imports/attendance','shift_plans','shift_exceptions','manual_attendance_punches'];
   const snaps=await Promise.all(paths.map(path=>db.ref(path).once('value')));
-  const [imports,plans,manual]=snaps.map(x=>x.val()||{}),rows=[],issues=[];
+  const [imports,plans,exceptions,manual]=snaps.map(x=>x.val()||{}),rows=[],issues=[];
   Object.entries(imports).forEach(([batchId,batch])=>Object.entries(batch?.records||{}).forEach(([i,r])=>{
    if(!r||typeof r!=='object')return;
    const source=String(r.source||'').toLowerCase();
@@ -3929,11 +3998,12 @@ async function lmPayLinkAttendance(){
   // Classification must use exactly the same rules as the attendance screen.
   // In particular, an A-shift 08:54 punch belongs to its calendar day,
   // not the preceding day merely because it is before 09:00.
-  const oldRows=lmAttWorkspace.rows,oldPlans=lmAttWorkspace.shiftPlans;
+  const oldRows=lmAttWorkspace.rows,oldPlans=lmAttWorkspace.shiftPlans,oldExceptions=lmAttWorkspace.shiftExceptions;
   let daily,scoped;
   try{
-   lmAttWorkspace.rows=deduped.filter(r=>validCodes.has(String(r.code)));
+   lmAttWorkspace.rows=deduped.filter(r=>validCodes.has(String(r.code))).map(r=>({...r}));
    lmAttWorkspace.shiftPlans=plans;
+   lmAttWorkspace.shiftExceptions=exceptions;
    lmAttClassify();
    scoped=lmAttWorkspace.rows.filter(r=>r.reportWorkday>=period.start&&r.reportWorkday<=period.lastAttendanceDate);
    daily=lmAttWorkHourRows(scoped);
@@ -3945,7 +4015,7 @@ async function lmPayLinkAttendance(){
     const valid=items.length>=2&&items.every(r=>r.reportPairStatus==='PAIRED');
     return valid?d:{...d,dayOt:null,nightOt:null,ot:null,reason:d.reason||'UNPAIRED_ATTENDANCE'};
    });
-  }finally{lmAttWorkspace.rows=oldRows;lmAttWorkspace.shiftPlans=oldPlans;}
+  }finally{lmAttWorkspace.rows=oldRows;lmAttWorkspace.shiftPlans=oldPlans;lmAttWorkspace.shiftExceptions=oldExceptions;}
   const workdayOf=r=>r.reportWorkday||lmAttDate(r);
   lmPayAttendanceLink.raw880=deduped.filter(r=>String(r.code)==='880').map(r=>({date:lmAttDate(r),time:lmAttTime(r),origin:r.origin,workday:workdayOf(r),inCycle:workdayOf(r)>=period.start&&workdayOf(r)<=period.lastAttendanceDate}));
   lmPayAttendanceLink.raw109=deduped.filter(r=>String(r.code)==='109').map(r=>({date:lmAttDate(r),time:lmAttTime(r),origin:r.origin,workday:workdayOf(r),inCycle:workdayOf(r)>=period.start&&workdayOf(r)<=period.lastAttendanceDate}));
@@ -4523,7 +4593,7 @@ function lmLeaveCloseFullReport(){
    original.appendChild(title);
    raw.before(original);original.appendChild(raw);
   }
-  const rows=lmAttFiltered(),groups=new Map();
+  const rows=lmAttFilteredWorkdays(),groups=new Map();
   for(const r of rows){
    const code=String(r.code||'').trim(),day=String(r.reportWorkday||lmAttDate(r)||'');
    if(!code||!day)continue;
@@ -4531,21 +4601,52 @@ function lmLeaveCloseFullReport(){
    if(!groups.has(key))groups.set(key,[]);
    groups.get(key).push(r);
   }
+  // In report mode, materialize every calendar day for an explicitly selected
+  // employee. Empty days are display-only rows; they are never saved as punches.
+  const from=document.getElementById('lm-att-from')?.value||'',to=document.getElementById('lm-att-to')?.value||'';
+  const selectedCode=document.getElementById('lm-att-code')?.value.trim()||'';
+  const emptyDays=[];
+  if(lmAttWorkspace.mode==='report' && /^\d+$/.test(selectedCode) && /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) && from<=to){
+   const start=Date.parse(from+'T12:00:00Z'),end=Date.parse(to+'T12:00:00Z');
+   if(Number.isFinite(start)&&Number.isFinite(end)&&(end-start)/86400000<=400){
+    for(let ms=start;ms<=end;ms+=86400000){
+     const date=new Date(ms).toISOString().slice(0,10),key=selectedCode+'|'+date;
+     if(!groups.has(key)){const placeholder={id:'display-only:'+key,code:selectedCode,date,time:'',origin:'display-only',status:'NO_PUNCH',reportWorkday:date};groups.set(key,[placeholder]);emptyDays.push(placeholder);}
+    }
+   }
+  }
   const shiftRows=new Map(lmAttWorkHourRows(rows).map(r=>[r.code+'|'+r.date,r]));
-  const th=[hrText('الكود','Code'),hrText('الموظف','Employee'),hrText('التاريخ','Date'),hrText('الوردية','Shift'),hrText('الحضور','In'),hrText('الانصراف','Out'),hrText('المدة الفعلية','Elapsed'),hrText('إضافي خام','Raw OT'),hrText('نهاري × 1.35','Day × 1.35'),hrText('ليلي × 1.70','Night × 1.70'),hrText('إضافي بالمعامل','Weighted OT'),hrText('الحالة','Status'),hrText('الموقع','Location')];
+  const th=[hrText('الكود','Code'),hrText('الموظف','Employee'),hrText('التاريخ','Date'),hrText('الوردية','Shift'),hrText('الحضور','In'),hrText('الانصراف','Out'),hrText('المدة الفعلية','Elapsed'),hrText('إضافي خام','Raw OT'),hrText('نهاري × 1.35','Day × 1.35'),hrText('ليلي × 1.70','Night × 1.70'),hrText('إضافي بالمعامل','Weighted OT'),hrText('الحالة','Status'),hrText('إجراء الوردية','Shift action'),hrText('سبب الإجراء','Action reason'),hrText('الموقع','Location')];
   const tableRows=[...groups].sort((a,b)=>b[0].localeCompare(a[0])).slice(0,500).map(([key,items])=>{
-   const sorted=items.map(r=>({r,ms:Date.parse(lmAttDate(r)+'T'+lmAttTime(r))})).filter(x=>Number.isFinite(x.ms)).sort((a,b)=>a.ms-b.ms);
-   const first=sorted[0],last=sorted[sorted.length-1],day=key.slice(key.indexOf('|')+1),shift=shiftRows.get(key);
+   const sorted=items.filter(r=>r.origin!=='display-only').map(r=>({r,ms:Date.parse(lmAttDate(r)+'T'+lmAttTime(r))})).filter(x=>Number.isFinite(x.ms)).sort((a,b)=>a.ms-b.ms);
+   const first=sorted[0],last=sorted[sorted.length-1],day=key.slice(key.indexOf('|')+1),shift=shiftRows.get(key),isEmptyDay=items.every(r=>r.origin==='display-only');
    const complete=sorted.length>=2&&last.ms>first.ms&&last.ms-first.ms<=20*3600000
      &&items.every(r=>r.reportPairStatus==='PAIRED');
    const minutes=complete?Math.floor((last.ms-first.ms)/60000):null;
    const elapsed=minutes===null?'—':String(Math.floor(minutes/60)).padStart(2,'0')+':'+String(minutes%60).padStart(2,'0');
-   const state=complete?hrText('زوج بصمات','Paired'):hrText('ناقص / مراجعة','Incomplete / review');
+   const exception=(lmAttWorkspace.shiftExceptions||{})[lmV5ShiftKey(items[0].code,day)];
+   const exceptionKind=exception?.kind||items.find(r=>r.origin==='exception')?.exceptionKind||'';
+   const exceptionReason=exception?.reason||items.find(r=>r.origin==='exception')?.exceptionReason||'';
+   const actionLabel=exceptionKind?lmAttExceptionLabel(exceptionKind):'—';
+   const plan=(lmAttWorkspace.shiftPlans||{})[lmV5ShiftKey(items[0].code,day)];
+   const state=isEmptyDay&&plan?.kind==='REST'?hrText('راحة مجدولة','Scheduled rest'):
+     isEmptyDay&&plan?.kind==='LEAVE'?hrText('إجازة مجدولة','Scheduled leave'):
+     isEmptyDay?hrText('لا توجد بصمات','No punches'):
+     exceptionKind==='CANCEL'?hrText('إلغاء عمل — مسجل','Work cancelled — recorded'):
+     exceptionKind==='REST'?hrText('راحة استثنائية — مسجلة','Exceptional rest — recorded'):
+     exceptionKind==='RECALL'||exceptionKind==='CANCEL_REST'?hrText('استدعاء — مراجعة البصمات','Recall — review punches'):
+     complete?hrText('زوج بصمات','Paired'):hrText('ناقص / مراجعة','Incomplete / review');
    const map=items.map(x=>lmAttMapLink(x)).find(x=>x!=='—')||'—';
-   const values=[items[0].code,lmAttEmployeeName(items[0]),day,shift?.shift||'—',first?lmAttTime(first.r):'—',complete?lmAttTime(last.r):'—',elapsed,shift?.ot==null?'—':shift.ot.toFixed(2),shift?.dayOt==null?'—':(Math.round(shift.dayOt*135)/100).toFixed(2),shift?.nightOt==null?'—':(Math.round(shift.nightOt*170)/100).toFixed(2),shift?.ot==null?'—':(Math.round((shift.dayOt*1.35+shift.nightOt*1.70)*100)/100).toFixed(2),state];
+   const values=[items[0].code,lmAttEmployeeName(items[0]),day,shift?.shift||plan?.shift||'—',first?lmAttTime(first.r):'—',complete?lmAttTime(last.r):'—',elapsed,shift?.ot==null?'—':shift.ot.toFixed(2),shift?.dayOt==null?'—':(Math.round(shift.dayOt*135)/100).toFixed(2),shift?.nightOt==null?'—':(Math.round(shift.nightOt*170)/100).toFixed(2),shift?.ot==null?'—':(Math.round((shift.dayOt*1.35+shift.nightOt*1.70)*100)/100).toFixed(2),state,actionLabel,exceptionReason||'—'];
    return '<tr>'+values.map(v=>'<td>'+lmAttSafe(v)+'</td>').join('')+'<td>'+map+'</td></tr>';
   });
-  summary.innerHTML='<div class="flex flex-wrap justify-between items-center gap-2 mb-3"><h3 class="font-bold text-sky-300">'+hrText('السجل اليومي الموحد','Unified daily attendance')+'</h3><span class="text-xs text-amber-200">'+hrText('المدة الفعلية من أول وآخر بصمة؛ الإضافي مبدئي','Elapsed time from first/last punch; overtime provisional')+'</span></div>'+
+  const selectedCodes=[...new Set([...groups.keys()].map(k=>k.slice(0,k.indexOf('|'))))];
+  const cCycleSummaries=selectedCodes.map(code=>{
+   const prefix=String(code).replace(/[.#$\[\]/]/g,'_')+'_';
+   const shifts=new Set(Object.entries(lmAttWorkspace.shiftPlans||{}).filter(([key,p])=>key.startsWith(prefix)).map(([,p])=>String(p?.shift||'').toUpperCase()));
+   return ['B','C'].filter(shift=>shifts.has(shift)).map(shift=>lmAttShiftCCycleSummary(code,shift)).join('');
+  }).join('');
+  summary.innerHTML='<div class="flex flex-wrap justify-between items-center gap-2 mb-3"><h3 class="font-bold text-sky-300">'+hrText('السجل اليومي الموحد','Unified daily attendance')+'</h3><span class="text-xs text-amber-200">'+hrText('الأيام الخالية من البصمات للعرض فقط؛ الإضافي مبدئي حسب سياسة الوردية','No-punch days are display-only; overtime is provisional under shift policy')+'</span></div>'+cCycleSummaries+
    '<div class="overflow-x-auto"><table class="hr-feature-table w-full"><thead><tr>'+th.map(x=>'<th>'+lmAttSafe(x)+'</th>').join('')+'</tr></thead><tbody>'+tableRows.join('')+'</tbody></table></div>'+
    (groups.size>500?'<p class="text-xs mt-2">'+hrText('أول 500 يوم؛ الحركات الأصلية والتصدير محفوظان','First 500 days; original events and export retained')+'</p>':'');
  };
