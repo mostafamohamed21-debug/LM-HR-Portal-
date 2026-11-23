@@ -3258,7 +3258,15 @@ async function lmManualPunchSave(e){
   const employee=(allEmployees||[]).find(x=>String(x.code||'').trim()===code);if(!employee)throw Error(hrText('كود الموظف غير موجود','Employee code not found'));
   const existing=(lmAttWorkspace.rows||[]).filter(r=>String(r.code)===code&&lmAttDate(r)===date).sort((a,b)=>lmAttStamp(a)-lmAttStamp(b));
   if(existing.some(r=>lmAttTime(r).padEnd(8,':00').slice(0,8)===time))throw Error(hrText('توجد بصمة بنفس الوقت','A punch already exists at that time'));
-  if(punchType==='OUT'&&!existing.some(r=>lmAttTime(r).padEnd(8,':00').slice(0,8)<time))throw Error(hrText('لا يمكن إضافة انصراف دون بصمة حضور سابقة في نفس اليوم. راجع الورديات الليلية يدويًا.','Checkout requires a prior check-in on the same date. Review overnight shifts separately.'));
+  if(punchType==='OUT'){
+   const sameDayIn=existing.some(r=>r.reportPunch==='IN'||(lmAttTime(r).padEnd(8,':00').slice(0,8)<time&&String(r.punch||'').toUpperCase()==='IN'));
+   const prev=new Date(date+'T12:00:00Z');prev.setUTCDate(prev.getUTCDate()-1);const previousDate=prev.toISOString().slice(0,10);
+   const previousPlan=(lmAttWorkspace.shiftPlans||{})[lmV5ShiftKey(code,previousDate)];
+   const overnight=previousPlan?.kind==='WORK'&&!previousPlan?.cancelled&&String(previousPlan?.pattern||'').toLowerCase()==='night'&&['B','C','D'].includes(String(previousPlan?.shift||'').toUpperCase())&&Number(time.slice(0,2))<12;
+   const previousRows=(lmAttWorkspace.rows||[]).filter(r=>String(r.code)===code&&String(r.reportWorkday||lmAttDate(r))===previousDate);
+   const overnightIn=overnight&&previousRows.some(r=>r.reportPunch==='IN'||String(r.punch||'').toUpperCase()==='IN')&&!previousRows.some(r=>r.reportPunch==='OUT'||String(r.punch||'').toUpperCase()==='OUT');
+   if(!sameDayIn&&!overnightIn)throw Error(hrText('لا يمكن إضافة انصراف دون حضور سابق مطابق في نفس اليوم أو وردية ليلية معتمدة في اليوم السابق.','Checkout requires a matching prior check-in or an approved overnight shift on the previous day.'));
+  }
   if(!await lmDialog(hrText('تأكيد حفظ البصمة اليدوية؟ سيتم تسجيل السبب والمسؤول ولا يمكن تعديل السجل.','Confirm immutable manual punch with audit?'),true))return;
   const ref=db.ref('manual_attendance_punches').push();await ref.set({code,date,time,punchType,reason,source:'MANUAL_ADMIN',actorCode:'778',actorUid:portalAuth.currentUser.uid,createdAt:firebase.database.ServerValue.TIMESTAMP});
   document.getElementById('lm-manual-overlay')?.remove();await lmAttLoad();await lmDialog(hrText('تم حفظ البصمة اليدوية وإعادة تحميل التقرير','Manual punch saved; report refreshed'));
