@@ -3259,7 +3259,7 @@ async function lmManualPunchSave(e){
   const existing=(lmAttWorkspace.rows||[]).filter(r=>String(r.code)===code&&lmAttDate(r)===date).sort((a,b)=>lmAttStamp(a)-lmAttStamp(b));
   if(existing.some(r=>lmAttTime(r).padEnd(8,':00').slice(0,8)===time))throw Error(hrText('توجد بصمة بنفس الوقت','A punch already exists at that time'));
   if(punchType==='OUT'){
-   const sameDayIn=existing.some(r=>r.reportPunch==='IN'||(lmAttTime(r).padEnd(8,':00').slice(0,8)<time&&String(r.punch||'').toUpperCase()==='IN'));
+   const sameDayIn=existing.some(r=>r.reportPunch==='IN'||lmAttTime(r).padEnd(8,':00').slice(0,8)<time);
    const prev=new Date(date+'T12:00:00Z');prev.setUTCDate(prev.getUTCDate()-1);const previousDate=prev.toISOString().slice(0,10);
    const previousPlan=(lmAttWorkspace.shiftPlans||{})[lmV5ShiftKey(code,previousDate)];
    const overnight=previousPlan?.kind==='WORK'&&!previousPlan?.cancelled&&String(previousPlan?.pattern||'').toLowerCase()==='night'&&['B','C','D'].includes(String(previousPlan?.shift||'').toUpperCase())&&Number(time.slice(0,2))<12;
