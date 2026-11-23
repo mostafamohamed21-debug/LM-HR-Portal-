@@ -3264,7 +3264,7 @@ async function lmManualPunchSave(e){
    const previousPlan=(lmAttWorkspace.shiftPlans||{})[lmV5ShiftKey(code,previousDate)];
    const overnight=previousPlan?.kind==='WORK'&&!previousPlan?.cancelled&&String(previousPlan?.pattern||'').toLowerCase()==='night'&&['B','C','D'].includes(String(previousPlan?.shift||'').toUpperCase())&&Number(time.slice(0,2))<12;
    const previousRows=(lmAttWorkspace.rows||[]).filter(r=>String(r.code)===code&&String(r.reportWorkday||lmAttDate(r))===previousDate);
-   const overnightIn=overnight&&previousRows.some(r=>r.reportPunch==='IN'||String(r.punch||'').toUpperCase()==='IN')&&!previousRows.some(r=>r.reportPunch==='OUT'||String(r.punch||'').toUpperCase()==='OUT');
+   const overnightIn=overnight&&previousRows.some(r=>r.reportPunch==='IN'||String(r.punch||'').toUpperCase()==='IN'||(r.reportPairStatus==='SINGLE_PUNCH'&&lmAttTime(r)>='20:00'))&&!previousRows.some(r=>r.reportPunch==='OUT'||String(r.punch||'').toUpperCase()==='OUT');
    if(!sameDayIn&&!overnightIn)throw Error(hrText('لا يمكن إضافة انصراف دون حضور سابق مطابق في نفس اليوم أو وردية ليلية معتمدة في اليوم السابق.','Checkout requires a matching prior check-in or an approved overnight shift on the previous day.'));
   }
   if(!await lmDialog(hrText('تأكيد حفظ البصمة اليدوية؟ سيتم تسجيل السبب والمسؤول ولا يمكن تعديل السجل.','Confirm immutable manual punch with audit?'),true))return;
