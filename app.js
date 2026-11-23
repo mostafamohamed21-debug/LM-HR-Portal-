@@ -3304,7 +3304,7 @@ async function lmAttLoad(){
   if(r.origin==='exception'){r.reportPairStatus='EXCEPTION';continue;}
   if(r.origin==='schedule'){r.reportPairStatus='NO_PUNCH';continue;}
   const code=String(r.code||'').trim(),date=lmAttDate(r),time=lmAttTime(r),stamp=Date.parse(date+'T'+time);
-  if(!code||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!/^d{1,2}:\d{2}/.test(time)||!Number.isFinite(stamp)){r.reportPairStatus='INVALID_TIME';continue;}
+  if(!code||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!/^\d{1,2}:\d{2}/.test(time)||!Number.isFinite(stamp)){r.reportPairStatus='INVALID_TIME';continue;}
   let workday=date;
   const previous=dayBefore(date),previousPlan=plans[lmV5ShiftKey(code,previous)];
   const previousShift=String(previousPlan?.shift||'').toUpperCase(),previousPattern=String(previousPlan?.pattern||'').toLowerCase();
