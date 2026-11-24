@@ -3269,13 +3269,16 @@ function lmPunchExcluded(r, exclusions){return ['device','manual'].includes(r.or
 async function lmExcludePunchOpen(){
  if(!portalIsAdmin()||String(currentUserData?.code)!=='778'||portalAuth.currentUser?.uid!==PORTAL_ADMIN_UID)return;
  if(!lmAttWorkspace.exclusionsReady)return lmDialog(hrText('تعذر قراءة سجل الاستبعاد','Exclusion ledger unavailable'));
- const rows=lmAttFiltered().filter(r=>['device','manual'].includes(r.origin));
- if(!rows.length)return lmDialog(hrText('لا توجد بصمات قابلة للاستبعاد','No eligible punches'));
+ const rows=lmAttWorkspace.rows.filter(r=>['device','manual'].includes(r.origin));
  if(document.getElementById('lm-exclude-overlay'))return;
  const el=document.createElement('div');el.id='lm-exclude-overlay';el.style.cssText='position:fixed;inset:0;z-index:100002;background:#000b;display:grid;place-items:center';
- el.innerHTML='<section class="hr-panel" style="background:#102038;color:white;padding:20px;width:min(720px,95vw);max-height:85vh;overflow:auto"><h2>'+hrText('حدد البصمات المراد استبعادها','Select punches to exclude')+'</h2><div id="lm-exclude-list"></div><textarea id="lm-exclude-reason" class="hr-feature-input w-full" placeholder="'+hrText('سبب الاستبعاد (8 أحرف على الأقل)','Reason (at least 8 characters)')+'"></textarea><button id="lm-exclude-save" class="portal-action-btn">'+hrText('تأكيد المسح','Confirm exclusion')+'</button> <button id="lm-exclude-close" class="portal-ghost-btn">'+hrText('إلغاء','Cancel')+'</button></section>';
- document.body.append(el);const list=el.querySelector('#lm-exclude-list');
- rows.forEach((r,i)=>{const label=document.createElement('label');label.style.display='block';const cb=document.createElement('input');cb.type='checkbox';cb.value=String(i);label.append(cb,document.createTextNode(' '+r.code+' — '+lmAttDate(r)+' '+lmAttTime(r)+' — '+lmAttPunchLabel(r)));list.append(label);});
+ el.innerHTML=`<section class="hr-panel" style="padding:24px;width:min(1100px,96vw);max-height:90vh;overflow:auto;background:var(--panel-bg,#102038);color:inherit;border-radius:18px"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold">${hrText('مسح البصمات المحددة','Exclude selected punches')}</h2><button id="lm-exclude-close" class="portal-ghost-btn">✕</button></div><div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4"><label>${hrText('الإدارة','Department')}<select id="ex-dept" class="hr-feature-input w-full"></select></label><label>${hrText('الموظف','Employee')}<select id="ex-emp" class="hr-feature-input w-full"></select></label><label>${hrText('من','From')}<input id="ex-from" type="date" class="hr-feature-input w-full"></label><label>${hrText('إلى','To')}<input id="ex-to" type="date" class="hr-feature-input w-full"></label></div><label><input type="checkbox" id="ex-all"> ${hrText('تحديد كل النتائج','Select all results')}</label><span id="ex-count" class="mx-3"></span><div style="max-height:45vh;overflow:auto"><table class="hr-feature-table w-full"><thead><tr>${['',hrText('الكود','Code'),hrText('الموظف','Employee'),hrText('التاريخ','Date'),hrText('الوقت','Time'),hrText('الحركة','Punch')].map(x=>'<th>'+x+'</th>').join('')}</tr></thead><tbody id="lm-exclude-list"></tbody></table></div><textarea id="lm-exclude-reason" class="hr-feature-input w-full mt-4" placeholder="${hrText('سبب الاستبعاد (8 أحرف على الأقل)','Reason (at least 8 characters)')}"></textarea><button id="lm-exclude-save" class="portal-action-btn px-4 py-2 mt-3">${hrText('تأكيد المسح','Confirm exclusion')}</button></section>`;
+ document.body.append(el);const list=el.querySelector('#lm-exclude-list'),dept=el.querySelector('#ex-dept'),emp=el.querySelector('#ex-emp'),from=el.querySelector('#ex-from'),to=el.querySelector('#ex-to'),all=el.querySelector('#ex-all');
+ const departments=lmV5DeptGroups();const option=(select,value,label)=>select.add(new Option(label,value));
+ option(dept,'',hrText('كل الإدارات','All departments'));departments.forEach(d=>option(dept,d.key,hrText(d.ar||d.en,d.en||d.ar)));
+ function employees(){emp.replaceChildren();option(emp,'',hrText('كل الموظفين','All employees'));const d=departments.find(x=>x.key===dept.value);for(const e of allEmployees||[]){const c=String(getEmployeeCode(e)||'').trim();if(c&&(!d||d.codes.has(c)))option(emp,c,c+' — '+lmAttEmployeeName({code:c}));}}
+ function render(){list.replaceChildren();all.checked=false;const d=departments.find(x=>x.key===dept.value);let n=0;rows.forEach((r,i)=>{const c=String(r.code),date=lmAttDate(r);if((d&&!d.codes.has(c))||(emp.value&&emp.value!==c)||(from.value&&date<from.value)||(to.value&&date>to.value))return;const tr=document.createElement('tr'),td=tr.insertCell(),cb=document.createElement('input');cb.type='checkbox';cb.value=String(i);td.append(cb);for(const v of [c,lmAttEmployeeName(r),date,lmAttTime(r),lmAttPunchLabel(r)])tr.insertCell().textContent=v;list.append(tr);n++;});el.querySelector('#ex-count').textContent=n+' '+hrText('بصمة','punches');}
+ dept.onchange=()=>{employees();render();};emp.onchange=from.onchange=to.onchange=render;all.onchange=()=>list.querySelectorAll('input').forEach(x=>x.checked=all.checked);employees();render();
  el.querySelector('#lm-exclude-close').onclick=()=>el.remove();
  el.querySelector('#lm-exclude-save').onclick=async()=>{const reason=el.querySelector('textarea').value.trim(),chosen=[...list.querySelectorAll('input:checked')].map(x=>rows[Number(x.value)]);if(reason.length<8||!chosen.length)return lmDialog(hrText('حدد بصمة واكتب السبب','Select a punch and enter a reason'));if(!await lmDialog(hrText('تأكيد الاستبعاد من الحسابات؟','Confirm exclusion from calculations?'),true))return;const btn=el.querySelector('#lm-exclude-save');btn.disabled=true;try{const updates={};for(const r of chosen)updates['attendance_punch_exclusions/'+lmPunchExclusionKey(r)]={code:String(r.code),date:lmAttDate(r),time:lmAttTime(r),sourceId:String(r.id),reason,actorCode:'778',actorUid:portalAuth.currentUser.uid,createdAt:firebase.database.ServerValue.TIMESTAMP};await db.ref().update(updates);el.remove();await lmAttLoad();}catch(e){await lmDialog(String(e.message||e));}finally{btn.disabled=false;}};
 }
@@ -4572,25 +4575,22 @@ function lmLeaveCloseFullReport(){
    if(!groups.has(key))groups.set(key,[]);
    groups.get(key).push(r);
   }
-  // In report mode, materialize every calendar day for an explicitly selected
-  // employee. Empty days are display-only rows; they are never saved as punches.
-  const from=document.getElementById('lm-att-from')?.value||'',to=document.getElementById('lm-att-to')?.value||'';
-  const selectedCode=document.getElementById('lm-att-code')?.value.trim()||'';
-  const emptyDays=[];
-  if(lmAttWorkspace.mode==='report' && /^\d+$/.test(selectedCode) && /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) && from<=to){
-   const start=Date.parse(from+'T12:00:00Z'),end=Date.parse(to+'T12:00:00Z');
-   if(Number.isFinite(start)&&Number.isFinite(end)&&(end-start)/86400000<=400){
-    for(let ms=start;ms<=end;ms+=86400000){
-     const date=new Date(ms).toISOString().slice(0,10),key=selectedCode+'|'+date;
-     if(!groups.has(key)){const placeholder={id:'display-only:'+key,code:selectedCode,date,time:'',origin:'display-only',status:'NO_PUNCH',reportWorkday:date};groups.set(key,[placeholder]);emptyDays.push(placeholder);}
-    }
-   }
+  // Calendar rows are independent of punch existence and never persisted.
+  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  const from=lmAttWorkspace.mode==='today'?today:(document.getElementById('lm-att-from')?.value||today.slice(0,8)+'01');
+  const to=lmAttWorkspace.mode==='today'?today:(document.getElementById('lm-att-to')?.value||today);
+  const query=document.getElementById('lm-att-code')?.value.trim()||'',dept=document.getElementById('lm-att-dept')?.value||'';
+  const department=lmV5DeptGroups().find(d=>d.key===dept),emptyDays=[];
+  const codes=new Set((allEmployees||[]).map(e=>String(getEmployeeCode(e)||'').trim()).filter(c=>c&&(!query||c.includes(query))&&(!department||department.codes.has(c))));
+  const start=Date.parse(from+'T12:00:00Z'),end=Date.parse(to+'T12:00:00Z');
+  if(Number.isFinite(start)&&Number.isFinite(end)&&start<=end){
+   for(const code of codes)for(let ms=start;ms<=end;ms+=86400000){const date=new Date(ms).toISOString().slice(0,10),key=code+'|'+date;if(!groups.has(key)){const placeholder={id:'display-only:'+key,code,date,time:'',origin:'display-only',status:'NO_PUNCH',reportWorkday:date};groups.set(key,[placeholder]);emptyDays.push(placeholder);}}
   }
   const shiftRows=new Map(lmAttWorkHourRows(rows.concat(emptyDays)).map(r=>[r.code+'|'+r.date,r]));
   const th=[hrText('الكود','Code'),hrText('الموظف','Employee'),hrText('التاريخ','Date'),hrText('الوردية','Shift'),hrText('الحضور','In'),hrText('الانصراف','Out'),hrText('المدة الفعلية','Elapsed'),hrText('إضافي خام','Raw OT'),hrText('نهاري × 1.35','Day × 1.35'),hrText('ليلي × 1.70','Night × 1.70'),hrText('إضافي بالمعامل','Weighted OT'),hrText('الحالة','Status'),hrText('إجراء الوردية','Shift action'),hrText('سبب الإجراء','Action reason'),hrText('الموقع','Location')];
-  const tableRows=[...groups].sort((a,b)=>b[0].localeCompare(a[0])).slice(0,500).map(([key,items])=>{
+  const tableRows=[...groups].sort((a,b)=>b[0].localeCompare(a[0])).map(([key,items])=>{
    const sorted=items.filter(r=>r.origin!=='display-only').map(r=>({r,ms:Date.parse(lmAttDate(r)+'T'+lmAttTime(r))})).filter(x=>Number.isFinite(x.ms)).sort((a,b)=>a.ms-b.ms);
-   const first=sorted[0],last=sorted[sorted.length-1],day=key.slice(key.indexOf('|')+1),shift=shiftRows.get(key),isEmptyDay=items.every(r=>r.origin==='display-only');
+   const first=sorted[0],last=sorted[sorted.length-1],day=key.slice(key.indexOf('|')+1),shift=shiftRows.get(key),isEmptyDay=!sorted.length;
    const complete=sorted.length>=2&&last.ms>first.ms&&last.ms-first.ms<=20*3600000
      &&items.every(r=>r.reportPairStatus==='PAIRED');
    const minutes=complete?Math.floor((last.ms-first.ms)/60000):null;
@@ -4615,6 +4615,6 @@ function lmLeaveCloseFullReport(){
   const cCycleSummaries=selectedCodes.map(code=>{const hasC=Object.entries(lmAttWorkspace.shiftPlans||{}).some(([key,p])=>key.startsWith(String(code).replace(/[.#$\[\]/]/g,'_')+'_')&&String(p?.shift||'').toUpperCase()==='C');return hasC?lmAttShiftCCycleSummary(code):'';}).join('');
   summary.innerHTML='<div class="flex flex-wrap justify-between items-center gap-2 mb-3"><h3 class="font-bold text-sky-300">'+hrText('السجل اليومي الموحد','Unified daily attendance')+'</h3><span class="text-xs text-amber-200">'+hrText('الأيام الخالية من البصمات للعرض فقط؛ الإضافي مبدئي حسب سياسة الوردية','No-punch days are display-only; overtime is provisional under shift policy')+'</span></div>'+cCycleSummaries+
    '<div class="overflow-x-auto"><table class="hr-feature-table w-full"><thead><tr>'+th.map(x=>'<th>'+lmAttSafe(x)+'</th>').join('')+'</tr></thead><tbody>'+tableRows.join('')+'</tbody></table></div>'+
-   (groups.size>500?'<p class="text-xs mt-2">'+hrText('أول 500 يوم؛ الحركات الأصلية والتصدير محفوظان','First 500 days; original events and export retained')+'</p>':'');
+   '';
  };
 })();
