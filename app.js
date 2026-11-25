@@ -4100,7 +4100,7 @@ async function lmPayLinkAttendance(){
    for(const r of scoped){const key=String(r.code)+'|'+r.reportWorkday;const a=paired.get(key)||[];a.push(r);paired.set(key,a);}
    daily=daily.map(d=>{
     const items=paired.get(d.code+'|'+d.date)||[];
-    const valid=items.length>=2&&sorted.every(x=>x.r.reportPairStatus==='PAIRED');
+    const valid=items.length>=2&&items.every(x=>x.reportPairStatus==='PAIRED');
     return valid?d:{...d,dayOt:null,nightOt:null,ot:null,reason:d.reason||'UNPAIRED_ATTENDANCE'};
    });
   }finally{lmAttWorkspace.rows=oldRows;lmAttWorkspace.shiftPlans=oldPlans;}
