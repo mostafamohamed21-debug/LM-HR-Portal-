@@ -394,6 +394,7 @@ async function completeLogin(code, pass, remember, user) {
     lmUpdateHeaderIdentity();
 }
 async function handleLogout() {
+    lmAttReadCache=null;
     localStorage.removeItem('lacto_saved_pass');
     localStorage.removeItem('lacto_saved_code');
     sessionStorage.removeItem('lacto_active_code');
@@ -3290,15 +3291,26 @@ async function lmExcludePunchOpen(){
  el.querySelector('#lm-exclude-close').onclick=()=>el.remove();
  el.querySelector('#lm-exclude-save').onclick=async()=>{const reason=el.querySelector('textarea').value.trim(),chosen=[...list.querySelectorAll('input:checked')].map(x=>rows[Number(x.value)]);if(reason.length<8||!chosen.length)return lmDialog(hrText('حدد بصمة واكتب السبب','Select a punch and enter a reason'));if(!await lmDialog(hrText('تأكيد الاستبعاد من الحسابات؟','Confirm exclusion from calculations?'),true))return;const btn=el.querySelector('#lm-exclude-save');btn.disabled=true;try{const updates={};for(const r of chosen)updates['attendance_punch_exclusions/'+lmPunchExclusionKey(r)]={code:String(r.code),date:lmAttDate(r),time:lmAttTime(r),sourceId:String(r.id),reason,actorCode:'778',actorUid:portalAuth.currentUser.uid,createdAt:firebase.database.ServerValue.TIMESTAMP};await db.ref().update(updates);el.remove();await lmAttLoad();}catch(e){await lmDialog(String(e.message||e));}finally{btn.disabled=false;}};
 }
+// Session-only normalized attendance cache; always revalidate Firebase before reuse.
+let lmAttReadCache=null;
 async function lmAttLoad(){
  const el=document.getElementById('lm-att-table');if(!el||lmAttWorkspace.loading)return;
  if(!portalIsAdmin()){el.textContent=hrText('غير مصرح بعرض السجلات','Not authorized');return;}
  lmAttWorkspace.loading=true;el.textContent=hrText('جاري قراءة سجلات Firebase','Reading Firebase records');
  const rows=[],errors=[];lmAttWorkspace.exclusionsReady=false;
+ const cacheUid=portalAuth.currentUser?.uid;let cacheSignature=null;
  const add=(r)=>{if(r&&typeof r==='object')rows.push(r)};
  try{
   const jobs=[['attendance_requests/2','ess'],['approved_attendance/2','approved'],['hr_imports/attendance','imports'],['shift_plans','plans'],['shift_exceptions','exceptions'],['manual_attendance_punches','manual'],['attendance_punch_exclusions','exclusions']];
   const results=await Promise.allSettled(jobs.map(([path])=>db.ref(path).once('value')));
+  if(cacheUid&&results.every(res=>res.status==='fulfilled')){
+   cacheSignature=JSON.stringify(results.map(res=>res.value.val()));
+   if(lmAttReadCache?.uid===cacheUid&&lmAttReadCache.signature===cacheSignature){
+    const cached=lmAttReadCache;
+    lmAttWorkspace.rows=cached.rows.map(r=>({...r}));lmAttWorkspace.shiftPlans=JSON.parse(cached.plans);lmAttWorkspace.shiftExceptions=JSON.parse(cached.exceptions);lmAttWorkspace.exclusions=JSON.parse(cached.exclusions);lmAttWorkspace.shiftPlansLoaded=true;lmAttWorkspace.exclusionsReady=true;lmAttWorkspace.loading=false;lmAttFilter();return;
+   }
+  }
+  lmAttReadCache=null;
   results.forEach((res,i)=>{
    const [path,kind]=jobs[i];if(res.status!=='fulfilled'){errors.push(path);return;}
    const val=res.value.val()||{};
@@ -3322,6 +3334,7 @@ async function lmAttLoad(){
   .filter(([key,p])=>!observed.has(String(p.code)+'|'+String(p.date))&&!exceptionKeys.has(String(p.code)+'|'+String(p.date)))
   .map(([key,p])=>({id:'schedule:'+key,code:String(p.code),date:String(p.date),time:'',origin:'schedule',status:'SCHEDULED',scheduleShift:String(p.shift||''),schedulePattern:String(p.pattern||''),scheduleKind:String(p.kind||'WORK'),reportWorkday:String(p.date)}));
  lmAttWorkspace.rows=uniqueRows.concat(exceptionRows,scheduleRows).sort((a,b)=>lmAttStamp(b)-lmAttStamp(a));lmAttWorkspace.loading=false;lmAttClassify();
+ if(!errors.length&&cacheSignature!==null&&cacheUid===portalAuth.currentUser?.uid){lmAttReadCache={uid:cacheUid,signature:cacheSignature,rows:lmAttWorkspace.rows.map(r=>({...r})),plans:JSON.stringify(lmAttWorkspace.shiftPlans||{}),exceptions:JSON.stringify(lmAttWorkspace.shiftExceptions||{}),exclusions:JSON.stringify(lmAttWorkspace.exclusions||{})};}
  const warn=document.getElementById('lm-att-count');if(warn&&errors.length)warn.textContent=hrText('تعذر قراءة بعض المصادر: ','Some sources unavailable: ')+errors.join(', ');
  lmAttFilter();
 }function lmAttClassify(){
