@@ -3202,7 +3202,7 @@ function lmAttWorkspaceLayout(){
  let toolbar=d.querySelector('#lm-att-toolbar');
  if(!toolbar){
   toolbar=document.createElement('section');toolbar.id='lm-att-toolbar';toolbar.className='hr-panel mb-4';
-  toolbar.innerHTML=`<div class="flex flex-wrap justify-between items-center gap-3"><div><h2 class="font-bold text-sky-300 text-lg">${hrText('إدارة البصمات','Fingerprint management')}</h2><span id="lm-zk-health" class="text-xs text-amber-300">${hrText('جاري فحص Bridge','Checking bridge')}</span></div><div class="flex flex-wrap gap-2"><button type="button" class="portal-action-btn px-3 py-2 rounded-xl" onclick="lmZkModal('pull')">${hrText('سحب البصمات','Pull punches')}</button><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmZkModal('import')">${hrText('استيراد Excel / CSV','Import Excel / CSV')}</button><button type="button" class="portal-action-btn px-3 py-2 rounded-xl" onclick="lmManualPunchOpen()">${hrText('إضافة بصمة يدويًا','Add manual punch')}</button><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" id="lm-att-toggle-filters" aria-controls="lm-att-filters" aria-expanded="false" onclick="lmAttShowFilters()">${hrText('فلاتر التقرير','Report filters')}</button><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmAttExport()">${hrText('تصدير CSV','Export CSV')}</button><button type="button" class="portal-action-btn px-3 py-2 rounded-xl" onclick="lmV5ShiftOpen()">${hrText('إدارة الورديات','Shift management')}</button></div></div>`;
+  toolbar.innerHTML=`<div class="flex flex-wrap justify-between items-center gap-3"><div><h2 class="font-bold text-sky-300 text-lg">${hrText('إدارة البصمات','Fingerprint management')}</h2><span id="lm-zk-health" class="text-xs text-amber-300">${hrText('جاري فحص Bridge','Checking bridge')}</span></div><div class="flex flex-wrap gap-2"><button type="button" class="portal-action-btn px-3 py-2 rounded-xl" onclick="lmZkModal('pull')">${hrText('سحب البصمات','Pull punches')}</button><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmZkModal('import')">${hrText('استيراد Excel / CSV','Import Excel / CSV')}</button><button type="button" class="portal-action-btn px-3 py-2 rounded-xl" onclick="lmManualPunchOpen()">${hrText('إضافة بصمة يدويًا','Add manual punch')}</button><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmExcludePunchOpen()">${hrText('مسح البصمة','Exclude punch')}</button><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" id="lm-att-toggle-filters" aria-controls="lm-att-filters" aria-expanded="false" onclick="lmAttShowFilters()">${hrText('فلاتر التقرير','Report filters')}</button><button type="button" class="portal-ghost-btn px-3 py-2 rounded-xl" onclick="lmAttExport()">${hrText('تصدير CSV','Export CSV')}</button><button type="button" class="portal-action-btn px-3 py-2 rounded-xl" onclick="lmV5ShiftOpen()">${hrText('إدارة الورديات','Shift management')}</button></div></div>`;
   if(heading)heading.after(toolbar);else d.prepend(toolbar);
  }
  imp.style.display='none';
@@ -3272,17 +3272,37 @@ async function lmManualPunchSave(e){
   document.getElementById('lm-manual-overlay')?.remove();await lmAttLoad();await lmDialog(hrText('تم حفظ البصمة اليدوية وإعادة تحميل التقرير','Manual punch saved; report refreshed'));
  }catch(err){status.textContent=hrText('تعذر الحفظ: ','Save failed: ')+(err.message||err.code);}finally{btn.disabled=false;}
 }
+function lmPunchExclusionKey(r){return encodeURIComponent(String(r.code)+'|'+lmAttDate(r)+'T'+(lmAttTime(r).length===5?lmAttTime(r)+':00':lmAttTime(r))).replace(/\./g,'%2E');}
+function lmPunchExcluded(r, exclusions){return ['device','manual'].includes(r.origin)&&!!exclusions[lmPunchExclusionKey(r)];}
+async function lmExcludePunchOpen(){
+ if(!portalIsAdmin()||String(currentUserData?.code)!=='778'||portalAuth.currentUser?.uid!==PORTAL_ADMIN_UID)return;
+ if(!lmAttWorkspace.exclusionsReady)return lmDialog(hrText('تعذر قراءة سجل الاستبعاد','Exclusion ledger unavailable'));
+ const rows=lmAttWorkspace.rows.filter(r=>['device','manual'].includes(r.origin));
+ if(document.getElementById('lm-exclude-overlay'))return;
+ const el=document.createElement('div');el.id='lm-exclude-overlay';el.style.cssText='position:fixed;inset:0;z-index:100002;background:#000b;display:grid;place-items:center';
+ el.innerHTML=`<section class="hr-panel" style="padding:24px;width:min(1100px,96vw);max-height:90vh;overflow:auto;background:var(--panel-bg,#102038);color:inherit;border-radius:18px"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold">${hrText('مسح البصمات المحددة','Exclude selected punches')}</h2><button id="lm-exclude-close" class="portal-ghost-btn">✕</button></div><div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4"><label>${hrText('الإدارة','Department')}<select id="ex-dept" class="hr-feature-input w-full"></select></label><label>${hrText('الموظف','Employee')}<select id="ex-emp" class="hr-feature-input w-full"></select></label><label>${hrText('من','From')}<input id="ex-from" type="date" class="hr-feature-input w-full"></label><label>${hrText('إلى','To')}<input id="ex-to" type="date" class="hr-feature-input w-full"></label></div><label><input type="checkbox" id="ex-all"> ${hrText('تحديد كل النتائج','Select all results')}</label><span id="ex-count" class="mx-3"></span><div style="max-height:45vh;overflow:auto"><table class="hr-feature-table w-full"><thead><tr>${['',hrText('الكود','Code'),hrText('الموظف','Employee'),hrText('التاريخ','Date'),hrText('الوقت','Time'),hrText('الحركة','Punch')].map(x=>'<th>'+x+'</th>').join('')}</tr></thead><tbody id="lm-exclude-list"></tbody></table></div><textarea id="lm-exclude-reason" class="hr-feature-input w-full mt-4" placeholder="${hrText('سبب الاستبعاد (8 أحرف على الأقل)','Reason (at least 8 characters)')}"></textarea><button id="lm-exclude-save" class="portal-action-btn px-4 py-2 mt-3">${hrText('تأكيد المسح','Confirm exclusion')}</button></section>`;
+ document.body.append(el);const list=el.querySelector('#lm-exclude-list'),dept=el.querySelector('#ex-dept'),emp=el.querySelector('#ex-emp'),from=el.querySelector('#ex-from'),to=el.querySelector('#ex-to'),all=el.querySelector('#ex-all');
+ const departments=lmV5DeptGroups();const option=(select,value,label)=>select.add(new Option(label,value));
+ option(dept,'',hrText('كل الإدارات','All departments'));departments.forEach(d=>option(dept,d.key,hrText(d.ar||d.en,d.en||d.ar)));
+ function employees(){emp.replaceChildren();option(emp,'',hrText('كل الموظفين','All employees'));const d=departments.find(x=>x.key===dept.value);for(const e of allEmployees||[]){const c=String(getEmployeeCode(e)||'').trim();if(c&&(!d||d.codes.has(c)))option(emp,c,c+' — '+lmAttEmployeeName({code:c}));}}
+ function render(){list.replaceChildren();all.checked=false;const d=departments.find(x=>x.key===dept.value);let n=0;rows.forEach((r,i)=>{const c=String(r.code),date=lmAttDate(r);if((d&&!d.codes.has(c))||(emp.value&&emp.value!==c)||(from.value&&date<from.value)||(to.value&&date>to.value))return;const tr=document.createElement('tr'),td=tr.insertCell(),cb=document.createElement('input');cb.type='checkbox';cb.value=String(i);td.append(cb);for(const v of [c,lmAttEmployeeName(r),date,lmAttTime(r),lmAttPunchLabel(r)])tr.insertCell().textContent=v;list.append(tr);n++;});el.querySelector('#ex-count').textContent=n+' '+hrText('بصمة','punches');}
+ dept.onchange=()=>{employees();render();};emp.onchange=from.onchange=to.onchange=render;all.onchange=()=>list.querySelectorAll('input').forEach(x=>x.checked=all.checked);employees();render();
+ el.querySelector('#lm-exclude-close').onclick=()=>el.remove();
+ el.querySelector('#lm-exclude-save').onclick=async()=>{const reason=el.querySelector('textarea').value.trim(),chosen=[...list.querySelectorAll('input:checked')].map(x=>rows[Number(x.value)]);if(reason.length<8||!chosen.length)return lmDialog(hrText('حدد بصمة واكتب السبب','Select a punch and enter a reason'));if(!await lmDialog(hrText('تأكيد الاستبعاد من الحسابات؟','Confirm exclusion from calculations?'),true))return;const btn=el.querySelector('#lm-exclude-save');btn.disabled=true;try{const updates={};for(const r of chosen)updates['attendance_punch_exclusions/'+lmPunchExclusionKey(r)]={code:String(r.code),date:lmAttDate(r),time:lmAttTime(r),sourceId:String(r.id),reason,actorCode:'778',actorUid:portalAuth.currentUser.uid,createdAt:firebase.database.ServerValue.TIMESTAMP};await db.ref().update(updates);el.remove();await lmAttLoad();}catch(e){await lmDialog(String(e.message||e));}finally{btn.disabled=false;}};
+}
 async function lmAttLoad(){
  const el=document.getElementById('lm-att-table');if(!el||lmAttWorkspace.loading)return;
  if(!portalIsAdmin()){el.textContent=hrText('غير مصرح بعرض السجلات','Not authorized');return;}
  lmAttWorkspace.loading=true;el.textContent=hrText('جاري قراءة سجلات Firebase','Reading Firebase records');
- const rows=[],errors=[];const add=(r)=>{if(r&&typeof r==='object')rows.push(r)};
+ const rows=[],errors=[];lmAttWorkspace.exclusionsReady=false;
+ const add=(r)=>{if(r&&typeof r==='object')rows.push(r)};
  try{
-  const jobs=[['attendance_requests/2','ess'],['approved_attendance/2','approved'],['hr_imports/attendance','imports'],['shift_plans','plans'],['shift_exceptions','exceptions'],['manual_attendance_punches','manual']];
+  const jobs=[['attendance_requests/2','ess'],['approved_attendance/2','approved'],['hr_imports/attendance','imports'],['shift_plans','plans'],['shift_exceptions','exceptions'],['manual_attendance_punches','manual'],['attendance_punch_exclusions','exclusions']];
   const results=await Promise.allSettled(jobs.map(([path])=>db.ref(path).once('value')));
   results.forEach((res,i)=>{
    const [path,kind]=jobs[i];if(res.status!=='fulfilled'){errors.push(path);return;}
    const val=res.value.val()||{};
+   if(kind==='exclusions'){lmAttWorkspace.exclusions=val;lmAttWorkspace.exclusionsReady=true;return;}
    if(kind==='plans'){lmAttWorkspace.shiftPlans=val;lmAttWorkspace.shiftPlansLoaded=true;return;}
    if(kind==='exceptions'){lmAttWorkspace.shiftExceptions=val;return;}
    if(kind==='manual')Object.entries(val).forEach(([id,r])=>{if(r&&r.code&&r.date&&r.time)add({id,code:String(r.code),date:r.date,time:r.time,timestamp:r.date+'T'+(r.time.length===5?r.time+':00':r.time),punch:r.punchType,status:'MANUAL',origin:'manual',createdAt:r.createdAt,manualReason:r.reason});});
@@ -3292,7 +3312,7 @@ async function lmAttLoad(){
   });
  }catch(e){errors.push(e.message||'read failed')}
  const seenPunches=new Set();
- const uniqueRows=rows.filter(r=>{if(r.origin!=='device')return true;const key=String(r.code)+'|'+String(r.timestamp||r.date+' '+r.time);if(seenPunches.has(key))return false;seenPunches.add(key);return true;});
+ const uniqueRows=rows.filter(r=>{if(lmPunchExcluded(r,lmAttWorkspace.exclusions||{}))return false;if(r.origin!=='device')return true;const key=String(r.code)+'|'+String(r.timestamp||r.date+' '+r.time);if(seenPunches.has(key))return false;seenPunches.add(key);return true;});
  const exceptionRows=Object.entries(lmAttWorkspace.shiftExceptions||{}).filter(([key,e])=>e&&e.code&&e.date&&['CANCEL','CANCEL_REST','REST','RECALL'].includes(String(e.kind||''))).map(([key,e])=>({id:'exception:'+key,code:String(e.code),date:String(e.date),time:'',origin:'exception',status:'EXCEPTION',exceptionKind:String(e.kind),exceptionReason:String(e.reason||''),reportWorkday:String(e.date)}));
  // Add a read-only row for every saved shift day with no attendance event.
  // This makes missing punches visible without inventing a punch or changing Firebase.
@@ -3332,7 +3352,7 @@ async function lmAttLoad(){
 }function lmAttPunchLabel(r){if(r.origin==='exception')return lmAttExceptionLabel(r.exceptionKind);if(r.origin==='schedule')return hrText('يوم مجدول بلا بصمة','Scheduled day — no punch');const v=r.reportPunch||'';return v==='IN'?hrText('حضور','Check-in'):v==='OUT'?hrText('انصراف','Check-out'):v==='INTERMEDIATE'?hrText('بصمة وسطية','Intermediate'):r.reportPairStatus==='SINGLE_PUNCH'?hrText('بصمة واحدة — مراجعة','Single punch — review'):r.reportPairStatus==='REVIEW_REQUIRED'?hrText('تحتاج مراجعة','Review required'):hrText('غير محدد','Unclassified');}
 function lmAttExceptionLabel(kind){const labels={CANCEL:['إلغاء يوم عمل','Cancelled workday'],CANCEL_REST:['استدعاء من الراحة','Rest-day recall'],REST:['راحة استثنائية','Exceptional rest'],RECALL:['استدعاء للعمل','Recall to work']};const v=labels[kind];return v?hrText(v[0],v[1]):hrText('إجراء خاص','Exception');}
 function lmAttEmployeeName(r){return lmBilingualName(r.code,r.name||'');}
-function lmAttFiltered(){const code=document.getElementById('lm-att-code')?.value.trim()||'',from=document.getElementById('lm-att-from')?.value||'',to=document.getElementById('lm-att-to')?.value||'',src=document.getElementById('lm-att-source')?.value||'all',dept=document.getElementById('lm-att-dept')?.value||'';const selected=lmV5DeptGroups().find(d=>d.key===dept);return lmAttWorkspace.rows.filter(r=>{const date=lmAttDate(r);if(lmAttWorkspace.mode==='today'&&date!==new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()) )return false;return (!selected||selected.codes.has(String(r.code||'')))&&(!code||String(r.code||'').includes(code))&&(!from||(date&&date>=from))&&(!to||(date&&date<=to))&&(src==='all'||r.origin===src)});}
+function lmAttFiltered(){const code=document.getElementById('lm-att-code')?.value.trim()||'',from=document.getElementById('lm-att-from')?.value||'',to=document.getElementById('lm-att-to')?.value||'',src=document.getElementById('lm-att-source')?.value||'all',dept=document.getElementById('lm-att-dept')?.value||'';const selected=lmV5DeptGroups().find(d=>d.key===dept);return lmAttWorkspace.rows.filter(r=>{const date=r.reportWorkday||lmAttDate(r);if(lmAttWorkspace.mode==='today'&&date!==new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()) )return false;return (!selected||selected.codes.has(String(r.code||'')))&&(!code||String(r.code||'').includes(code))&&(!from||(date&&date>=from))&&(!to||(date&&date<=to))&&(src==='all'||r.origin===src)});}
 function lmAttMapLink(r){
  const loc=r&&r.location;
  if(!loc||loc.lat===null||loc.lng===null||loc.lat===undefined||loc.lng===undefined)return '—';
@@ -3378,7 +3398,7 @@ function lmAttWorkHourRows(rows){
   else if(plan.cancelled){reason='CANCELLED_SHIFT';status='CANCELLED';}
   else if(items.some(r=>r.origin==='ess'&&r.status!=='APPROVED')){reason='PENDING_ESS_REVIEW';status='PENDING_REVIEW';}
   else if(isRestDay){
-   if(distinct.length<2){reason=distinct.length?'SINGLE_PUNCH':'NO_PUNCH';status=distinct.length?'SINGLE_PUNCH':'NO_PUNCH';}
+   if(distinct.length<2){reason=distinct.length?'SINGLE_PUNCH':'PROTECTED_REST';status=distinct.length?'SINGLE_PUNCH':'REST';}
    else{
     const first=distinct[0].stamp,last=distinct[distinct.length-1].stamp,ms=last-first;
     if(ms<=0||ms>20*3600000){reason='AMBIGUOUS_DURATION';status='REVIEW';}
@@ -3947,9 +3967,9 @@ async function lmPayLinkAttendance(){
   // Match the Unified Daily Attendance report: identical source paths,
   // import normalization, duplicate filtering, pairing, and work-hour engine.
   // Do NOT calculate a second payroll-only punch interpretation.
-  const paths=['hr_imports/attendance','shift_plans','manual_attendance_punches'];
+  const paths=['hr_imports/attendance','shift_plans','manual_attendance_punches','attendance_punch_exclusions'];
   const snaps=await Promise.all(paths.map(path=>db.ref(path).once('value')));
-  const [imports,plans,manual]=snaps.map(x=>x.val()||{}),rows=[],issues=[];
+  const [imports,plans,manual,exclusions]=snaps.map(x=>x.val()||{}),rows=[],issues=[];
   Object.entries(imports).forEach(([batchId,batch])=>Object.entries(batch?.records||{}).forEach(([i,r])=>{
    if(!r||typeof r!=='object')return;
    const source=String(r.source||'').toLowerCase();
@@ -3957,7 +3977,7 @@ async function lmPayLinkAttendance(){
   }));
   Object.entries(manual).forEach(([id,r])=>{if(r&&r.code&&r.date&&r.time)rows.push({id,code:String(r.code),date:r.date,time:r.time,timestamp:r.date+'T'+(r.time.length===5?r.time+':00':r.time),punch:r.punchType,origin:'manual',status:'MANUAL'});});
   const seen=new Set();
-  const deduped=rows.filter(r=>{if(r.origin!=='device')return true;const key=r.code+'|'+String(r.timestamp||r.date+' '+r.time);if(seen.has(key))return false;seen.add(key);return true;});
+  const deduped=rows.filter(r=>{if(lmPunchExcluded(r,exclusions))return false;if(r.origin!=='device')return true;const key=r.code+'|'+String(r.timestamp||r.date+' '+r.time);if(seen.has(key))return false;seen.add(key);return true;});
   const validCodes=new Set(allEmployees.map(e=>String(getEmployeeCode(e))));
   // Classification must use exactly the same rules as the attendance screen.
   // In particular, an A-shift 08:54 punch belongs to its calendar day,
@@ -3975,7 +3995,7 @@ async function lmPayLinkAttendance(){
    for(const r of scoped){const key=String(r.code)+'|'+r.reportWorkday;const a=paired.get(key)||[];a.push(r);paired.set(key,a);}
    daily=daily.map(d=>{
     const items=paired.get(d.code+'|'+d.date)||[];
-    const valid=items.length>=2&&items.every(r=>r.reportPairStatus==='PAIRED');
+    const valid=items.length>=2&&sorted.every(x=>x.r.reportPairStatus==='PAIRED');
     return valid?d:{...d,dayOt:null,nightOt:null,ot:null,reason:d.reason||'UNPAIRED_ATTENDANCE'};
    });
   }finally{lmAttWorkspace.rows=oldRows;lmAttWorkspace.shiftPlans=oldPlans;}
@@ -4564,25 +4584,22 @@ function lmLeaveCloseFullReport(){
    if(!groups.has(key))groups.set(key,[]);
    groups.get(key).push(r);
   }
-  // In report mode, materialize every calendar day for an explicitly selected
-  // employee. Empty days are display-only rows; they are never saved as punches.
-  const from=document.getElementById('lm-att-from')?.value||'',to=document.getElementById('lm-att-to')?.value||'';
-  const selectedCode=document.getElementById('lm-att-code')?.value.trim()||'';
-  const emptyDays=[];
-  if(lmAttWorkspace.mode==='report' && /^\d+$/.test(selectedCode) && /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) && from<=to){
-   const start=Date.parse(from+'T12:00:00Z'),end=Date.parse(to+'T12:00:00Z');
-   if(Number.isFinite(start)&&Number.isFinite(end)&&(end-start)/86400000<=400){
-    for(let ms=start;ms<=end;ms+=86400000){
-     const date=new Date(ms).toISOString().slice(0,10),key=selectedCode+'|'+date;
-     if(!groups.has(key)){const placeholder={id:'display-only:'+key,code:selectedCode,date,time:'',origin:'display-only',status:'NO_PUNCH',reportWorkday:date};groups.set(key,[placeholder]);emptyDays.push(placeholder);}
-    }
-   }
+  // Calendar rows are independent of punch existence and never persisted.
+  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  const from=lmAttWorkspace.mode==='today'?today:(document.getElementById('lm-att-from')?.value||today.slice(0,8)+'01');
+  const to=lmAttWorkspace.mode==='today'?today:(document.getElementById('lm-att-to')?.value||today);
+  const query=document.getElementById('lm-att-code')?.value.trim()||'',dept=document.getElementById('lm-att-dept')?.value||'';
+  const department=lmV5DeptGroups().find(d=>d.key===dept),emptyDays=[];
+  const codes=new Set((allEmployees||[]).map(e=>String(getEmployeeCode(e)||'').trim()).filter(c=>c&&(!query||c.includes(query))&&(!department||department.codes.has(c))));
+  const start=Date.parse(from+'T12:00:00Z'),end=Date.parse(to+'T12:00:00Z');
+  if(Number.isFinite(start)&&Number.isFinite(end)&&start<=end){
+   for(const code of codes)for(let ms=start;ms<=end;ms+=86400000){const date=new Date(ms).toISOString().slice(0,10),key=code+'|'+date;if(!groups.has(key)){const placeholder={id:'display-only:'+key,code,date,time:'',origin:'display-only',status:'NO_PUNCH',reportWorkday:date};groups.set(key,[placeholder]);emptyDays.push(placeholder);}}
   }
-  const shiftRows=new Map(lmAttWorkHourRows(rows).map(r=>[r.code+'|'+r.date,r]));
+  const shiftRows=new Map(lmAttWorkHourRows(rows.concat(emptyDays)).map(r=>[r.code+'|'+r.date,r]));
   const th=[hrText('الكود','Code'),hrText('الموظف','Employee'),hrText('التاريخ','Date'),hrText('الوردية','Shift'),hrText('الحضور','In'),hrText('الانصراف','Out'),hrText('المدة الفعلية','Elapsed'),hrText('إضافي خام','Raw OT'),hrText('نهاري × 1.35','Day × 1.35'),hrText('ليلي × 1.70','Night × 1.70'),hrText('إضافي بالمعامل','Weighted OT'),hrText('الحالة','Status'),hrText('إجراء الوردية','Shift action'),hrText('سبب الإجراء','Action reason'),hrText('الموقع','Location')];
-  const tableRows=[...groups].sort((a,b)=>b[0].localeCompare(a[0])).slice(0,500).map(([key,items])=>{
+  const tableRows=[...groups].sort((a,b)=>b[0].localeCompare(a[0])).map(([key,items])=>{
    const sorted=items.filter(r=>r.origin!=='display-only').map(r=>({r,ms:Date.parse(lmAttDate(r)+'T'+lmAttTime(r))})).filter(x=>Number.isFinite(x.ms)).sort((a,b)=>a.ms-b.ms);
-   const first=sorted[0],last=sorted[sorted.length-1],day=key.slice(key.indexOf('|')+1),shift=shiftRows.get(key),isEmptyDay=items.every(r=>r.origin==='display-only');
+   const first=sorted[0],last=sorted[sorted.length-1],day=key.slice(key.indexOf('|')+1),shift=shiftRows.get(key),isEmptyDay=!sorted.length;
    const complete=sorted.length>=2&&last.ms>first.ms&&last.ms-first.ms<=20*3600000
      &&items.every(r=>r.reportPairStatus==='PAIRED');
    const minutes=complete?Math.floor((last.ms-first.ms)/60000):null;
@@ -4591,20 +4608,22 @@ function lmLeaveCloseFullReport(){
    const exceptionKind=exception?.kind||items.find(r=>r.origin==='exception')?.exceptionKind||'';
    const exceptionReason=exception?.reason||items.find(r=>r.origin==='exception')?.exceptionReason||'';
    const actionLabel=exceptionKind?lmAttExceptionLabel(exceptionKind):'—';
-   const state=isEmptyDay?hrText('لا توجد بصمات','No punches'):
+   const dayPlan=(lmAttWorkspace.shiftPlans||{})[lmV5ShiftKey(items[0].code,day)];
+   const weeklyRest=['A','B'].includes(String(dayPlan?.shift||'A'))&&[5,6].includes(new Date(day+'T12:00:00Z').getUTCDay());
+   const state=
      exceptionKind==='CANCEL'?hrText('إلغاء عمل — مسجل','Work cancelled — recorded'):
      exceptionKind==='REST'?hrText('راحة استثنائية — مسجلة','Exceptional rest — recorded'):
      exceptionKind==='RECALL'||exceptionKind==='CANCEL_REST'?hrText('استدعاء — مراجعة البصمات','Recall — review punches'):
-     complete?hrText('زوج بصمات','Paired'):hrText('ناقص / مراجعة','Incomplete / review');
+     isEmptyDay?(dayPlan?.kind==='REST'||weeklyRest?hrText('راحة','Rest'):dayPlan?.kind==='LEAVE'?hrText('إجازة','Leave'):dayPlan?.cancelled?hrText('إلغاء وردية','Cancelled shift'):hrText('لا توجد بصمات','No punches')):complete?hrText('زوج بصمات','Paired'):hrText('ناقص / مراجعة','Incomplete / review');
    const map=items.map(x=>lmAttMapLink(x)).find(x=>x!=='—')||'—';
    const plan=(lmAttWorkspace.shiftPlans||{})[lmV5ShiftKey(items[0].code,day)];
-   const values=[items[0].code,lmAttEmployeeName(items[0]),day,shift?.shift||plan?.shift||'—',first?lmAttTime(first.r):'—',complete?lmAttTime(last.r):'—',elapsed,shift?.ot==null?'—':shift.ot.toFixed(2),shift?.dayOt==null?'—':(Math.round(shift.dayOt*135)/100).toFixed(2),shift?.nightOt==null?'—':(Math.round(shift.nightOt*170)/100).toFixed(2),shift?.ot==null?'—':(Math.round((shift.dayOt*1.35+shift.nightOt*1.70)*100)/100).toFixed(2),state,actionLabel,exceptionReason||'—'];
+   const values=[items[0].code,lmAttEmployeeName(items[0]),day,shift?.shift||plan?.shift||'—',first?lmAttTime(first.r):'—',complete?lmAttTime(last.r):'—',elapsed,shift?.ot==null?'—':shift.ot.toFixed(2),shift?.dayOt==null?'—':(Math.round(shift.dayOt*135)/100).toFixed(2),shift?.nightOt==null?'—':(Math.round(shift.nightOt*170)/100).toFixed(2),shift?.ot==null?'—':(Math.round(((shift.dayOt||0)*1.35+(shift.nightOt||0)*1.70+(shift.restOt||0)*2)*100)/100).toFixed(2),state,actionLabel,exceptionReason||'—'];
    return '<tr>'+values.map(v=>'<td>'+lmAttSafe(v)+'</td>').join('')+'<td>'+map+'</td></tr>';
   });
   const selectedCodes=[...new Set([...groups.keys()].map(k=>k.slice(0,k.indexOf('|'))))];
   const cCycleSummaries=selectedCodes.map(code=>{const hasC=Object.entries(lmAttWorkspace.shiftPlans||{}).some(([key,p])=>key.startsWith(String(code).replace(/[.#$\[\]/]/g,'_')+'_')&&String(p?.shift||'').toUpperCase()==='C');return hasC?lmAttShiftCCycleSummary(code):'';}).join('');
   summary.innerHTML='<div class="flex flex-wrap justify-between items-center gap-2 mb-3"><h3 class="font-bold text-sky-300">'+hrText('السجل اليومي الموحد','Unified daily attendance')+'</h3><span class="text-xs text-amber-200">'+hrText('الأيام الخالية من البصمات للعرض فقط؛ الإضافي مبدئي حسب سياسة الوردية','No-punch days are display-only; overtime is provisional under shift policy')+'</span></div>'+cCycleSummaries+
    '<div class="overflow-x-auto"><table class="hr-feature-table w-full"><thead><tr>'+th.map(x=>'<th>'+lmAttSafe(x)+'</th>').join('')+'</tr></thead><tbody>'+tableRows.join('')+'</tbody></table></div>'+
-   (groups.size>500?'<p class="text-xs mt-2">'+hrText('أول 500 يوم؛ الحركات الأصلية والتصدير محفوظان','First 500 days; original events and export retained')+'</p>':'');
+   '';
  };
 })();
