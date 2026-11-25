@@ -3237,7 +3237,7 @@ function lmAttWorkspaceLayout(){
  }
  lmGpsRender();
  const reportDept=document.getElementById('lm-att-dept');if(reportDept){reportDept.innerHTML='<option value="">'+hrText('كل الإدارات','All departments')+'</option>'+lmV5DeptGroups().map(d=>'<option value="'+hrEscape(d.key)+'">'+hrEscape(currentLang==='ar'?d.ar||d.en:d.en||d.ar)+'</option>').join('');}
- lmAttMode(lmAttWorkspace.mode);lmAttLoad();
+ setTimeout(()=>{if(document.getElementById('lm-att-table'))lmAttLoad();},0);
 }
 
 // Stage 1: create-only admin manual punch; never modifies ZKTeco source records.
@@ -4597,7 +4597,11 @@ function lmLeaveCloseFullReport(){
   }
   const shiftRows=new Map(lmAttWorkHourRows(rows.concat(emptyDays)).map(r=>[r.code+'|'+r.date,r]));
   const th=[hrText('الكود','Code'),hrText('الموظف','Employee'),hrText('التاريخ','Date'),hrText('الوردية','Shift'),hrText('الحضور','In'),hrText('الانصراف','Out'),hrText('المدة الفعلية','Elapsed'),hrText('إضافي خام','Raw OT'),hrText('نهاري × 1.35','Day × 1.35'),hrText('ليلي × 1.70','Night × 1.70'),hrText('إضافي بالمعامل','Weighted OT'),hrText('الحالة','Status'),hrText('إجراء الوردية','Shift action'),hrText('سبب الإجراء','Action reason'),hrText('الموقع','Location')];
-  const tableRows=[...groups].sort((a,b)=>b[0].localeCompare(a[0])).map(([key,items])=>{
+  const orderedGroups=[...groups].sort((a,b)=>b[0].localeCompare(a[0]));
+  const pageSize=100,pageCount=Math.max(1,Math.ceil(orderedGroups.length/pageSize));
+  const renderPage=page=>{
+  page=Math.max(0,Math.min(pageCount-1,page));
+  const tableRows=orderedGroups.slice(page*pageSize,(page+1)*pageSize).map(([key,items])=>{
    const sorted=items.filter(r=>r.origin!=='display-only').map(r=>({r,ms:Date.parse(lmAttDate(r)+'T'+lmAttTime(r))})).filter(x=>Number.isFinite(x.ms)).sort((a,b)=>a.ms-b.ms);
    const first=sorted[0],last=sorted[sorted.length-1],day=key.slice(key.indexOf('|')+1),shift=shiftRows.get(key),isEmptyDay=!sorted.length;
    const complete=sorted.length>=2&&last.ms>first.ms&&last.ms-first.ms<=20*3600000
@@ -4620,10 +4624,13 @@ function lmLeaveCloseFullReport(){
    const values=[items[0].code,lmAttEmployeeName(items[0]),day,shift?.shift||plan?.shift||'—',first?lmAttTime(first.r):'—',complete?lmAttTime(last.r):'—',elapsed,shift?.ot==null?'—':shift.ot.toFixed(2),shift?.dayOt==null?'—':(Math.round(shift.dayOt*135)/100).toFixed(2),shift?.nightOt==null?'—':(Math.round(shift.nightOt*170)/100).toFixed(2),shift?.ot==null?'—':(Math.round(((shift.dayOt||0)*1.35+(shift.nightOt||0)*1.70+(shift.restOt||0)*2)*100)/100).toFixed(2),state,actionLabel,exceptionReason||'—'];
    return '<tr>'+values.map(v=>'<td>'+lmAttSafe(v)+'</td>').join('')+'<td>'+map+'</td></tr>';
   });
-  const selectedCodes=[...new Set([...groups.keys()].map(k=>k.slice(0,k.indexOf('|'))))];
-  const cCycleSummaries=selectedCodes.map(code=>{const hasC=Object.entries(lmAttWorkspace.shiftPlans||{}).some(([key,p])=>key.startsWith(String(code).replace(/[.#$\[\]/]/g,'_')+'_')&&String(p?.shift||'').toUpperCase()==='C');return hasC?lmAttShiftCCycleSummary(code):'';}).join('');
+  const selectedCodes=[...new Set(orderedGroups.slice(page*pageSize,(page+1)*pageSize).map(([k])=>k.slice(0,k.indexOf('|'))))];
+  const cCodes=new Set(Object.entries(lmAttWorkspace.shiftPlans||{}).filter(([key,p])=>String(p?.shift||'').toUpperCase()==='C').map(([key,p])=>String(p.code||key.slice(0,key.lastIndexOf('_')))));
+  const cCycleSummaries=selectedCodes.map(code=>cCodes.has(code)?lmAttShiftCCycleSummary(code):'').join('');
   summary.innerHTML='<div class="flex flex-wrap justify-between items-center gap-2 mb-3"><h3 class="font-bold text-sky-300">'+hrText('السجل اليومي الموحد','Unified daily attendance')+'</h3><span class="text-xs text-amber-200">'+hrText('الأيام الخالية من البصمات للعرض فقط؛ الإضافي مبدئي حسب سياسة الوردية','No-punch days are display-only; overtime is provisional under shift policy')+'</span></div>'+cCycleSummaries+
    '<div class="overflow-x-auto"><table class="hr-feature-table w-full"><thead><tr>'+th.map(x=>'<th>'+lmAttSafe(x)+'</th>').join('')+'</tr></thead><tbody>'+tableRows.join('')+'</tbody></table></div>'+
-   '';
+   '<div class="flex flex-wrap items-center gap-3 mt-3"><button type="button" id="lm-att-prev-page" class="portal-ghost-btn">'+hrText('السابق','Previous')+'</button><span>'+hrText('صفحة','Page')+' '+(page+1)+' / '+pageCount+' — '+orderedGroups.length+' '+hrText('يوم موظف','employee-days')+'</span><button type="button" id="lm-att-next-page" class="portal-ghost-btn">'+hrText('التالي','Next')+'</button></div>';
+  const prev=summary.querySelector('#lm-att-prev-page'),next=summary.querySelector('#lm-att-next-page');prev.disabled=page===0;next.disabled=page+1>=pageCount;prev.onclick=()=>renderPage(page-1);next.onclick=()=>renderPage(page+1);
+  };renderPage(0);
  };
 })();
