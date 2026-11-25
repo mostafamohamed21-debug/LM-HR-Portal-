@@ -1879,7 +1879,7 @@ async function fahdAddField(){
  fahdBusy=true;const btn=document.getElementById('fahd-add');if(btn)btn.disabled=true;
  try{
   // A single root multi-location update commits schema + employee fields + audit together.
-  await db.ref().update(updates);
+  await lmAuditAttachIP(updates);await db.ref().update(updates);
   lmCustomFieldDefinitions[key]=value;
   for(const record of allEmployees){record.hr_custom_fields??={};if(!Object.hasOwn(record.hr_custom_fields,key))record.hr_custom_fields[key]={valueAr:getEmployeeCode(record)===fahdEditing.code?valueAr:'',valueEn:getEmployeeCode(record)===fahdEditing.code?valueEn:''};}
   fahdRender(emp);
@@ -2336,7 +2336,7 @@ async function lmBCommit(){const st=lmBalanceState;if(!st.ready||st.busy||!porta
  for(const key of keys)updates[`${PORTAL_EMPLOYEE_COLLECTION}/${row.code}/${key}`]=row.final;
  audit.push({code:row.code,previous:row.old,newBalance:row.final});}
  const batch=db.ref('hr_imports/leave-balance-updates').push();updates[`hr_imports/leave-balance-updates/${batch.key}`]={filename:st.file,effectiveDate:new Date().toISOString().slice(0,10),createdAt:firebase.database.ServerValue.TIMESTAMP,actorUid:portalAuth.currentUser.uid,records:audit,recordCount:audit.length};
- await db.ref().update(updates);for(const row of st.rows){const emp=allEmployees.find(e=>String(getEmployeeCode(e))===row.code);if(emp)for(const k of row.keys)emp[k]=row.final;}
+ await lmAuditAttachIP(updates);await db.ref().update(updates);for(const row of st.rows){const emp=allEmployees.find(e=>String(getEmployeeCode(e))===row.code);if(emp)for(const k of row.keys)emp[k]=row.final;}
  st.ready=false;status.textContent=lmBText('تم اعتماد الدفعة بنجاح. حدث الصفحة لمراجعة الأرصدة.','Batch committed. Refresh to review balances.');renderHRFeature('leave-balances');
  }catch(e){status.textContent=lmBText('تم إلغاء الاعتماد دون تحديث: ','Update cancelled: ')+e.message;}finally{st.busy=false;document.getElementById('lm-b-commit')?.setAttribute('disabled','');}}
 
@@ -2853,7 +2853,7 @@ async function lm15SaveLegacy(code){
   const updates={};
   updates[base+'/hr_leave_settlement_cycle']=year===null?null:{startYear:year,approvedByUid:actor,approvedAt:firebase.database.ServerValue.TIMESTAMP,source:'FINANCE_LEGACY_RECONCILIATION'};
   updates['hr_imports/leave-cycle-audit/'+auditRef.key]={employeeCode:code,hireDate:lm3Hire(e),oldStartYear:prev,newStartYear:year,actorUid:actor,createdAt:firebase.database.ServerValue.TIMESTAMP,reason:'FINANCE_LEGACY_RECONCILIATION'};
-  await db.ref().update(updates);
+  await lmAuditAttachIP(updates);await db.ref().update(updates);
   e.hr_leave_settlement_cycle=year===null?null:{startYear:year,approvedByUid:actor,source:'FINANCE_LEGACY_RECONCILIATION'};
   el.textContent=t('تم الحفظ وتوثيق العملية.','Saved and audited.');lm15OpenLegacy();lm3Apply();
  }catch(err){el.textContent=t('تعذر الحفظ: ','Save failed: ')+err.message;}
@@ -3102,6 +3102,14 @@ function lmAttDate(r){return String(r.date||r.clientDate||r.timestamp||'').slice
 function lmAttStamp(r){if(r.origin==='manual')return Date.parse(String(r.timestamp||''))||0;const n=Number(r.createdAt||r.approvedAt||0);return n||Date.parse(String(r.timestamp||r.clientDate||''))||0;}
 function lmAttSource(r){return r.origin==='ess'?'ESS GPS':r.origin==='device'?'ZKTeco'+(r.device?' #'+r.device:''):r.origin==='manual'?hrText('يدوي','Manual'):r.origin==='schedule'?hrText('جدول الورديات','Shift plan'):r.origin==='exception'?hrText('استثناء وردية','Shift exception'):hrText('غير محدد','Unknown');}
 const LM_ZK_BRIDGE='http://127.0.0.1:4371';
+async function lmAuditWorkstation(){
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),1500);
+ try{const response=await fetch(LM_ZK_BRIDGE+'/api/workstation',{cache:'no-store',signal:controller.signal});if(!response.ok)return 'UNAVAILABLE';const v=await response.json();const ip=String(v.ip||'');return v.ok===true&&v.status==='OK'&&/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)&&ip.split('.').every(x=>Number(x)<=255)?ip:'UNAVAILABLE';}catch(e){return 'UNAVAILABLE';}finally{clearTimeout(timer);}
+}
+async function lmAuditAttachIP(updates){
+ const keys=Object.keys(updates).filter(k=>/^(shift_audit|attendance_punch_exclusions)\/[^/]+$/.test(k));
+ if(keys.length){const ip=await lmAuditWorkstation();for(const k of keys)updates[k].workstationIP=ip;}
+}
 async function lmZkCheckHealth(){
  const el=document.getElementById('lm-zk-health');if(!el)return;
  try{const r=await fetch(LM_ZK_BRIDGE+'/api/health',{signal:AbortSignal.timeout(3500)});if(!r.ok)throw Error('HTTP '+r.status);const data=await r.json();if(!data.ok)throw Error('Bridge unavailable');el.textContent=hrText('Bridge متصل','Bridge connected');el.className='text-xs text-emerald-300';}
@@ -3270,7 +3278,7 @@ async function lmManualPunchSave(e){
    if(!sameDayIn&&!overnightIn)throw Error(hrText('لا يمكن إضافة انصراف دون حضور سابق مطابق في نفس اليوم أو وردية ليلية معتمدة في اليوم السابق.','Checkout requires a matching prior check-in or an approved overnight shift on the previous day.'));
   }
   if(!await lmDialog(hrText('تأكيد حفظ البصمة اليدوية؟ سيتم تسجيل السبب والمسؤول ولا يمكن تعديل السجل.','Confirm immutable manual punch with audit?'),true))return;
-  const ref=db.ref('manual_attendance_punches').push();await ref.set({code,date,time,punchType,reason,source:'MANUAL_ADMIN',actorCode:'778',actorUid:portalAuth.currentUser.uid,createdAt:firebase.database.ServerValue.TIMESTAMP});
+  const ref=db.ref('manual_attendance_punches').push();await ref.set({code,date,time,punchType,reason,source:'MANUAL_ADMIN',actorCode:'778',actorUid:portalAuth.currentUser.uid,workstationIP:await lmAuditWorkstation(),createdAt:firebase.database.ServerValue.TIMESTAMP});
   document.getElementById('lm-manual-overlay')?.remove();await lmAttLoad();await lmDialog(hrText('تم حفظ البصمة اليدوية وإعادة تحميل التقرير','Manual punch saved; report refreshed'));
  }catch(err){status.textContent=hrText('تعذر الحفظ: ','Save failed: ')+(err.message||err.code);}finally{btn.disabled=false;}
 }
@@ -3290,7 +3298,7 @@ async function lmExcludePunchOpen(){
  function render(){list.replaceChildren();all.checked=false;const d=departments.find(x=>x.key===dept.value);let n=0;rows.forEach((r,i)=>{const c=String(r.code),date=lmAttDate(r);if((d&&!d.codes.has(c))||(emp.value&&emp.value!==c)||(from.value&&date<from.value)||(to.value&&date>to.value))return;const tr=document.createElement('tr'),td=tr.insertCell(),cb=document.createElement('input');cb.type='checkbox';cb.value=String(i);td.append(cb);for(const v of [c,lmAttEmployeeName(r),date,lmAttTime(r),lmAttPunchLabel(r)])tr.insertCell().textContent=v;list.append(tr);n++;});el.querySelector('#ex-count').textContent=n+' '+hrText('بصمة','punches');}
  dept.onchange=()=>{employees();render();};emp.onchange=from.onchange=to.onchange=render;all.onchange=()=>list.querySelectorAll('input').forEach(x=>x.checked=all.checked);employees();render();
  el.querySelector('#lm-exclude-close').onclick=()=>el.remove();
- el.querySelector('#lm-exclude-save').onclick=async()=>{const reason=el.querySelector('textarea').value.trim(),chosen=[...list.querySelectorAll('input:checked')].map(x=>rows[Number(x.value)]);if(reason.length<8||!chosen.length)return lmDialog(hrText('حدد بصمة واكتب السبب','Select a punch and enter a reason'));if(!await lmDialog(hrText('تأكيد الاستبعاد من الحسابات؟','Confirm exclusion from calculations?'),true))return;const btn=el.querySelector('#lm-exclude-save');btn.disabled=true;try{const updates={};for(const r of chosen)updates['attendance_punch_exclusions/'+lmPunchExclusionKey(r)]={code:String(r.code),date:lmAttDate(r),time:lmAttTime(r),sourceId:String(r.id),reason,actorCode:'778',actorUid:portalAuth.currentUser.uid,createdAt:firebase.database.ServerValue.TIMESTAMP};await db.ref().update(updates);el.remove();await lmAttLoad();}catch(e){await lmDialog(String(e.message||e));}finally{btn.disabled=false;}};
+ el.querySelector('#lm-exclude-save').onclick=async()=>{const reason=el.querySelector('textarea').value.trim(),chosen=[...list.querySelectorAll('input:checked')].map(x=>rows[Number(x.value)]);if(reason.length<8||!chosen.length)return lmDialog(hrText('حدد بصمة واكتب السبب','Select a punch and enter a reason'));if(!await lmDialog(hrText('تأكيد الاستبعاد من الحسابات؟','Confirm exclusion from calculations?'),true))return;const btn=el.querySelector('#lm-exclude-save');btn.disabled=true;try{const updates={};for(const r of chosen)updates['attendance_punch_exclusions/'+lmPunchExclusionKey(r)]={code:String(r.code),date:lmAttDate(r),time:lmAttTime(r),sourceId:String(r.id),reason,actorCode:'778',actorUid:portalAuth.currentUser.uid,createdAt:firebase.database.ServerValue.TIMESTAMP};await lmAuditAttachIP(updates);await db.ref().update(updates);el.remove();await lmAttLoad();}catch(e){await lmDialog(String(e.message||e));}finally{btn.disabled=false;}};
 }
 // Session-only normalized attendance cache; always revalidate Firebase before reuse.
 let lmAttReadCache=null;
@@ -3597,7 +3605,7 @@ function lmAdminLeaveOpen(){
  form.querySelector('[data-close]').onclick=()=>el.remove();
  form.onsubmit=async ev=>{ev.preventDefault();if(!portalIsAdmin()||btn.disabled)return;const e=employee(),f=new FormData(form),code=field.value.trim(),startDate=String(f.get('start')),endDate=String(f.get('end')),type=String(f.get('type')),notes=String(f.get('notes')).trim();
  if(!e||!lmV5ShiftDay(startDate)||!lmV5ShiftDay(endDate)||startDate>endDate||notes.length<8||!['annual','emergency','sick','unpaid','maternity'].includes(type)){msg.textContent=hrText('راجع الموظف والتواريخ والسبب','Check employee, dates and reason');return;}
- btn.disabled=true;try{const uid=portalAuth.currentUser.uid,now=firebase.database.ServerValue.TIMESTAMP;await db.ref('leave_requests/'+code).push({code,name:getEmployeeName(e),type,startDate,endDate,notes,status:'Pending',source:'PORTAL_HR',createdBy:uid,createdByCode:String(currentUserData?.code||''),createdAt:now,timestamp:now});el.remove();await lmDialog(hrText('تم تسجيل الطلب دون خصم الرصيد؛ ينتظر الاعتماد','Request registered without deduction; pending approval'));}catch(err){msg.textContent=err.code||err.message;btn.disabled=false;}};
+ btn.disabled=true;try{const uid=portalAuth.currentUser.uid,now=firebase.database.ServerValue.TIMESTAMP;await db.ref('leave_requests/'+code).push({code,name:getEmployeeName(e),type,startDate,endDate,notes,status:'Pending',source:'PORTAL_HR',createdBy:uid,createdByCode:String(currentUserData?.code||''),createdWorkstationIP:await lmAuditWorkstation(),createdAt:now,timestamp:now});el.remove();await lmDialog(hrText('تم تسجيل الطلب دون خصم الرصيد؛ ينتظر الاعتماد','Request registered without deduction; pending approval'));}catch(err){msg.textContent=err.code||err.message;btn.disabled=false;}};
 }
 function lmReportsCenter(){
  const root=document.getElementById('hr-reports-view');if(!root)return;
@@ -3613,7 +3621,7 @@ async function lmAuditOpen(){
  const info=el.querySelector('[data-info]'),table=el.querySelector('[data-table]');info.textContent=hrText('جاري تحميل السجلات','Loading audit records');
  const paths=['shift_audit','manual_attendance_punches','attendance_punch_exclusions','leave_requests'],types=['shift','manual','exclude','leave'],events=[];
  const results=await Promise.allSettled(paths.map(p=>db.ref(p).once('value')));
- const add=(type,id,v,code,action,at,actor,before,after)=>events.push({type,id,code:String(code||''),action,at:Number(at)||0,actor:String(actor||''),affected:String(v.date||[v.startDate,v.endDate].filter(Boolean).join(' — ')||''),reason:String(v.reason||v.notes||''),before,after});
+ const add=(type,id,v,code,action,at,actor,before,after)=>events.push({type,id,code:String(code||''),action,at:Number(at)||0,actor:String(actor||''),affected:String(v.date||[v.startDate,v.endDate].filter(Boolean).join(' — ')||''),reason:String(v.reason||v.notes||''),ip:String(type==='leave'?(action==='LEAVE_REQUEST'?v.createdWorkstationIP||'':v.reviewedWorkstationIP||''):v.workstationIP||''),before,after});
  results.forEach((res,i)=>{if(res.status!=='fulfilled')return;Object.entries(res.value.val()||{}).forEach(([id,v])=>{if(!v||typeof v!=='object')return;if(i===3){Object.entries(v).forEach(([rid,l])=>{if(!l||typeof l!=='object')return;add('leave',rid,l,id,'LEAVE_REQUEST',l.createdAt||l.timestamp,l.createdByCode||l.createdBy|| (l.source==='PORTAL_HR'?'':id),null,{type:l.type,startDate:l.startDate,endDate:l.endDate,source:l.source});if(l.reviewedAt)add('leave',rid,l,id,'LEAVE_'+l.status,l.reviewedAt,l.reviewedBy,null,{status:l.status});});}else add(types[i],id,v,v.code,v.action||(i===1?'MANUAL_PUNCH':i===2?'EXCLUDE_PUNCH':'SHIFT_CHANGE'),v.at||v.createdAt,v.actorCode||v.actorUid,i===0?{plan:v.previous,exception:v.previousException}:null,i===0?v.next:v);});});
  events.sort((a,b)=>b.at-a.at);let filtered=[];
  const dateKey=t=>t?new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(t)).filter(p=>p.type!=='literal').reduce((a,p)=>(a[p.type]=p.value,a),{}):null;
@@ -3622,8 +3630,8 @@ async function lmAuditOpen(){
  const names=new Map(allEmployees.map(e=>[String(getEmployeeCode(e)),String(getEmployeeName(e)||'')]));
  const labels={CANCEL_TO_APPROVED_LEAVE:['تحويل إلغاء وردية إلى إجازة معتمدة','Cancelled shift converted to approved leave'],CREATE_C_ROTATION:['إنشاء دورة وردية C','Create C rotation'],REPLACE_C_ROTATION:['تعديل دورة وردية C','Replace C rotation'],ASSIGN_SCHEDULE:['تعيين وردية','Assign schedule'],REPLACE_SCHEDULE:['تعديل وردية','Replace schedule'],EXCEPTION_CANCEL:['إلغاء وردية','Cancel shift'],EXCEPTION_REST:['راحة','Rest'],EXCEPTION_RECALL:['استدعاء','Recall'],EXCEPTION_CANCEL_REST:['إلغاء راحة','Cancel rest'],EXCEPTION_CLEAR:['إزالة إجراء خاص','Clear exception'],MANUAL_PUNCH:['إضافة بصمة يدوية','Add manual punch'],EXCLUDE_PUNCH:['استبعاد بصمة','Exclude punch'],LEAVE_REQUEST:['تسجيل طلب إجازة','Register leave request'],LEAVE_Approved:['اعتماد إجازة','Approve leave'],LEAVE_Rejected:['رفض إجازة','Reject leave'],SHIFT_CHANGE:['تعديل جدول وردية','Shift schedule change']};
  const actorName=e=>{const code=e.actor===PORTAL_ADMIN_UID?'778':e.actor;if(!code)return hrText('غير مسجل','Not recorded');if(names.has(code))return names.get(code)+' — '+code;if(code==='778')return hrText('مسؤول النظام','System administrator')+' — '+code;return /^[0-9]+$/.test(code)?code:hrText('هوية غير مرتبطة باسم','Unmapped identity')+' — '+code;};
- const cols=[hrText('نوع الحركة','Action'),hrText('منفذ الحركة','Actor'),hrText('كود الموظف','Employee code'),hrText('اسم الموظف','Employee name'),hrText('تاريخ التنفيذ','Event date'),hrText('الساعة','Time'),hrText('التاريخ المتأثر','Affected date'),hrText('السبب / الملاحظات','Reason / notes')];
- const values=e=>[labels[e.action]?hrText(...labels[e.action]):e.action,actorName(e),e.code,names.get(e.code)||'—',date(e.at)||'—',e.at?new Date(e.at).toLocaleTimeString(currentLang==='ar'?'ar-EG':'en-GB',{timeZone:'Africa/Cairo'}):'—',e.affected||'—',e.reason||'—'];
+ const cols=[hrText('نوع الحركة','Action'),hrText('منفذ الحركة','Actor'),hrText('كود الموظف','Employee code'),hrText('اسم الموظف','Employee name'),hrText('تاريخ التنفيذ','Event date'),hrText('الساعة','Time'),hrText('التاريخ المتأثر','Affected date'),hrText('السبب / الملاحظات','Reason / notes'),hrText('عنوان IP','IP address')];
+ const values=e=>[labels[e.action]?hrText(...labels[e.action]):e.action,actorName(e),e.code,names.get(e.code)||'—',date(e.at)||'—',e.at?new Date(e.at).toLocaleTimeString(currentLang==='ar'?'ar-EG':'en-GB',{timeZone:'Africa/Cairo'}):'—',e.affected||'—',e.reason||'—',e.ip==='UNAVAILABLE'?hrText('غير متاح','Unavailable'):e.ip||hrText('غير مسجل','Not recorded')];
  const draw=()=>{const code=el.querySelector('[data-code]').value.trim(),from=el.querySelector('[data-from]').value,to=el.querySelector('[data-to]').value,type=el.querySelector('[data-type]').value;filtered=events.filter(e=>(!code||e.code===code)&&(!type||e.type===type)&&(!from||date(e.at)>=from)&&(!to||date(e.at)<=to));const failed=paths.filter((p,i)=>results[i].status!=='fulfilled');info.textContent=hrText('عدد الحركات: ','Events: ')+filtered.length+hrText(' — عرض أول 200، والتصدير لكل النتائج',' — first 200 shown, export includes all')+(failed.length?' | '+hrText('تعذر قراءة: ','Read failed: ')+failed.join(', '):'');table.innerHTML='<table class="hr-feature-table w-full"><thead><tr>'+cols.map(c=>'<th>'+hrEscape(c)+'</th>').join('')+'</tr></thead><tbody>'+filtered.slice(0,200).map(e=>'<tr>'+values(e).map(v=>'<td style="max-width:240px;overflow-wrap:anywhere;white-space:normal;padding:12px 8px">'+hrEscape(v)+'</td>').join('')+'</tr>').join('')+'</tbody></table>';};
  el.querySelectorAll('input,select').forEach(x=>x.oninput=draw);el.querySelector('[data-export]').onclick=()=>{const q=v=>'"'+String(v??'').replace(/^[=+@\-\t\r\n]/,m=>"'"+m).replace(/"/g,'""')+'"',csv='\ufeff'+[cols,...filtered.map(values)].map(row=>row.map(q).join(',')).join('\r\n'),a=document.createElement('a'),url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.href=url;a.download='administrative_audit.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};draw();
 }
@@ -3670,8 +3678,8 @@ async function lmLeaveReqDecide(code,id,status){if(!portalIsAdmin()||!/^[0-9]+$/
   }
  }
  const path='leave_requests/'+code+'/'+id;
- updates[path+'/status']=status;updates[path+'/reviewedAt']=now;updates[path+'/reviewedBy']=uid;
- await db.ref().update(updates);lmAttReadCache=null;try{await db.ref('notifications/'+code).push({title:status==='Approved'?'تم اعتماد طلب الإجازة':'تم رفض طلب الإجازة',body:String(snap.val().startDate||'')+' — '+String(snap.val().endDate||''),createdAt:firebase.database.ServerValue.TIMESTAMP,senderUid:PORTAL_ADMIN_UID});await lmDialog(hrText('تم حفظ القرار وإرسال الإشعار','Decision saved and notification sent'));}catch(e){await lmDialog(hrText('تم حفظ القرار لكن تعذر إرسال الإشعار: ','Decision saved, notification failed: ')+(e.code||e.message));}}catch(e){await lmDialog(hrText('تعذر حفظ القرار: ','Could not save decision: ')+(e.code||e.message));}}
+ updates[path+'/status']=status;updates[path+'/reviewedAt']=now;updates[path+'/reviewedBy']=uid;updates[path+'/reviewedWorkstationIP']=await lmAuditWorkstation();
+ await lmAuditAttachIP(updates);await db.ref().update(updates);lmAttReadCache=null;try{await db.ref('notifications/'+code).push({title:status==='Approved'?'تم اعتماد طلب الإجازة':'تم رفض طلب الإجازة',body:String(snap.val().startDate||'')+' — '+String(snap.val().endDate||''),createdAt:firebase.database.ServerValue.TIMESTAMP,senderUid:PORTAL_ADMIN_UID});await lmDialog(hrText('تم حفظ القرار وإرسال الإشعار','Decision saved and notification sent'));}catch(e){await lmDialog(hrText('تم حفظ القرار لكن تعذر إرسال الإشعار: ','Decision saved, notification failed: ')+(e.code||e.message));}}catch(e){await lmDialog(hrText('تعذر حفظ القرار: ','Could not save decision: ')+(e.code||e.message));}}
 document.addEventListener('click',e=>{const b=e.target.closest?.('[data-leave-action]');if(b)lmLeaveReqDecide(b.dataset.code,b.dataset.id,b.dataset.leaveAction)});
 function lmLeaveReqExport(){const rows=lmLeaveReqFiltered(),keys=['code','name','type','startDate','endDate','notes','status','reviewedAt','reviewedBy'],q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const csv='\ufeff'+[keys.join(','),...rows.map(({code,r})=>keys.map(k=>q(k==='code'?code:r[k])).join(','))].join('\r\n'),a=document.createElement('a'),u=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.href=u;a.download='leave_requests.csv';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
 (function(){const prior=renderHRFeature;renderHRFeature=function(page){const result=prior(page);if(page==='leave-balances'){const root=document.getElementById('hr-leave-balances-view');if(root){root.insertAdjacentHTML('beforeend',lmLeaveReqPanel());lmLeaveReqWatch();}}return result;};})();
@@ -3772,7 +3780,7 @@ async function lmV5ShiftCSaveRotation(){
   }
   // Firebase multi-path update is atomic; audit is create-only in server rules.
   msg.textContent=lmV5ShiftT('جاري حفظ الجدول وسجل التدقيق...','Saving schedule and audit...');
-  await db.ref().update(updates);
+  await lmAuditAttachIP(updates);await db.ref().update(updates);
   msg.textContent=lmV5ShiftT('تم حفظ دورة C بنجاح؛ دون أي ترحيل مالي','Shift C rotation saved; no financial posting');
   await lmV5ShiftLoad();
  }catch(e){msg.textContent=lmV5ShiftT('تعذر الحفظ: ','Save failed: ')+e.message;}
@@ -3807,7 +3815,7 @@ async function lmV5ShiftSavePlan(){
  if(!await lmDialog(lmV5ShiftT('حفظ جدول جديد لعدد ','Save schedule for ')+rows.length+lmV5ShiftT(' يوم؟ سيتم استبدال ',' days? Replace ')+existingCount+lmV5ShiftT(' يوم محفوظ ومسح ',' existing plans and clear ')+exceptionCount+lmV5ShiftT(' إجراء خاص في الفترة المحددة فقط. كل التغييرات تُسجّل.',' exceptions in selected dates only. All changes are audited.'),true))return;
  const updates={},uid=portalAuth.currentUser.uid,now=firebase.database.ServerValue.TIMESTAMP;
  for(const r of rows){const key=lmV5ShiftKey(r.code,r.date),plan={code:r.code,date:r.date,shift,pattern,kind:'WORK',cancelled:false,reason,department:r.dept,updatedBy:uid,updatedByCode:'778',updatedAt:now};updates['shift_plans/'+key]=plan;if(exceptions[key])updates['shift_exceptions/'+key]=null;updates['shift_audit/'+db.ref('shift_audit').push().key]={key,code:r.code,date:r.date,previous:latest[key]||{},previousException:exceptions[key]||{},next:plan,actorUid:uid,actorCode:'778',at:now,reason,action:latest[key]?'REPLACE_SCHEDULE':'ASSIGN_SCHEDULE'};}
- try{await lmShiftLeaveGuard(rows);await db.ref().update(updates);await lmV5ShiftLoad();msg.textContent=lmV5ShiftT('تم حفظ الجدول','Schedule saved');}catch(e){msg.textContent=e.message;}
+ try{await lmShiftLeaveGuard(rows);await lmAuditAttachIP(updates);await db.ref().update(updates);await lmV5ShiftLoad();msg.textContent=lmV5ShiftT('تم حفظ الجدول','Schedule saved');}catch(e){msg.textContent=e.message;}
 }
 async function lmV5ShiftSaveException(){
  const msg=document.getElementById('lm-v5-message'),rows=lmV5ShiftSelected(),kind=document.getElementById('lm-v5-action').value,reason=document.getElementById('lm-v5-reason').value.trim();
@@ -3819,7 +3827,7 @@ async function lmV5ShiftSaveException(){
  const updates={},uid=portalAuth.currentUser.uid,now=firebase.database.ServerValue.TIMESTAMP;
  if(kind==='CLEAR'&&rows.some(r=>!existing[lmV5ShiftKey(r.code,r.date)])){msg.textContent=lmV5ShiftT('حدد أيامًا بها إجراء خاص مسجل فقط','Select days with an existing exception only');return;}
  for(const r of rows){const key=lmV5ShiftKey(r.code,r.date),prev=existing[key]||null,next=kind==='CLEAR'?null:{code:r.code,date:r.date,kind,reason,shift:plans[key].shift,baseKind:plans[key].kind,updatedBy:uid,updatedAt:now};updates['shift_exceptions/'+key]=next;updates['shift_audit/'+db.ref('shift_audit').push().key]={key,code:r.code,date:r.date,previous:prev||{},next:next||{},actorUid:uid,actorCode:'778',at:now,reason,action:'EXCEPTION_'+kind};}
- try{await lmShiftLeaveGuard(rows);await db.ref().update(updates);await lmV5ShiftLoad();msg.textContent=lmV5ShiftT('تم حفظ الإجراء دون تعديل الوردية','Exception saved; base schedule unchanged');}catch(e){msg.textContent=e.message;}
+ try{await lmShiftLeaveGuard(rows);await lmAuditAttachIP(updates);await db.ref().update(updates);await lmV5ShiftLoad();msg.textContent=lmV5ShiftT('تم حفظ الإجراء دون تعديل الوردية','Exception saved; base schedule unchanged');}catch(e){msg.textContent=e.message;}
 }
 function lmV5ShiftClose(){document.getElementById('lm-v5-shift-modal')?.remove();}
 // Read-only cycle preview in shift management. Never posts hours to payroll.
@@ -3874,7 +3882,7 @@ async function lmV5ShiftApply(){const msg=document.getElementById('lm-v5-message
  const ok=await lmDialog(lmV5ShiftT('تأكيد حفظ '+rows.length+' تعديل وردية مع تسجيل التدقيق؟','Save '+rows.length+' shift changes with audit trail?'),true);if(!ok)return;
  msg.textContent=lmV5ShiftT('جاري الحفظ...','Saving...');const updates={};const uid=portalAuth.currentUser.uid,now=firebase.database.ServerValue.TIMESTAMP;
  for(const r of rows){const key=lmV5ShiftKey(r.code,r.date),previous=lmV5ShiftState.plans[key]||null,plan={code:r.code,date:r.date,shift,pattern,kind:action,cancelled:action==='CANCEL',reason,department:r.dept,updatedBy:uid,updatedByCode:'778',updatedAt:now};updates['shift_plans/'+key]=plan;const auditKey=db.ref('shift_audit').push().key;updates['shift_audit/'+auditKey]={key,code:r.code,date:r.date,previous:previous||{},next:plan,actorUid:uid,actorCode:'778',at:now,reason};}
- try{await db.ref().update(updates);msg.textContent=lmV5ShiftT('تم الحفظ مع سجل التدقيق','Saved with audit trail');await lmV5ShiftLoad()}catch(e){msg.textContent=lmV5ShiftT('فشل الحفظ: ','Save failed: ')+e.message;}}
+ try{await lmAuditAttachIP(updates);await db.ref().update(updates);msg.textContent=lmV5ShiftT('تم الحفظ مع سجل التدقيق','Saved with audit trail');await lmV5ShiftLoad()}catch(e){msg.textContent=lmV5ShiftT('فشل الحفظ: ','Save failed: ')+e.message;}}
 function lmV5ShiftExport(){const rows=lmV5ShiftState.rows||[];if(!rows.length)return;const cols=['code','name','department','date','shift','pattern','kind','reason'];const q=x=>'"'+String(x??'').replace(/"/g,'""')+'"';const csv='\ufeff'+[cols.join(','),...rows.map(r=>[r.code,r.name,r.dept,r.date,r.plan?.shift,r.plan?.pattern,r.plan?.kind,r.plan?.reason].map(q).join(','))].join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='shift_plans_v5.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 
 /* V5.5.4: pure chronological overtime ledger. Cancellation debits carry forward
