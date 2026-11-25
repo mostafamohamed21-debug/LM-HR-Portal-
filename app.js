@@ -4083,7 +4083,8 @@ async function lmPayLinkAttendance(){
   Object.entries(manual).forEach(([id,r])=>{if(r&&r.code&&r.date&&r.time)rows.push({id,code:String(r.code),date:r.date,time:r.time,timestamp:r.date+'T'+(r.time.length===5?r.time+':00':r.time),punch:r.punchType,origin:'manual',status:'MANUAL'});});
   const seen=new Set();
   const deduped=rows.filter(r=>{if(lmPunchExcluded(r,exclusions))return false;if(r.origin!=='device')return true;const key=r.code+'|'+String(r.timestamp||r.date+' '+r.time);if(seen.has(key))return false;seen.add(key);return true;});
-  const validCodes=new Set(allEmployees.map(e=>String(getEmployeeCode(e))));
+  const eligible=lmPayCycleEmployees(period),windows=new Map(eligible.map(e=>[String(getEmployeeCode(e)),lmPayServiceWindow(e,period)]));
+  const validCodes=new Set(windows.keys());
   // Classification must use exactly the same rules as the attendance screen.
   // In particular, an A-shift 08:54 punch belongs to its calendar day,
   // not the preceding day merely because it is before 09:00.
@@ -4093,7 +4094,7 @@ async function lmPayLinkAttendance(){
    lmAttWorkspace.rows=deduped.filter(r=>validCodes.has(String(r.code)));
    lmAttWorkspace.shiftPlans=plans;
    lmAttClassify();
-   scoped=lmAttWorkspace.rows.filter(r=>r.reportWorkday>=period.start&&r.reportWorkday<=period.lastAttendanceDate);
+   scoped=lmAttWorkspace.rows.filter(r=>{const w=windows.get(String(r.code));return w&&r.reportWorkday>=w.start&&r.reportWorkday<=w.last;});
    daily=lmAttWorkHourRows(scoped);
    // The unified report only treats complete PAIRED days as financial evidence.
    const paired=new Map();
@@ -4117,7 +4118,7 @@ async function lmPayLinkAttendance(){
    o.day+=d.dayOt;o.night+=d.nightOt;o.verifiedDays++;
   });
   // Include employees with no punch records explicitly so zero is auditable.
-  for(const employee of allEmployees){
+  for(const employee of eligible){
    const code=String(getEmployeeCode(employee)||'');
    if(code&&!byCode[code])byCode[code]={day:0,night:0,verifiedDays:0,review:['NO_PUNCHES_IN_CYCLE']};
   }
@@ -4174,7 +4175,7 @@ function lmDashboardOtKpiMarkup(){
  let ratio=null,alerts=0,month='';
  if(ready){
   let grossSum=0,otSum=0;
-  for(const e of lm27ActiveEmployees()){
+  for(const e of lmPayCycleEmployees(lmPayAttendanceLink.period)){
    const gross=lmPayNum(lmPayField(e,['الراتب الشامل','المرتب الشامل','gross salary','gross_salary','total salary','الشامل','الاجر الشامل','الأجر الشامل','comprehensiveSalary','grossSalary']));
    if(!(gross>0))continue;
    const code=String(getEmployeeCode(e)||'');
@@ -4225,7 +4226,7 @@ const lmOtRadarThreshold=0.60;
 const lmOtRadarFilters={department:'',query:'',alertOnly:false};
 function lmOtRadarRows(){
  if(lmPayAttendanceLink.month!==lmPayrollState.month||!lmPayAttendanceLink.period)return [];
- return allEmployees.map(e=>{
+ return lmPayCycleEmployees(lmPayAttendanceLink.period).map(e=>{
   const code=String(getEmployeeCode(e)||'');
   const input=lmPayEmployee(e);
   const gross=lmPayNum(input.gross);
@@ -4312,12 +4313,26 @@ function lmPaySearch(){lmPayrollState.page=1;lmPayRenderRows();lmOtRadarRender()
 function lmPayRowHtml(r){
  const columns=['gross','insurance','phone','transport','glasses','bonus','meal','overtime','other','penalty','loan','medical','absence','lateness'];
  const code=String(r.code),safe=escapeHtml(code),encoded=encodeURIComponent(code);
- return `<tr data-pay-code="${safe}"><td>${safe}</td><td>${escapeHtml(getEmployeeName(r.e))}</td>${columns.map(key=>`<td><input aria-label="${key} ${safe}" class="hr-feature-input" style="width:95px" type="text" inputmode="decimal" value="${lmPayMoney(lmPayNum(r.input[key])).replace(/,/g,'')}" onchange="lmPayEdit(decodeURIComponent('${encoded}'),'${key}',this.value)"></td>`).join('')}<td><select class="hr-feature-input" onchange="lmPayEdit(decodeURIComponent('${encoded}'),'insured',this.value)"><option value="true" ${r.input.insured?'selected':''}>Yes</option><option value="false" ${!r.input.insured?'selected':''}>No</option></select></td><td><select class="hr-feature-input" onchange="lmPayEdit(decodeURIComponent('${encoded}'),'secondary',this.value)"><option value="false" ${!r.input.secondary?'selected':''}>No</option><option value="true" ${r.input.secondary?'selected':''}>10% withholding</option></select></td><td>${lmPayMoney(r.calc.tax)}</td><td>${lmPayMoney(r.calc.insuranceEmployee)}</td><td>${lmPayMoney(r.calc.martyrs)}</td><td class="font-bold">${lmPayMoney(r.calc.net)}</td><td><button class="portal-ghost-btn" onclick="lmPayDetails(decodeURIComponent('${encoded}'))">${hrText('عرض الحسبة','Breakdown')}</button></td></tr>`;
+ const period=LactoPayrollCycle.schedule(lmPayrollState.month,lmSafeCycleSettings()),w=lmPayServiceWindow(r.e,period);
+ const flag=w?.settlement?hrText('تسوية نهائية — للمراجعة','Final settlement — review'):w?.missingHire?hrText('تاريخ التعيين غير متاح','Hire date missing'):w&&w.start>period.start?hrText('تعيين خلال الدورة — للمراجعة','Hired during cycle — review'):'';
+ return `<tr data-pay-code="${safe}"><td>${safe}</td><td>${escapeHtml(getEmployeeName(r.e))}${flag?'<div class="text-amber-400 text-xs">'+escapeHtml(flag)+'</div>':''}</td>${columns.map(key=>`<td><input aria-label="${key} ${safe}" class="hr-feature-input" style="width:95px" type="text" inputmode="decimal" value="${lmPayMoney(lmPayNum(r.input[key])).replace(/,/g,'')}" onchange="lmPayEdit(decodeURIComponent('${encoded}'),'${key}',this.value)"></td>`).join('')}<td><select class="hr-feature-input" onchange="lmPayEdit(decodeURIComponent('${encoded}'),'insured',this.value)"><option value="true" ${r.input.insured?'selected':''}>Yes</option><option value="false" ${!r.input.insured?'selected':''}>No</option></select></td><td><select class="hr-feature-input" onchange="lmPayEdit(decodeURIComponent('${encoded}'),'secondary',this.value)"><option value="false" ${!r.input.secondary?'selected':''}>No</option><option value="true" ${r.input.secondary?'selected':''}>10% withholding</option></select></td><td>${lmPayMoney(r.calc.tax)}</td><td>${lmPayMoney(r.calc.insuranceEmployee)}</td><td>${lmPayMoney(r.calc.martyrs)}</td><td class="font-bold">${lmPayMoney(r.calc.net)}</td><td><button class="portal-ghost-btn" onclick="lmPayDetails(decodeURIComponent('${encoded}'))">${hrText('عرض الحسبة','Breakdown')}</button></td></tr>`;
+}
+function lmPayServiceWindow(e,period){
+ const lifecycle=lm22Lifecycle(e);
+ const hire=lm8Date(lmPayField(e,['تاريخ التعيين','date_of_hiring','hireDate','hire date']));
+ const end=lm8Date(lifecycle.endDate),ended=lifecycle.status==='ended';
+ if(ended&&!end)return null;
+ const start=hire&&hire>period.start?hire:period.start;
+ const last=ended&&end<period.lastAttendanceDate?end:period.lastAttendanceDate;
+ return start>last?null:{start,last,settlement:ended&&end>=period.start&&end<=period.lastAttendanceDate,missingHire:!hire};
+}
+function lmPayCycleEmployees(period=LactoPayrollCycle.schedule(lmPayrollState.month,lmSafeCycleSettings())){
+ return allEmployees.filter(e=>lmPayServiceWindow(e,period));
 }
 function lmPayRenderRows(keepPage=false){
  const target=document.getElementById('lm-payroll-table');if(!target)return;
  const q=String(document.getElementById('lm-pay-search')?.value||'').trim().toLowerCase();
- const employees=allEmployees.filter(e=>!q||String(getEmployeeCode(e)).toLowerCase()===q||getEmployeeName(e).toLowerCase().includes(q));
+ const employees=lmPayCycleEmployees().filter(e=>!q||String(getEmployeeCode(e)).toLowerCase()===q||getEmployeeName(e).toLowerCase().includes(q));
  lmPayrollState.results=employees.map(e=>({e,code:getEmployeeCode(e),input:lmPayEmployee(e)})).map(r=>({...r,calc:lmPayCalc(r.input)}));
  const columns=[['gross','الشامل / Gross'],['insurance','أجر الاشتراك / Insured wage'],['phone','اتصال / Phone'],['transport','انتقال / Transport'],['glasses','نظارة / Glasses'],['bonus','حافز / Bonus'],['meal','وجبة / Meal'],['overtime','إضافي مالي / OT'],['other','استحقاقات أخرى / Other'],['penalty','جزاء / Penalty'],['loan','قسط / Loan'],['medical','طبي / Medical'],['absence','غياب / Absence'],['lateness','تأخير / Lateness']];
  const pages=Math.max(1,Math.ceil(lmPayrollState.results.length/lmPayrollState.pageSize));
