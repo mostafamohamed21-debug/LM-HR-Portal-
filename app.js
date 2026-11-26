@@ -4309,7 +4309,27 @@ function lmPayMonthPickerOpen(){
  document.getElementById('lm-pay-month-dialog')?.remove();
  const d=document.createElement('dialog');d.id='lm-pay-month-dialog';d.dir=currentLang==='ar'?'rtl':'ltr';d.style.cssText='position:fixed;inset:0;margin:auto;width:min(340px,92vw);max-height:90vh;padding:20px;border:1px solid #38bdf8;border-radius:16px;background:#101d35;color:#e2e8f0;box-shadow:0 12px 48px #0008';
  d.addEventListener('close',()=>d.remove());d.addEventListener('click',e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();}});
- document.body.append(d);lmPayMonthPickerYear(Number(lmPayrollState.month.slice(0,4)));d.showModal();const workspace=document.getElementById('lm-pay-month-picker')?.closest('.glass-card');if(workspace){const r=workspace.getBoundingClientRect(),w=d.getBoundingClientRect().width;const center=Math.max(w/2+12,Math.min(window.innerWidth-w/2-12,r.left+r.width/2));d.style.setProperty('inset','auto','important');d.style.setProperty('margin','0','important');d.style.setProperty('left',center+'px','important');d.style.setProperty('top','50%','important');d.style.setProperty('transform','translate(-50%,-50%)','important');}
+ document.body.append(d);lmPayMonthPickerYear(Number(lmPayrollState.month.slice(0,4)));d.showModal();const anchor=document.querySelector('#lm-pay-month-picker button');
+ const place=()=>{
+  if(!anchor||!anchor.isConnected)return;
+  const r=anchor.getBoundingClientRect();
+  d.style.setProperty('inset','auto','important');
+  d.style.setProperty('margin','0','important');
+  d.style.setProperty('transform','none','important');
+  d.style.setProperty('box-sizing','border-box','important');
+  d.style.setProperty('max-width','calc(100vw - 16px)','important');
+  const w=d.getBoundingClientRect().width;
+  const left=Math.max(8,Math.min(window.innerWidth-w-8,r.left+(r.width-w)/2));
+  const top=r.bottom+6;
+  d.style.setProperty('left',left+'px','important');
+  d.style.setProperty('top',top+'px','important');
+  d.style.setProperty('max-height',Math.max(80,window.innerHeight-top-8)+'px','important');
+  d.style.setProperty('overflow-y','auto','important');
+ };
+ place();
+ window.addEventListener('resize',place);
+ window.addEventListener('scroll',place,true);
+ d.addEventListener('close',()=>{window.removeEventListener('resize',place);window.removeEventListener('scroll',place,true);},{once:true});
 }
 function lmPayMonthPickerYear(year){
  if(year<1900||year>2200)return;const d=document.getElementById('lm-pay-month-dialog');if(!d)return;
