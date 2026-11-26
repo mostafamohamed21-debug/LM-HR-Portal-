@@ -3982,7 +3982,15 @@ function lmRaiseExport(){
 
 
 /* V5.5.6 integrated payroll calculation workbench — simulation only, no DB writes. */
-function lmPayCurrentMonth(date=new Date()){const p=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit'}).formatToParts(date);return p.find(x=>x.type==='year').value+'-'+p.find(x=>x.type==='month').value;}
+function lmPayCurrentMonth(date=new Date(),deadlineDay){
+ const p=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date);
+ const get=k=>Number(p.find(x=>x.type===k).value);let y=get('year'),m=get('month'),d=get('day');
+ if(deadlineDay===undefined){try{deadlineDay=Number(JSON.parse(localStorage.getItem('lm-payroll-cycle-review-v2')||'{}').deadlineDay);}catch(_){deadlineDay=30;}}
+ if(!Number.isInteger(deadlineDay)||deadlineDay<1||deadlineDay>31)deadlineDay=30;
+ const delivery=Math.min(deadlineDay,new Date(Date.UTC(y,m,0)).getUTCDate());
+ if(d>=delivery){if(++m===13){m=1;y++;}}
+ return y+'-'+String(m).padStart(2,'0');
+}
 const lmPayrollState={overrides:{},results:[],page:1,pageSize:25,month:lmPayCurrentMonth(),taxPhone:0.2,taxTransport:0,taxGlasses:0,insuranceMin:2700,insuranceMax:16700};
 function lmPayMoney(n){return Number.isFinite(n)?n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';}
 function lmPayNum(v,defaultValue=0){const n=lmRaiseNum(v);return Number.isFinite(n)?n:defaultValue;}
@@ -4301,7 +4309,7 @@ function lmPayMonthPickerOpen(){
  document.getElementById('lm-pay-month-dialog')?.remove();
  const d=document.createElement('dialog');d.id='lm-pay-month-dialog';d.dir=currentLang==='ar'?'rtl':'ltr';d.style.cssText='position:fixed;inset:0;margin:auto;width:min(340px,92vw);max-height:90vh;padding:20px;border:1px solid #38bdf8;border-radius:16px;background:#101d35;color:#e2e8f0;box-shadow:0 12px 48px #0008';
  d.addEventListener('close',()=>d.remove());d.addEventListener('click',e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();}});
- document.body.append(d);lmPayMonthPickerYear(Number(lmPayrollState.month.slice(0,4)));d.showModal();
+ document.body.append(d);lmPayMonthPickerYear(Number(lmPayrollState.month.slice(0,4)));d.showModal();const workspace=document.getElementById('hr-payroll-view');if(workspace){const r=workspace.getBoundingClientRect(),w=d.getBoundingClientRect().width;const center=Math.max(w/2+12,Math.min(window.innerWidth-w/2-12,r.left+r.width/2));d.style.inset='auto';d.style.margin='0';d.style.left=center+'px';d.style.top='50%';d.style.transform='translate(-50%,-50%)';}
 }
 function lmPayMonthPickerYear(year){
  if(year<1900||year>2200)return;const d=document.getElementById('lm-pay-month-dialog');if(!d)return;
