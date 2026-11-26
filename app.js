@@ -3982,7 +3982,8 @@ function lmRaiseExport(){
 
 
 /* V5.5.6 integrated payroll calculation workbench — simulation only, no DB writes. */
-const lmPayrollState={overrides:{},results:[],page:1,pageSize:25,month:new Date().toISOString().slice(0,7),taxPhone:0.2,taxTransport:0,taxGlasses:0,insuranceMin:2700,insuranceMax:16700};
+function lmPayCurrentMonth(date=new Date()){const p=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit'}).formatToParts(date);return p.find(x=>x.type==='year').value+'-'+p.find(x=>x.type==='month').value;}
+const lmPayrollState={overrides:{},results:[],page:1,pageSize:25,month:lmPayCurrentMonth(),taxPhone:0.2,taxTransport:0,taxGlasses:0,insuranceMin:2700,insuranceMax:16700};
 function lmPayMoney(n){return Number.isFinite(n)?n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';}
 function lmPayNum(v,defaultValue=0){const n=lmRaiseNum(v);return Number.isFinite(n)?n:defaultValue;}
 function lmPayField(e,keys){return lmRaiseField(e,keys);}
@@ -4291,13 +4292,23 @@ function lmPayLinkedInput(e,input){
  const rate=lmPayNum(input.gross)/30/7;
  return {...input,overtime:lmPayRound(day*rate*1.35+night*rate*1.70)};
 }
-function lmPayMonthPickerMarkup(year=Number(lmPayrollState.month.slice(0,4)),open=false){
- const t=hrText,months=currentLang==='ar'?['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
- const selected=lmPayrollState.month, label=months[Number(selected.slice(5,7))-1]+' '+selected.slice(0,4);
- return '<details '+(open?'open':'')+' style="position:relative"><summary class="portal-ghost-btn" style="cursor:pointer;min-width:175px">'+escapeHtml(label)+'</summary><div class="glass-card" style="position:absolute;inset-inline-start:0;top:100%;z-index:1000;width:260px;padding:12px;background:var(--card-bg,#14243c);color:inherit;border:1px solid #64748b;border-radius:12px"><div class="flex items-center justify-between mb-2"><button type="button" class="portal-ghost-btn" onclick="lmPayMonthPickerYear('+ (year-1)+')" aria-label="'+t('السنة السابقة','Previous year')+'">−</button><strong>'+year+'</strong><button type="button" class="portal-ghost-btn" onclick="lmPayMonthPickerYear('+(year+1)+')" aria-label="'+t('السنة التالية','Next year')+'">+</button></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px">'+months.map((m,i)=>{const value=year+'-'+String(i+1).padStart(2,'0');return '<button type="button" class="'+(value===selected?'portal-action-btn':'portal-ghost-btn')+'" onclick="lmPayMonthPickerSelect(\''+value+'\')">'+m+'</button>'}).join('')+'</div></div></details>';
+function lmPayMonthPickerMarkup(){
+ const months=currentLang==='ar'?['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+ const selected=lmPayrollState.month;
+ return '<button type="button" class="hr-feature-input" style="min-width:175px;padding:9px 12px;border-radius:10px;cursor:pointer;text-align:start" onclick="lmPayMonthPickerOpen()">'+escapeHtml(months[Number(selected.slice(5,7))-1]+' '+selected.slice(0,4))+' ▾</button>';
 }
-function lmPayMonthPickerYear(year){if(year<1900||year>2200)return;const el=document.getElementById('lm-pay-month-picker');if(el)el.innerHTML=lmPayMonthPickerMarkup(year,true);}
-function lmPayMonthPickerSelect(value){if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(value))return;lmPayChangeMonth(value);const el=document.getElementById('lm-pay-month-picker');if(el)el.innerHTML=lmPayMonthPickerMarkup();}
+function lmPayMonthPickerOpen(){
+ document.getElementById('lm-pay-month-dialog')?.remove();
+ const d=document.createElement('dialog');d.id='lm-pay-month-dialog';d.dir=currentLang==='ar'?'rtl':'ltr';d.style.cssText='position:fixed;inset:0;margin:auto;width:min(340px,92vw);max-height:90vh;padding:20px;border:1px solid #38bdf8;border-radius:16px;background:#101d35;color:#e2e8f0;box-shadow:0 12px 48px #0008';
+ d.addEventListener('close',()=>d.remove());d.addEventListener('click',e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();}});
+ document.body.append(d);lmPayMonthPickerYear(Number(lmPayrollState.month.slice(0,4)));d.showModal();
+}
+function lmPayMonthPickerYear(year){
+ if(year<1900||year>2200)return;const d=document.getElementById('lm-pay-month-dialog');if(!d)return;
+ const t=hrText,months=currentLang==='ar'?['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+ d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><strong>'+t('اختيار شهر الدورة','Select cycle month')+'</strong><button type="button" class="portal-ghost-btn" onclick="document.getElementById(\'lm-pay-month-dialog\').close()">✕</button></div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><button type="button" class="portal-ghost-btn" onclick="lmPayMonthPickerYear('+(year-1)+')" aria-label="'+t('السنة السابقة','Previous year')+'">−</button><strong>'+year+'</strong><button type="button" class="portal-ghost-btn" onclick="lmPayMonthPickerYear('+(year+1)+')" aria-label="'+t('السنة التالية','Next year')+'">+</button></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'+months.map((m,i)=>{const value=year+'-'+String(i+1).padStart(2,'0');return '<button type="button" style="padding:10px 4px;border-radius:8px" class="'+(value===lmPayrollState.month?'portal-action-btn':'portal-ghost-btn')+'" onclick="lmPayMonthPickerSelect(\''+value+'\')">'+m+'</button>'}).join('')+'</div>';
+}
+function lmPayMonthPickerSelect(value){if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(value))return;document.getElementById('lm-pay-month-dialog')?.close();lmPayChangeMonth(value);const el=document.getElementById('lm-pay-month-picker');if(el)el.innerHTML=lmPayMonthPickerMarkup();}
 function lmPayChangeMonth(value){lmPayrollState.month=value;lmPayAttendanceLink.month=null;lmPayAttendanceLink.byCode={};lmPayAttendanceLink.period=null;lmPayAttendanceLink.raw880=[];lmPayAttendanceLink.raw109=[];lmPayRenderAttendancePreview();lmSafeCycleShow();lmPayRenderRows();lmOtRadarRender();lmDashboardOtUpdate();const el=document.getElementById('lm-pay-att-link-status');if(el)el.textContent=hrText('جارٍ تحديث مؤثرات الدورة تلقائيًا...','Updating cycle effects automatically...');lmPayAutoSchedule();}
 function lmPayEmployee(e){
  const code=getEmployeeCode(e),base={gross:lmPayNum(lmPayField(e,['الراتب الشامل','المرتب الشامل','gross salary','gross_salary','total salary','الشامل','الاجر الشامل','الأجر الشامل','comprehensiveSalary','grossSalary'])),insurance:lmPayNum(lmPayField(e,['أجر الاشتراك التأميني','insuranceContributionWage','insuranceWage','insuredWage'])),phone:0,transport:0,glasses:0,bonus:0,meal:0,overtime:0,other:0,penalty:0,loan:0,medical:0,absence:0,lateness:0,included:1,insured:!!lmPayNum(lmPayField(e,['أجر الاشتراك التأميني','insuranceContributionWage','insuranceWage','insuredWage'])),secondary:false};
