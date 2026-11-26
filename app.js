@@ -3982,7 +3982,15 @@ function lmRaiseExport(){
 
 
 /* V5.5.6 integrated payroll calculation workbench — simulation only, no DB writes. */
-function lmPayCurrentMonth(date=new Date()){const p=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit'}).formatToParts(date);return p.find(x=>x.type==='year').value+'-'+p.find(x=>x.type==='month').value;}
+function lmPayCurrentMonth(date=new Date(),deadlineDay){
+ const p=new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date);
+ const get=k=>Number(p.find(x=>x.type===k).value);let y=get('year'),m=get('month'),d=get('day');
+ if(deadlineDay===undefined){try{deadlineDay=Number(JSON.parse(localStorage.getItem('lm-payroll-cycle-review-v2')||'{}').deadlineDay);}catch(_){deadlineDay=30;}}
+ if(!Number.isInteger(deadlineDay)||deadlineDay<1||deadlineDay>31)deadlineDay=30;
+ const delivery=Math.min(deadlineDay,new Date(Date.UTC(y,m,0)).getUTCDate());
+ if(d>=delivery){if(++m===13){m=1;y++;}}
+ return y+'-'+String(m).padStart(2,'0');
+}
 const lmPayrollState={overrides:{},results:[],page:1,pageSize:25,month:lmPayCurrentMonth(),taxPhone:0.2,taxTransport:0,taxGlasses:0,insuranceMin:2700,insuranceMax:16700};
 function lmPayMoney(n){return Number.isFinite(n)?n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';}
 function lmPayNum(v,defaultValue=0){const n=lmRaiseNum(v);return Number.isFinite(n)?n:defaultValue;}
