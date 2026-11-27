@@ -4845,7 +4845,7 @@ function lmLeaveCloseFullReport(){
  };
 })();
 
-/* Administrative decisions — phase 1: local draft workspace only. */
+/* Administrative decisions — phase 1: Firebase draft workspace. */
 const lmDecisionDrafts=new Map();
 let lmDecisionEditing=null;
 function lmDecisionPage(){
@@ -4853,16 +4853,16 @@ function lmDecisionPage(){
  if(!portalIsAdmin()){root.textContent=hrText('غير مصرح بالدخول','Access denied');return;}
  const t=hrText;
  const field=(id,ar,en,type='text')=>'<label class="block text-sm">'+t(ar,en)+'<input id="lm-dec-'+id+'" type="'+type+'" class="hr-feature-input block w-full mt-1"></label>';
- root.innerHTML='<h1 class="text-2xl font-bold mb-4">'+t('القرارات الإدارية','Administrative decisions')+'</h1><div class="glass-card rounded-xl p-4 mb-4"><p class="text-amber-300 text-sm mb-4">'+t('مرحلة تجريبية: المسودات في ذاكرة الصفحة فقط، ولا يتم النشر أو تعديل الحضور.','Pilot: drafts are held in page memory only; no publishing or attendance changes.')+'</p><div class="grid grid-cols-1 md:grid-cols-3 gap-3">'+field('number','رقم القرار','Decision number','number')+field('year','السنة','Year','number')+field('issued','تاريخ التحرير','Issue date','date')+'<label>'+t('نوع القرار','Decision type')+'<select id="lm-dec-type" class="hr-feature-input block w-full" onchange="lmDecisionToggleHoliday()"><option value="general">'+t('قرار عام','General decision')+'</option><option value="holiday">'+t('إجازة رسمية','Official holiday')+'</option></select></label>'+field('title','موضوع القرار','Subject')+'</div><div id="lm-dec-holiday" class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3" hidden>'+field('original','تاريخ المناسبة الأصلي','Original occasion date','date')+field('from','بداية الإجازة الفعلية','Actual holiday start','date')+field('to','نهاية الإجازة الفعلية','Actual holiday end','date')+'<label><input id="lm-dec-recall" type="checkbox"> '+t('السماح بالتكليف بالعمل','Work assignment permitted')+'</label></div><label class="block mt-3">'+t('الحيثيات والمراجع','Recitals and references')+'<textarea id="lm-dec-recitals" rows="4" class="hr-feature-input block w-full"></textarea></label><label class="block mt-3">'+t('مواد القرار','Decision articles')+'<textarea id="lm-dec-body" rows="6" class="hr-feature-input block w-full"></textarea></label><label class="block mt-3">'+t('صفة جهة الاعتماد','Approving authority title')+'<input id="lm-dec-authority" class="hr-feature-input block w-full"></label><p class="text-sm text-sky-300 mt-3">'+t('إقرار الاطلاع إلزامي عند النشر (مرحلة لاحقة).','Acknowledgement is mandatory upon publishing (later phase).')+'</p><div class="flex flex-wrap gap-2 mt-4"><button class="portal-action-btn" onclick="lmDecisionSave()">'+t('حفظ مسودة مؤقتة','Save temporary draft')+'</button><button class="portal-ghost-btn" onclick="lmDecisionEditing=null;lmDecisionPage()">'+t('قرار جديد','New decision')+'</button></div><p id="lm-dec-status" class="mt-3 text-sm" aria-live="polite"></p></div><div class="glass-card rounded-xl p-4"><h2 class="font-bold mb-3">'+t('المسودات المؤقتة','Temporary drafts')+'</h2><div id="lm-dec-list"></div></div>';
+ root.innerHTML='<h1 class="text-2xl font-bold mb-4">'+t('القرارات الإدارية','Administrative decisions')+'</h1><div class="glass-card rounded-xl p-4 mb-4"><p class="text-amber-300 text-sm mb-4">'+t('المسودات تحفظ في قاعدة البيانات؛ لا يتم النشر أو تعديل الحضور.','Drafts are stored in the database; no publishing or attendance changes.')+'</p><div class="grid grid-cols-1 md:grid-cols-3 gap-3">'+field('number','رقم القرار','Decision number','number')+field('year','السنة','Year','number')+field('issued','تاريخ التحرير','Issue date','date')+'<label>'+t('نوع القرار','Decision type')+'<select id="lm-dec-type" class="hr-feature-input block w-full" onchange="lmDecisionToggleHoliday()"><option value="general">'+t('قرار عام','General decision')+'</option><option value="holiday">'+t('إجازة رسمية','Official holiday')+'</option></select></label>'+field('title','موضوع القرار','Subject')+'</div><div id="lm-dec-holiday" class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3" hidden>'+field('original','تاريخ المناسبة الأصلي','Original occasion date','date')+field('from','بداية الإجازة الفعلية','Actual holiday start','date')+field('to','نهاية الإجازة الفعلية','Actual holiday end','date')+'<label><input id="lm-dec-recall" type="checkbox"> '+t('السماح بالتكليف بالعمل','Work assignment permitted')+'</label></div><label class="block mt-3">'+t('الحيثيات والمراجع','Recitals and references')+'<textarea id="lm-dec-recitals" rows="4" class="hr-feature-input block w-full"></textarea></label><label class="block mt-3">'+t('مواد القرار','Decision articles')+'<textarea id="lm-dec-body" rows="6" class="hr-feature-input block w-full"></textarea></label><label class="block mt-3">'+t('صفة جهة الاعتماد','Approving authority title')+'<input id="lm-dec-authority" class="hr-feature-input block w-full"></label><p class="text-sm text-sky-300 mt-3">'+t('إقرار الاطلاع إلزامي عند النشر (مرحلة لاحقة).','Acknowledgement is mandatory upon publishing (later phase).')+'</p><div class="flex flex-wrap gap-2 mt-4"><button class="portal-action-btn" onclick="lmDecisionSave()">'+t('حفظ المسودة','Save draft')+'</button><button class="portal-ghost-btn" onclick="lmDecisionEditing=null;lmDecisionPage()">'+t('قرار جديد','New decision')+'</button></div><p id="lm-dec-status" class="mt-3 text-sm" aria-live="polite"></p></div><div class="glass-card rounded-xl p-4"><h2 class="font-bold mb-3">'+t('المسودات المحفوظة','Saved drafts')+'</h2><div id="lm-dec-list"></div></div>';
  const today=essCairoDay(Date.now());
  const defaults={year:today.slice(0,4),issued:today,type:'general',authority:t('رئيس مجلس الإدارة والعضو المنتدب','Chairman and Managing Director')};
  const data=lmDecisionDrafts.get(lmDecisionEditing)||defaults;
  for(const key of ['number','year','issued','type','title','original','from','to','recitals','body','authority'])document.getElementById('lm-dec-'+key).value=data[key]||'';
  document.getElementById('lm-dec-recall').checked=!!data.recall;
- lmDecisionToggleHoliday();lmDecisionList();
+ lmDecisionToggleHoliday();lmDecisionList();lmDecisionLoad();
 }
 function lmDecisionToggleHoliday(){const el=document.getElementById('lm-dec-holiday');if(el)el.style.display=document.getElementById('lm-dec-type').value==='holiday'?'grid':'none';}
-function lmDecisionSave(){
+async function lmDecisionSave(){
  if(!portalIsAdmin())return;
  const t=hrText,out=document.getElementById('lm-dec-status'),d={};
  for(const key of ['number','year','issued','type','title','original','from','to','recitals','body','authority'])d[key]=document.getElementById('lm-dec-'+key).value.trim();
@@ -4871,9 +4871,23 @@ function lmDecisionSave(){
  if(d.type==='holiday'&&(!d.from||!d.to||d.from>d.to)){out.textContent=t('راجع فترة الإجازة الفعلية','Check actual holiday dates');return;}
  if(d.type!=='holiday'){d.original=d.from=d.to='';d.recall=false;}
  d.number=String(Number(d.number));const key=d.year+'-'+d.number;
- if(lmDecisionDrafts.has(key)&&key!==lmDecisionEditing){out.textContent=t('رقم القرار مكرر في المسودات','Duplicate draft decision number');return;}
- if(lmDecisionEditing&&lmDecisionEditing!==key)lmDecisionDrafts.delete(lmDecisionEditing);
- lmDecisionDrafts.set(key,d);lmDecisionEditing=key;lmDecisionList();out.textContent=t('تم حفظ المسودة مؤقتًا دون نشر','Temporary draft saved without publishing');
+ if(lmDecisionEditing&&lmDecisionEditing!==key){out.textContent=t('لا يمكن تغيير رقم أو سنة قرار محفوظ؛ أنشئ قرارًا جديدًا','Saved decision number and year are immutable; create a new decision');return;}
+ if(!portalAuth.currentUser)return;
+ const uid=portalAuth.currentUser.uid,editing=lmDecisionEditing===key,expected=lmDecisionDrafts.get(key)?.revision;
+ const btn=out.parentElement.querySelector('button[onclick="lmDecisionSave()"]');if(btn)btn.disabled=true;
+ try{
+  const result=await db.ref('administrative_decisions/'+key).transaction(old=>{
+   if(editing?(!old||old.status!=='DRAFT'||old.revision!==expected):old!==null)return;
+   const revision=(old?.revision||0)+1;
+   const stamp=firebase.database.ServerValue.TIMESTAMP;
+   const snapshot={...d,status:'DRAFT',revision,createdBy:old?.createdBy||uid,createdAt:old?.createdAt||stamp,updatedBy:uid,updatedAt:stamp};
+   return {...snapshot,history:{...(old?.history||{}),[revision]:snapshot}};
+  },undefined,false);
+  if(!result.committed)throw Error(t('رقم مكرر أو تغيرت المسودة؛ أعد فتحها','Duplicate number or changed draft; reopen it'));
+  lmDecisionDrafts.set(key,result.snapshot.val());lmDecisionEditing=key;lmDecisionList();
+  out.textContent=t('تم حفظ المسودة في Firebase دون نشر','Draft saved in Firebase without publishing');
+ }catch(e){out.textContent=t('تعذر الحفظ: ','Save failed: ')+(e.code||e.message);}
+ finally{if(btn)btn.disabled=false;}
 }
 function lmDecisionList(){
  const host=document.getElementById('lm-dec-list');if(!host)return;
@@ -4885,4 +4899,15 @@ function lmDecisionList(){
   row.append(label,btn);host.append(row);
  }
  if(!lmDecisionDrafts.size)host.textContent=hrText('لا توجد مسودات','No drafts');
+}
+
+async function lmDecisionLoad(){
+ const host=document.getElementById('lm-dec-list');if(!host||!portalIsAdmin())return;
+ try{
+  const snap=await db.ref('administrative_decisions').once('value');
+  if(!host.isConnected||!portalIsAdmin())return;
+  lmDecisionDrafts.clear();
+  snap.forEach(child=>{const d=child.val();if(d?.status==='DRAFT')lmDecisionDrafts.set(child.key,d);});
+  lmDecisionList();
+ }catch(e){if(host.isConnected)host.textContent=hrText('تعذر تحميل القرارات: ','Cannot load decisions: ')+(e.code||e.message);}
 }
